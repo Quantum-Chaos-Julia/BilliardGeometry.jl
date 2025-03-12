@@ -1,18 +1,26 @@
 include("symmetry.jl")
 export XReflection, YReflection, XYReflection, new_sector, symmetry_action
-include("linesegment.jl")
-export LineSegment, VirtLineSegment, SymLineSegment
-include("circlesegment.jl")
+include("segments/linesegment.jl")
+export LineSegment
+include("segments/circlesegment.jl")
 export CircleSegment
-include("stadium.jl")
-export Stadium
-include("mushroom.jl")
-export Mushroom
-include("limacon.jl")
-export Limacon, LimaconSegment
+
+include("domains/polygons.jl")
+export Polygon
+
+include("domains/complexdomains.jl")
+export reset_ids!
 
 
-export Domain, Billiard, is_inside, curve, domain_fun, domain_gradient_vector
+#include("billiards/stadium.jl")
+#export Stadium
+#include("billiards/mushroom.jl")
+#export Mushroom
+#include("billiards/limacon.jl")
+#export Limacon, LimaconSegment
+
+
+export Domain, Billiard, is_inside, curve, domain_fun, domain_gradient_vector, arc_length
 struct Domain{T} <: AbsDomain where T<:Real
     boundary::Vector{AbsCurve}
     id::Int64

@@ -10,16 +10,14 @@ reflect_x = LinearMap(SMatrix{2,2}([-1.0 0.0;0.0 1.0]))
 reflect_y = LinearMap(SMatrix{2,2}([1.0 0.0;0.0 -1.0]))
 reflect_xy = reflect_x ∘ reflect_y
 
-abstract type AbsReflection <: AbsSymmetry end
-
-
-
 struct XReflection{T} <: AbsReflection where T<:Real
     N_sectors::Int64
     phase::T #phase factor is only used in quantum billiards
 end
 
-XReflection(N_sectors) = XReflection(N_sectors, 1.0)
+function XReflection(N_sectors) 
+    return XReflection(N_sectors, 1.0)
+end
 
 struct YReflection{T} <: AbsReflection where T<:Real
     N_sectors::Int64
