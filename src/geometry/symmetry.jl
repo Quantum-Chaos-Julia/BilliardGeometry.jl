@@ -92,12 +92,3 @@ end
 
 abstract type AbsRotation <: AbsSymmetry end
 
-#=
-function symmetry_action(billiard::B, pt) where  B <: AbsBilliard
-    let id = pt.sym_sector
-        return billiard.symmetry[id](pt)
-    end
-end
-=#
-
-#Reflection symetries
