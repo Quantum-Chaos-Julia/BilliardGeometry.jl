@@ -5,23 +5,26 @@ using CoordinateTransformations, Rotations
 using ForwardDiff
 using CircularArrays
 using Accessors
+using FastGaussQuadrature
+using StatsBase
 
 abstract type AbsBoundaryCondition end
 abstract type AbsCurve{BC} end 
 abstract type AbsSymmetry end
 abstract type AbsDomain end
 abstract type AbsSimpleDomain <: AbsDomain end
-abstract type AbsComplexDomain <: AbsDomain end
+abstract type AbsCompositeDomain <: AbsDomain end
 abstract type AbsBilliard end
 
-
+abstract type AbsSampler end
 abstract type AbsReflection <: AbsSymmetry end
 
-export AbsCurve, AbsDomain, AbsComplexDomain, AbsSimpleDomain, AbsBilliard, AbsBoundaryCondition
+export AbsCurve, AbsDomain, AbsCompositeDomain, AbsSimpleDomain, AbsBilliard, AbsBoundaryCondition, AbsSampler
 
 include("geometry/utils.jl")
 include("geometry/geometry.jl")
 include("geometry/boundarytypes.jl")
 
-
+include("quadrature/samplers.jl")
+export LinearNodes, GaussLegendreNodes, FourierNodes, sample_points
 end

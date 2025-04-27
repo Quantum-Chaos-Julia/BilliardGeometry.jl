@@ -10,85 +10,45 @@ reflect_x = LinearMap(SMatrix{2,2}([-1.0 0.0;0.0 1.0]))
 reflect_y = LinearMap(SMatrix{2,2}([1.0 0.0;0.0 -1.0]))
 reflect_xy = reflect_x ∘ reflect_y
 
-struct XReflection{T} <: AbsReflection where T<:Real
-    N_sectors::Int64
-    phase::T #phase factor is only used in quantum billiards
+struct XAxisReflection <: AbsReflection
+end
+struct YAxisReflection <: AbsReflection
+end
+struct XYAxisReflection <: AbsReflection 
 end
 
-function XReflection(N_sectors) 
-    return XReflection(N_sectors, 1.0)
+function apply_symmetry(sym::XAxisReflection, pts)
+    return [reflect_y(pt) for pt in pts]
 end
 
-struct YReflection{T} <: AbsReflection where T<:Real
-    N_sectors::Int64
-    phase::T
+function apply_symmetry(sym::YAxisReflection, pts)
+    return [reflect_x(pt) for pt in pts]
 end
 
-YReflection(N_sectors) = YReflection(N_sectors, 1.0)
-
-struct XYReflection{T} <: AbsReflection where T<:Real
-    N_sectors::Int64
-    phase::T
+function apply_symmetry(sym::XYAxisReflection, pts)
+    return [reflect_xy(pt) for pt in pts]
 end
 
-XYReflection(N_sectors) = XYReflection(N_sectors,1.0)
-
-#reflections
-#sector change when crossing y axis means x coordinate is reflected
-# N_sectors is number of symmetry sectors 2 - for only x symmetry, 4 - for x and y symmetry 
-function new_sector(sym_x::R, id) where  R <: XReflection
-    N_sectors = sym_x.N_sectors
-    
-    if N_sectors == 2
-        if id == 1
-            new_id = 2
-        else
-            new_id = 1
-        end 
-    else # N_sectors = 4 case
-        if id == 1
-            new_id = 2
-        end
-        if id == 2
-            new_id = 1
-        end
-        if id == 3
-            new_id = 4
-        end
-        if id == 4
-            new_id = 3
-        end
-    end
-    return new_id
-end
-
-#sector change when crossing x axis means y coordinate is reflected
-function new_sector(sym_y::R, id) where  R <: YReflection
-    N_sectors = sym_y.N_sectors
-    
-    if N_sectors == 2
-        if id == 1
-            new_id = 2
-        else
-            new_id = 1
-        end 
-    else # N_sectors = 4 case
-        if id == 1
-            new_id = 4
-        end
-        if id == 2
-            new_id = 3
-        end
-        if id == 3
-            new_id = 2
-        end
-        if id == 4
-            new_id = 1
-        end
-    end
-    return new_id
-end
-
+D2_symmetry = [XAxisReflection(), XYAxisReflection(), YAxisReflection()]
 
 abstract type AbsRotation <: AbsSymmetry end
 
+struct NFoldRotation <: AbsRotation
+    order::Int64
+    m::Int64
+    angle::Float64
+    sym_map::LinearMap{SMatrix{2, 2, Float64, 4}}
+end
+
+function NFoldRotation(N,m)
+    angle = 2*pi/N
+    sym_map = LinearMap(RotZ(angle*m))
+    return NFoldRotation(N,m,angle,sym_map) 
+end
+
+function apply_symmetry(sym::NFoldRotation, pts)
+    return [sym.sym_map(pt) for pt in pts]
+end
+
+
+Cn_symmetry(n) = [NFoldRotation(n,i) for i in 1:(n-1)]

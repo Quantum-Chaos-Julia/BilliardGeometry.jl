@@ -1,19 +1,18 @@
 include("symmetry.jl")
-export XReflection, YReflection, XYReflection, new_sector, symmetry_action
+export XAxisReflection, YAxisReflection, XYAxisReflection, NFoldRotation, apply_symmetry, D2_symmetry, Cn_symmetry
 include("segments/linesegment.jl")
 export LineSegment
 include("segments/circlesegment.jl")
 export CircleSegment
-
 include("domains/polygons.jl")
 export Polygon
+include("domains/circular.jl")
+export CircleWedge
+include("domains/compositedomains.jl")
+export ComplexDomain, reset_ids!
+include("billiards/stadium.jl")
+export Stadium
 
-include("domains/complexdomains.jl")
-export reset_ids!
-
-
-#include("billiards/stadium.jl")
-#export Stadium
 #include("billiards/mushroom.jl")
 #export Mushroom
 #include("billiards/limacon.jl")
