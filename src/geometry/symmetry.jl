@@ -1,9 +1,3 @@
-using CoordinateTransformations
-using Rotations
-using StaticArrays
-
-#struct Ident{T} <: AbsSymmetry end #Identity transformation
-
 
 ident = IdentityTransformation()
 reflect_x = LinearMap(SMatrix{2,2}([-1.0 0.0;0.0 1.0]))

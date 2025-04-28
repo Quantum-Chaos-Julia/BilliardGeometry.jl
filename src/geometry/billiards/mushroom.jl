@@ -1,33 +1,27 @@
 struct Mushroom{T} <: AbsBilliard where T<:Real
-    subdomains::Vector{AbsDomain}
-    symmetries::Vector{CoordinateTransformations.Transformation}
+    fundamental_domain::CompositeDomain
+    symmetries::Vector{AbsSymmetry}
 end
 
-function Mushroom(half_width,stem_heigth=1.0;R=1.0,origin=SVector(0.0,0.0))
+function Mushroom(half_width,stem_heigth=1.0;R=1.0,origin=[0.0,0.0])
+    type = typeof(half_width)     
     cx,cy = origin #center of circle segment
-    x_ref = XReflection(2)
-    
     #mushroom cap consists of two domains
-    circle = CircleSegment(R, pi/2, 0.0, cx, cy)
-    chord1 = VirtLineSegment(SVector(cx,R), SVector(half_width,cy),2)
-    x_seg = LineSegment(SVector(half_width,cy), SVector(R,cy))
-    circle_dom =  Domain{Float64}([x_seg,circle,chord1],1)
+    circle = CircleSegment(R, pi/2, 0.0, cx, cy; bc = SpecularReflection())
+    chord1 = LineSegment([cx,R], [half_width,cy];bc = Transparent(2))
+    x_seg = LineSegment([half_width,cy], [R,cy]; bc = SpecularReflection())
+    corners = [SVector{2,type}([R,cy]),SVector{2,type}([cx,R]),SVector{2,type}([half_width,cy])]
+    circle_dom =  SimpleDomain{Float64}([x_seg,circle,chord1],corners,1)
 
+    triangle_dom = Polygon([[cx,R],origin,[half_width,cy]],2; 
+    bcs=[ReflectionSymmetry(YAxisReflection()),Transparent(3),Transparent(1)])
 
-    y_seg = SymLineSegment(SVector(cx,R), origin, x_ref)
-    x_virt_seg = VirtLineSegment(origin, SVector(half_width,cy),3)
-    chord2 = VirtLineSegment( SVector(half_width,cy),SVector(cx,R),1)
-    triangle_dom =  Domain{Float64}([y_seg,x_virt_seg,chord2],2)
+    #mushroom stem consists of one domain   
+    stem_dom = Polygon([origin,[cx,-stem_heigth],[half_width,-stem_heigth],[half_width,cy]],3; 
+    bcs=[ReflectionSymmetry(YAxisReflection()),SpecularReflection(),SpecularReflection(),Transparent(2)])
 
-    #mushroom stem consists of one domain
-    left_seg = SymLineSegment(origin, SVector(cx,-stem_heigth), x_ref)
-    bottom_seg = LineSegment(SVector(cx,-stem_heigth),SVector(half_width,-stem_heigth))
-    right_seg = LineSegment(SVector(half_width,-stem_heigth), SVector(half_width,cy))
-    top_seg = VirtLineSegment( SVector(half_width,cy), origin, 2)
-   
-    stem_dom = Domain{Float64}([left_seg, bottom_seg,right_seg, top_seg],3)
-    symmetries = [ident, reflect_x] #order coresponds to symmetry sectors
-    return Mushroom{typeof(half_width)}([circle_dom, triangle_dom, stem_dom], symmetries)
+    symmetries = [YAxisReflection()] #order coresponds to symmetry sectors
+    return Mushroom{typeof(half_width)}(CompositeDomain([circle_dom, triangle_dom, stem_dom]), symmetries)
 end
 
 

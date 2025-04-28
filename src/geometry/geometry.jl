@@ -1,5 +1,7 @@
 include("symmetry.jl")
 export XAxisReflection, YAxisReflection, XYAxisReflection, NFoldRotation, apply_symmetry, D2_symmetry, Cn_symmetry
+include("boundarytypes.jl")
+export SpecularReflection, Transparent, PeriodicX, ReflectionSymmetry, get_boundary_curves
 include("segments/linesegment.jl")
 export LineSegment
 include("segments/circlesegment.jl")
@@ -9,21 +11,16 @@ export Polygon
 include("domains/circular.jl")
 export CircleWedge
 include("domains/compositedomains.jl")
-export ComplexDomain, reset_ids!
+export SimpleDomain, CompositeDomain, reset_ids!
 include("billiards/stadium.jl")
 export Stadium
-
-#include("billiards/mushroom.jl")
-#export Mushroom
+include("billiards/mushroom.jl")
+export Mushroom
 #include("billiards/limacon.jl")
 #export Limacon, LimaconSegment
 
 
-export Domain, Billiard, is_inside, curve, domain_fun, domain_gradient_vector, arc_length
-struct Domain{T} <: AbsDomain where T<:Real
-    boundary::Vector{AbsCurve}
-    id::Int64
-end
+export is_inside, curve, domain_fun, domain_gradient_vector, arc_length
 
 function is_inside(domain::D, pt::SVector{2,T}) where {D<:AbsDomain, T<:Real}
     d = [is_inside(crv, pt) for crv in domain.boundary]
@@ -60,6 +57,10 @@ function domain_gradient_vector(curve::C, pts::AbstractArray) where {C<:AbsCurve
     gs = [ForwardDiff.gradient(f, pt) for pt in pts]
     return gs
 end
+
+
+
+
 
 #=
 struct Billiard{T} <: AbsBilliard where T<:Real

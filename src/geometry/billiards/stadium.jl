@@ -1,5 +1,5 @@
 struct Stadium{T} <: AbsBilliard where T<:Real
-    fundamental_domain::AbsCompositeDomain
+    fundamental_domain::CompositeDomain
     symmetries::Vector{AbsSymmetry}
 end
 
@@ -11,7 +11,7 @@ function Stadium(half_width)
     bcs = [SpecularReflection(),ReflectionSymmetry(YAxisReflection()),ReflectionSymmetry(XAxisReflection()),Transparent(1)])
 
     symmetries = D2_symmetry #order coresponds to symmetry sectors
-    return Stadium{typeof(half_width)}(ComplexDomain([circle_dom,rectangle_dom]), symmetries)
+    return Stadium{typeof(half_width)}(CompositeDomain([circle_dom,rectangle_dom]), symmetries)
 end
 
 

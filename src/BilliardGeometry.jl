@@ -23,7 +23,7 @@ export AbsCurve, AbsDomain, AbsCompositeDomain, AbsSimpleDomain, AbsBilliard, Ab
 
 include("geometry/utils.jl")
 include("geometry/geometry.jl")
-include("geometry/boundarytypes.jl")
+
 
 include("quadrature/samplers.jl")
 export LinearNodes, GaussLegendreNodes, FourierNodes, sample_points

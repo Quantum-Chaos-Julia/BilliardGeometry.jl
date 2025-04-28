@@ -1,4 +1,10 @@
 
+struct SimpleDomain{T} <: AbsSimpleDomain where T<:Real
+    boundary::Vector{AbsCurve}
+    corners::Vector{SVector{2,T}}
+    id::Int64
+end
+
 struct CompositeDomain <: AbsCompositeDomain
     subdomains::Vector{AbsSimpleDomain}
 end
