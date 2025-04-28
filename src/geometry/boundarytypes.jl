@@ -10,8 +10,8 @@ end
 
 struct ReflectionSymmetry{S} <:AbsBoundaryCondition where S<:AbsReflection
     symmetry::S
+    N_sectors::Int64
 end
-
 
 function get_boundary_curves(domain::D) where D<:AbsSimpleDomain
     is_outer(crv) = typeof(crv.bc) <: SpecularReflection

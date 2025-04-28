@@ -14,11 +14,11 @@ function Mushroom(half_width,stem_heigth=1.0;R=1.0,origin=[0.0,0.0])
     circle_dom =  SimpleDomain{Float64}([x_seg,circle,chord1],corners,1)
 
     triangle_dom = Polygon([[cx,R],origin,[half_width,cy]],2; 
-    bcs=[ReflectionSymmetry(YAxisReflection()),Transparent(3),Transparent(1)])
+    bcs=[ReflectionSymmetry(YAxisReflection(),2),Transparent(3),Transparent(1)])
 
     #mushroom stem consists of one domain   
     stem_dom = Polygon([origin,[cx,-stem_heigth],[half_width,-stem_heigth],[half_width,cy]],3; 
-    bcs=[ReflectionSymmetry(YAxisReflection()),SpecularReflection(),SpecularReflection(),Transparent(2)])
+    bcs=[ReflectionSymmetry(YAxisReflection(),2),SpecularReflection(),SpecularReflection(),Transparent(2)])
 
     symmetries = [YAxisReflection()] #order coresponds to symmetry sectors
     return Mushroom{typeof(half_width)}(CompositeDomain([circle_dom, triangle_dom, stem_dom]), symmetries)
