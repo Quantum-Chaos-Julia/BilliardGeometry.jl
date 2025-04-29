@@ -11,21 +11,21 @@ end
 struct XYAxisReflection <: AbsReflection 
 end
 
-function apply_symmetry(sym::XAxisReflection, pt::SVector{2,T})
+function apply_symmetry(sym::XAxisReflection, pt::SVector{2,T}) where T<:Real
     return reflect_y(pt)
 end
 function apply_symmetry(sym::XAxisReflection, pts)
     return [reflect_y(pt) for pt in pts]
 end
 
-function apply_symmetry(sym::YAxisReflection, pt::SVector{2,T})
+function apply_symmetry(sym::YAxisReflection, pt::SVector{2,T})  where T<:Real
     return reflect_x(pt)
 end
 function apply_symmetry(sym::YAxisReflection, pts)
     return [reflect_x(pt) for pt in pts]
 end
 
-function apply_symmetry(sym::XYAxisReflection, pt::SVector{2,T})
+function apply_symmetry(sym::XYAxisReflection, pt::SVector{2,T})  where T<:Real
     return reflect_xy(pt)
 end
 function apply_symmetry(sym::XYAxisReflection, pts)
