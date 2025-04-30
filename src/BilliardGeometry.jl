@@ -7,6 +7,7 @@ using CircularArrays
 using Accessors
 using FastGaussQuadrature
 using StatsBase
+using Elliptic
 
 abstract type AbsBoundaryCondition end
 abstract type AbsCurve{BC} end 

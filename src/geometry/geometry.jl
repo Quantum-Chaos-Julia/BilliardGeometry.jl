@@ -16,8 +16,8 @@ include("billiards/stadium.jl")
 export Stadium
 include("billiards/mushroom.jl")
 export Mushroom
-#include("billiards/limacon.jl")
-#export Limacon, LimaconSegment
+include("billiards/limacon.jl")
+export Limacon, LimaconSegment
 
 
 export is_inside, curve, domain_fun, domain_gradient_vector, arc_length

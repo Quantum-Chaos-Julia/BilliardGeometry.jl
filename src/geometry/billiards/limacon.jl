@@ -34,6 +34,7 @@ struct LimaconSegment{T,BC} <: AbsCurve{BC} where T<:Real
     length::T
     cusp::SVector{2,T}
     start::SVector{2,T}
+    bc::BC
 end
 
 function LimaconSegment(a; orientation=1)
@@ -51,7 +52,8 @@ function LimaconSegment(a; orientation=1)
     center = (r0 .+ r1)/2
     r1 = limacon_eq(a, R, arc, shift, center, 0.0) 
     r0 = limacon_eq(a, R, arc, shift, center, 1.0)
-    return LimaconSegment(a, R, arc, shift, center, orientation, L, r0, r1)
+    bc = SpecularReflection()
+    return LimaconSegment(a, R, arc, shift, center, orientation, L, r0, r1,bc )
 end
 
 function curve(limacon::L, t) where {L<:LimaconSegment}
@@ -90,20 +92,18 @@ end
 ####################################################################################
 
 struct Limacon{T} <: AbsBilliard where T<:Real
-    parameter::T
-    subdomains::Vector{AbsDomain}
-    symmetries::Vector{CoordinateTransformations.Transformation}
+    fundamental_domain::SimpleDomain
+    symmetries::Vector{AbsSymmetry}
 end
 
 
 function Limacon(a)
-    y_ref = YReflection(2)
-    limacon = LimaconSegment(a)
+     limacon = LimaconSegment(a)
     r0 = limacon.cusp
     r1 = limacon.start
     type = typeof(a)
-    x_segment= SymLineSegment(r0, r1, y_ref)
-    limacon_dom =  Domain{type}([limacon,x_segment],1)
-    symmetries = [ident, reflect_y]
-    return Limacon{type}(a, [limacon_dom], symmetries)
+    x_segment = LineSegment(r0, r1; bc=ReflectionSymmetry(XAxisReflection(),2))
+    limacon_dom =  SimpleDomain{type}([limacon,x_segment],[r1,r0],1)
+    symmetries = [XAxisReflection()]
+    return Limacon{type}(limacon_dom, symmetries)
 end
