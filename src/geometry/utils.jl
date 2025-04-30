@@ -1,10 +1,41 @@
 
-export is_overlaping, is_connected, is_closed, angle, circle_center, angle
+export is_overlaping, is_connected, is_closed, angle
 
 function is_overlaping(pt1, pt2)
     x = isapprox(pt1[1],pt2[1])
     y = isapprox(pt1[2],pt2[2])
     return x && y
+end
+
+function connect_curves(curves)
+    if is_closed(curves)
+        return curves
+    end
+    connected_curves = Vector{AbsCurve}()
+    remaining_curves = copy(curves)
+    push!(connected_curves, popfirst!(remaining_curves))
+    for i in 2:length(curves)
+        end_pt = curve(connected_curves[end],1.0)
+        N_remaining = length(remaining_curves)
+        for j in 1:N_remaining
+            start_pt = curve(remaining_curves[j],0.0)
+            if is_overlaping(end_pt, start_pt)
+                push!(connected_curves,splice!(remaining_curves,j))
+                break
+            end
+        end
+    end
+    if length(remaining_curves) > 0
+        second_section = connect_curves(remaining_curves)
+        start_first, end_first = curve(connected_curves[1],0.0), curve(connected_curves[end],1.0)
+        start_second, end_second = curve(second_section[1],0.0), curve(second_section[end],1.0)
+        if is_overlaping(end_first, start_second)
+            append!(connected_curves,second_section)
+        elseif is_overlaping(end_second, start_first)
+            prepend!(connected_curves,second_section)
+        end
+    end
+    return connected_curves
 end
 
 function is_connected(boundary; start_intial = true)
@@ -18,39 +49,17 @@ function is_connected(boundary; start_intial = true)
     return test
 end
 
-function is_closed(boundary; start_intial = true)
-    return all(is_connected(boundary; start_intial))
+function is_closed(boundary; check_periodic=false,  start_intial = true)
+    if check_periodic
+        return all(is_connected(boundary; start_intial))
+    end
+
+    if start_intial
+        return all(is_connected(boundary; start_intial)[2:end])
+    else
+        return all(is_connected(boundary; start_intial)[1:end-1])
+    end
 end 
 
 angle(a, b) = atan(norm(cross(a,b)),dot(a,b))
 
-function circle_center(pt0, pt1, r)
-    type = eltype(pt0)
-    pt0 = SVector{2, type}(pt0)
-    pt1 = SVector{2, type}(pt1)
-
-    mid = (pt0 + pt1) ./ 2
-    l = norm(pt1 - pt0)
-
-    # Exit condition if circle is not possible
-    if r < l/2
-        println("Error: Radius is smaller than half the distance between points. Circle not possible.")
-        return nothing
-    end
-    # The circle center will be along the perpendicular bisector of pt0 and pt1
-    # Compute the slope of this bisector
-    if pt0[1] == pt1[1]
-        p = SVector(1.0,0.0)
-    elseif pt0[2] == pt1[2]
-        p = SVector(0.0,1.0) 
-    else
-        slope = (pt1[2] - pt0[2]) / (pt1[1] - pt0[1])
-        p = normalize(SVector{2,type}(1.0, -1.0 / slope))
-    end
-    # Find the distance between M and the circle center C, which are located on the line with slope m_PM
-    d = hypot(r,l/2)
-    # The sign can be + or -, leading to two potential circle centers
-    C1 = mid .+ d .* p
-    C2 = mid .- d .* p
-    return C1, C2
-end

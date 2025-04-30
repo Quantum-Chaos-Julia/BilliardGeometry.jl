@@ -15,7 +15,8 @@ end
 
 function get_boundary_curves(domain::D) where D<:AbsSimpleDomain
     is_outer(crv) = typeof(crv.bc) <: SpecularReflection
-    return filter(is_outer, domain.boundary)
+    boundary = filter(is_outer, domain.boundary)
+    return connect_curves(boundary)
 end
 
 function get_boundary_curves(composite_domain::D) where D<:AbsCompositeDomain
@@ -24,5 +25,5 @@ function get_boundary_curves(composite_domain::D) where D<:AbsCompositeDomain
         subboundary = get_boundary_curves(domain)
         append!(boundary,subboundary)
     end
-    return boundary
+    return connect_curves(boundary)
 end
