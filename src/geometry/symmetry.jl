@@ -32,7 +32,7 @@ function apply_symmetry(sym::XYAxisReflection, pts)
     return [reflect_xy(pt) for pt in pts]
 end
 
-D2_symmetry = [XAxisReflection(), XYAxisReflection(), YAxisReflection()]
+D2_symmetry = [YAxisReflection(), XYAxisReflection(), XAxisReflection()]
 
 abstract type AbsRotation <: AbsSymmetry end
 
