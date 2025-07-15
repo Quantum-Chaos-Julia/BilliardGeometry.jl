@@ -4,6 +4,8 @@ include("boundarytypes.jl")
 export SpecularReflection, Transparent, PeriodicX, ReflectionSymmetry, get_boundary_curves
 include("segments/linesegment.jl")
 export LineSegment
+include("segments/polarcurves.jl")
+export PolarSegment, polar_radius
 include("segments/circlesegment.jl")
 export CircleSegment
 include("domains/polygons.jl")

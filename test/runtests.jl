@@ -11,9 +11,9 @@ using StaticArrays
 end
 
 @testset "circlesegment.jl" begin
-    circle = LineSegment([0.0,0.0],[1.0,1.0])
-    @test curve(circle, [0.0,1.0]) == [SVector(0.0,0.0),SVector(1.0,1.0)]
+    circle = CircleSegment(1.0,pi,0.0,0.0)
+    @test curve(circle, [0.0,1.0]) == [SVector(1.0,0.0),SVector(1.0,0.0)]
     @test domain_fun(circle, SVector{2,Float64}([0.1,0.2])) < 0.0
-    @test domain_fun(circle, SVector{2,Float64}([0.1,0.0])) > 0.0
+    @test domain_fun(circle, SVector{2,Float64}([1.1,1.1])) > 0.0
     @test arc_length(circle, circle.pt1) == circle.length
 end
