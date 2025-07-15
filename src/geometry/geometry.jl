@@ -20,6 +20,8 @@ include("billiards/mushroom.jl")
 export Mushroom
 include("billiards/limacon.jl")
 export Limacon, LimaconSegment
+include("billiards/polar.jl")
+export PolarBilliard
 
 
 export is_inside, curve, domain_fun, domain_gradient_vector, arc_length

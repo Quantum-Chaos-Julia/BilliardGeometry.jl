@@ -98,7 +98,7 @@ end
 
 
 function Limacon(a)
-     limacon = LimaconSegment(a)
+    limacon = LimaconSegment(a)
     r0 = limacon.cusp
     r1 = limacon.start
     type = typeof(a)
