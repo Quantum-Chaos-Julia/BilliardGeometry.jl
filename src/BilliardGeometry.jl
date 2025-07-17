@@ -15,6 +15,7 @@ abstract type AbsPolarCurve{BC} <: AbsCurve{BC} end
 abstract type AbsSymmetry end
 abstract type AbsDomain end
 abstract type AbsSimpleDomain <: AbsDomain end
+abstract type AbsPolarDomain <: AbsDomain end
 abstract type AbsCompositeDomain <: AbsDomain end
 abstract type AbsBilliard end
 
