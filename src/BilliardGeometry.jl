@@ -22,7 +22,7 @@ abstract type AbsBilliard end
 abstract type AbsSampler end
 abstract type AbsReflection <: AbsSymmetry end
 
-export AbsCurve,AbsPolarCurve, AbsDomain, AbsCompositeDomain, AbsSimpleDomain, AbsBilliard, AbsBoundaryCondition, AbsSampler
+export AbsCurve,AbsPolarCurve, AbsDomain, AbsPolarDomain, AbsCompositeDomain, AbsSimpleDomain, AbsBilliard, AbsBoundaryCondition, AbsSampler
 
 include("geometry/utils.jl")
 include("geometry/geometry.jl")
