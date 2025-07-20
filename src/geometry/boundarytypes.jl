@@ -27,3 +27,7 @@ function get_boundary_curves(composite_domain::D) where D<:AbsCompositeDomain
     end
     return connect_curves(boundary)
 end
+
+function get_boundary_curves(billiard::B) where B<:AbsBilliard
+    return get_boundary_curves(billiard.fundamental_domain)
+end
