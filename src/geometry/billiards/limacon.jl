@@ -24,9 +24,9 @@ function limacon_arc_length(a, R, phi)
     return 2.0 *(1.0 + a) * res
 end
 
-struct LimaconSegment{T,BC} <: AbsCurve{BC} where T<:Real
+struct LimaconSegment{T,BC} <: AbsPolarCurve{BC} where T<:Real
     parameter::T
-    radius::T
+    R::T
     arc_angle::T
     shift_angle::T
     center::SVector{2,T}
@@ -56,30 +56,36 @@ function LimaconSegment(a; orientation=1)
     return LimaconSegment(a, R, arc, shift, center, orientation, L, r0, r1,bc )
 end
 
+#=
 function curve(limacon::L, t) where {L<:LimaconSegment}
-    let a = limacon.parameter , R = limacon.radius, c = limacon.center, arc=limacon.arc_angle, s=limacon.shift_angle 
+    let a = limacon.parameter , R = limacon.R, c = limacon.center, arc=limacon.arc_angle, s=limacon.shift_angle 
         return limacon_eq(a, R, arc, s, c, t)
     end
 end
 function curve(limacon::L, ts::AbstractArray) where {L<:LimaconSegment}
-    let a = limacon.parameter , R = limacon.radius, c = limacon.center, arc=limacon.arc_angle, s=limacon.shift_angle 
+    let a = limacon.parameter , R = limacon.R, c = limacon.center, arc=limacon.arc_angle, s=limacon.shift_angle 
         return collect(limacon_eq(a, R, arc, s, c, t) for t in ts)
     end
 end
+=#
+function polar_radius(limacon::L, phi::T) where {L<:LimaconSegment, T<:Real}
+   return limacon.R*(one(phi)+limacon.parameter *cos(phi))
+end
 
+#=
 # returns negative value inside
 function domain_fun(limacon::L, pt::SVector{2,T}) where {L<:LimaconSegment, T<:Real}
-    let a = limacon.parameter , R = limacon.radius, c = limacon.center, arc=limacon.arc_angle, s=limacon.shift_angle 
+    let a = limacon.parameter , R = limacon.R, c = limacon.center, arc=limacon.arc_angle, s=limacon.shift_angle 
         return limacon_domain(a, R, c, pt[1], pt[2], limacon.cusp)*limacon.orientation
     end
 end
 
 function domain_fun(limacon::L, pts::AbstractArray) where {L<:LimaconSegment}
-    let a = limacon.parameter , R = limacon.radius, c = limacon.center, arc=limacon.arc_angle, s=limacon.shift_angle 
+    let a = limacon.parameter , R = limacon.R, c = limacon.center, arc=limacon.arc_angle, s=limacon.shift_angle 
         return collect(limacon_domain(a, R, c, pt[1], pt[2], limacon.cusp)*limacon.orientation for pt in pts)
     end
 end
-
+=#
 # arc length
 function arc_length(limacon::L, pt::SVector{2,T}) where {L<:LimaconSegment, T<:Real}
     let center = limacon.center, a=limacon.a, R=limacon.R
@@ -92,7 +98,7 @@ end
 ####################################################################################
 
 struct Limacon{T} <: AbsBilliard where T<:Real
-    fundamental_domain::SimpleDomain
+    fundamental_domain::PolarDomain
     symmetries::Vector{AbsSymmetry}
 end
 
@@ -103,7 +109,7 @@ function Limacon(a)
     r1 = limacon.start
     type = typeof(a)
     x_segment = LineSegment(r0, r1; bc=ReflectionSymmetry(XAxisReflection(),2))
-    limacon_dom =  SimpleDomain{type}([limacon,x_segment],[r1,r0],1)
+    limacon_dom =  PolarDomain{type}([limacon,x_segment],[r1,r0],1)
     symmetries = [XAxisReflection()]
     return Limacon{type}(limacon_dom, symmetries)
 end

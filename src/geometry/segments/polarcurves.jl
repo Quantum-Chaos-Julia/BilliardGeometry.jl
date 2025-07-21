@@ -28,20 +28,20 @@ function polar_radius(polar_segment::L, phi::T) where {L<:PolarSegment, T<:Real}
     end
 end
 
-function curve(polar_curve::L, t::T) where {L<:PolarSegment, T<:Real}
+function curve(polar_curve::L, t::T) where {L<:AbsPolarCurve, T<:Real}
     phi = polar_curve.shift_angle + t*polar_curve.arc_angle
     radius = polar_radius(polar_curve, phi)
     return @SVector [radius*cos(phi)+polar_curve.center[1], radius*sin(phi)+polar_curve.center[2]]
 end
 
-function curve(polar_curve::L, ts::AbstractArray) where {L<:PolarSegment}
+function curve(polar_curve::L, ts::AbstractArray) where {L<:AbsPolarCurve}
     type = eltype(ts)
     phi = @. polar_curve.shift_angle + ts*polar_curve.arc_angle
     radius = polar_radius(polar_curve::L, phi)
     x0 = polar_curve.center[1]
     y0 = polar_curve.center[2]
-    rx = @. radius*cos(phi)+x0
-    ry = @. radius*sin(phi)+y0
+    rx = @. radius*cos(phi)-x0
+    ry = @. radius*sin(phi)-y0
     return [SVector{2,type}(x,y) for (x,y) in zip(rx,ry)]
 end
 
