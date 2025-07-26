@@ -31,42 +31,36 @@ end
 function curve(polar_curve::L, t::T) where {L<:AbsPolarCurve, T<:Real}
     phi = polar_curve.shift_angle + t*polar_curve.arc_angle
     radius = polar_radius(polar_curve, phi)
-    return @SVector [radius*cos(phi)+polar_curve.center[1], radius*sin(phi)+polar_curve.center[2]]
+    pt = Polar(radius, phi) #in polar coordinates
+    return Translation(polar_curve.center)(CartesianFromPolar()(pt))
 end
 
 function curve(polar_curve::L, ts::AbstractArray) where {L<:AbsPolarCurve}
-    type = eltype(ts)
     phi = @. polar_curve.shift_angle + ts*polar_curve.arc_angle
     radius = polar_radius(polar_curve::L, phi)
-    x0 = polar_curve.center[1]
-    y0 = polar_curve.center[2]
-    rx = @. radius*cos(phi)-x0
-    ry = @. radius*sin(phi)-y0
-    return [SVector{2,type}(x,y) for (x,y) in zip(rx,ry)]
+    pts_polar = [Polar(r,th) for (r,th) in zip(radius,phi)]
+    return [Translation(polar_curve.center)(CartesianFromPolar()(pt)) for pt in pts_polar]
 end
 
 #generic functions
-function polar_radius(polar::L, phi::AbstractArray) where {L<:AbsPolarCurve}
-    return [polar_radius(polar, t) for t in phi]
+function polar_radius(polar_curve::L, phi::AbstractArray) where {L<:AbsPolarCurve}
+    return [polar_radius(polar_curve, t) for t in phi]
 end
 
-function polar_domain(polar::L, x, y, center) where {L<:AbsPolarCurve}
-    angle = atan(y-center[2], x-center[1]) 
-    r = polar_radius(polar, angle)
-    return @. (hypot(y-center[2],x-center[1]) - r)
+function polar_domain(polar_curve::L, pt) where {L<:AbsPolarCurve}
+    pt_polar = PolarFromCartesian()(Translation(-polar_curve.center)(pt))
+    R = polar_radius(polar_curve, pt_polar.θ)
+    return @. (pt_polar.r - R)
 end
 
 # returns negative value inside
 function domain_fun(polar_curve::L, pt::SVector{2,T}) where {L<:AbsPolarCurve, T<:Real}
-    let  center = polar_curve.center 
-        return polar_domain(polar_curve, pt[1], pt[2], center)*polar_curve.orientation
-    end
+    return polar_domain(polar_curve, pt)*polar_curve.orientation
+
 end
 
 function domain_fun(polar_curve::L, pts::AbstractArray) where {L<:AbsPolarCurve}
-    let  center = polar_curve.center 
-        return collect(polar_domain(polar_curve, pt[1], pt[2], center)*polar_curve.orientation for pt in pts)
-    end
+    return collect(polar_domain(polar_curve, pt)*polar_curve.orientation for pt in pts)
 end
 
 
