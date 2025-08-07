@@ -73,7 +73,7 @@ function Limacon(a)
     r0 = limacon.cusp
     r1 = limacon.start
     type = typeof(a)
-    x_segment = LineSegment(r0, r1; bc=ReflectionSymmetry(XAxisReflection(),2))
+    x_segment = LineSegment(r0, r1; bc=ReflectionSymmetry(XAxisReflection(),2),segment_id=2)
     limacon_dom =  PolarDomain{type}([limacon,x_segment],[r1,r0],1)
     symmetries = [XAxisReflection()]
     return Limacon{type}(limacon_dom, symmetries)

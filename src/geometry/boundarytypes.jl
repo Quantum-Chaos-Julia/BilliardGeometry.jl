@@ -74,7 +74,7 @@ function get_all_curves(domain::D) where D<:AbsDomain
     return curves
 end
 
-function get_curve(billiard, domain_id, segment_id)
+function get_curve(billiard::B, domain_id, segment_id) where B<:AbsBilliard
     curves = get_all_curves(billiard)
     for crv in curves
         if (domain_id == crv.domain_id && segment_id == crv.segment_id)
@@ -83,3 +83,14 @@ function get_curve(billiard, domain_id, segment_id)
     end
     return nothing
 end
+
+function get_curve(composite_curve::C, domain_id, segment_id) where C<:AbsCompositeCurve
+    curves = composite_curve.subcurves
+    for crv in curves
+        if (domain_id == crv.domain_id && segment_id == crv.segment_id)
+            return crv
+        end
+    end
+    return nothing
+end
+
