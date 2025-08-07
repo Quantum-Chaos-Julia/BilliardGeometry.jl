@@ -1,5 +1,5 @@
 
-export is_overlaping, is_connected, is_closed, angle
+export is_overlaping, is_connected, is_closed, angle, connect_curves
 
 function is_overlaping(pt1, pt2)
     x = isapprox(pt1[1],pt2[1])

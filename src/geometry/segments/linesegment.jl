@@ -56,7 +56,4 @@ function arc_length(line::L, pt::SVector{2,T}) where {L<:AbsLine, T<:Real}
     return hypot(x, y)
 end
 
-function arc_length(line::L, pts::AbstractArray) where {L<:AbsLine}
-    return collect(arc_length(line, pt) for pt in pts)
-end
 

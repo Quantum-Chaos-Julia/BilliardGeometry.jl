@@ -5,7 +5,6 @@ struct PolarDomain{T} <: AbsPolarDomain where T<:Real
     id::Int64
 end
 
-
 struct PolarBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::PolarDomain
     symmetries::Vector{AbsSymmetry}

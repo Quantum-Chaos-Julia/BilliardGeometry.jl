@@ -8,6 +8,8 @@ include("segments/polarcurves.jl")
 export PolarSegment, polar_radius
 include("segments/circlesegment.jl")
 export CircleSegment
+include("segments/compositecurves.jl")
+export CompositeCurve
 include("domains/polygons.jl")
 export Polygon
 include("domains/circular.jl")
@@ -62,8 +64,9 @@ function domain_gradient_vector(curve::C, pts::AbstractArray) where {C<:AbsCurve
     return gs
 end
 
-
-
+function arc_length(circle::L, pts::AbstractArray) where {L<:AbsCurve}
+    return collect(arc_length(circle, pt) for pt in pts)
+end
 
 
 #=

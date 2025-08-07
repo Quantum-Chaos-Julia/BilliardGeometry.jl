@@ -16,7 +16,7 @@ struct CircleSegment{T,BC}  <: AbsCurve{BC} where {T<:Real}
 end
 
 function CircleSegment(R, arc_angle, shift_angle, center; bc = SpecularReflection(), orientation = 1)
-    center = SVector{2,eltype(center)}
+    center = SVector{2,eltype(center)}(center)
     L = R*arc_angle 
     return CircleSegment(R,arc_angle,shift_angle,center,orientation,L,bc)
 end
@@ -54,9 +54,4 @@ function arc_length(circle::L, pt::SVector{2,T}) where {L<:CircleSegment, T<:Rea
     center = circle.center
     angle = atan(pt[2]-center[2], pt[1]-center[1]) - circle.shift_angle
     return circle.radius*angle
-end
-
-
-function arc_length(circle::L, pts::AbstractArray) where {L<:CircleSegment}
-    return collect(arc_length(circle, pt) for pt in pts)
 end

@@ -26,14 +26,14 @@ struct LimaconSegment{T,BC} <: AbsPolarCurve{BC} where T<:Real
     bc::BC
 end
 
-function LimaconSegment(a; orientation=1)
+function LimaconSegment(a; orientation=1, bc = SpecularReflection() )
     type = typeof(a)
     R = one(type)
     arc = type(pi)
     shift = zero(type)
     center = SVector(zero(type),zero(type))
     L = limacon_arc_length(a, R, arc)
-    bc = SpecularReflection()
+    
     limacon = LimaconSegment(a, R, arc, shift, center, orientation, L, center, center, bc)
     r0, r1 = curve(limacon, [0.0,1.0])
     center = (r0 .+ r1)/2
@@ -51,9 +51,9 @@ end
 
 # arc length
 function arc_length(limacon::L, pt::SVector{2,T}) where {L<:LimaconSegment, T<:Real}
-    let center = limacon.center, a=limacon.a, R=limacon.R
-        angle = atan(pt[2]-center[2], pt[1]-center[1]) - limacon.shift_angle
-        return limacon_arc_length(a,R,angle)
+    let center = limacon.center, a=limacon.parameter, R=limacon.R
+        pt_polar = PolarFromCartesian()(Translation(-center)(pt))
+        return limacon_arc_length(a,R,pt_polar.θ)
     end
 end
 
