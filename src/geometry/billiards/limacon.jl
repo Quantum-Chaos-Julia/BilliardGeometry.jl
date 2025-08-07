@@ -24,9 +24,11 @@ struct LimaconSegment{T,BC} <: AbsPolarCurve{BC} where T<:Real
     cusp::SVector{2,T}
     start::SVector{2,T}
     bc::BC
+    domain_id::Int64
+    segment_id::Int64
 end
 
-function LimaconSegment(a; orientation=1, bc = SpecularReflection() )
+function LimaconSegment(a; orientation=1, bc = SpecularReflection(), domain_id=1, segment_id=1 )
     type = typeof(a)
     R = one(type)
     arc = type(pi)
@@ -34,13 +36,13 @@ function LimaconSegment(a; orientation=1, bc = SpecularReflection() )
     center = SVector(zero(type),zero(type))
     L = limacon_arc_length(a, R, arc)
     
-    limacon = LimaconSegment(a, R, arc, shift, center, orientation, L, center, center, bc)
+    limacon = LimaconSegment(a, R, arc, shift, center, orientation, L, center, center, bc, domain_id, segment_id)
     r0, r1 = curve(limacon, [0.0,1.0])
     center = (r0 .+ r1)/2
     #recenter
-    limacon = LimaconSegment(a, R, arc, shift, -center, orientation, L, r1, r0, bc)
+    limacon = LimaconSegment(a, R, arc, shift, -center, orientation, L, r1, r0, bc, domain_id, segment_id)
     r0, r1 = curve(limacon, [0.0,1.0]) 
-    limacon = LimaconSegment(a, R, arc, shift, -center, orientation, L, r1, r0, bc)   
+    limacon = LimaconSegment(a, R, arc, shift, -center, orientation, L, r1, r0, bc, domain_id, segment_id)   
 
     return limacon
 end

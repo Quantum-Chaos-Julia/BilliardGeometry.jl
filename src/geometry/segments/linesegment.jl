@@ -12,15 +12,17 @@ struct LineSegment{T, BC}  <: AbsLine{BC} where {T<:Real}
     orientation::Int64
     length::T
     bc::BC
+    domain_id::Int64
+    segment_id::Int64
 end
 
 #constructors
-function LineSegment(pt0, pt1; bc = SpecularReflection(), orientation = 1) 
+function LineSegment(pt0, pt1; bc = SpecularReflection(), orientation = 1, domain_id=1, segment_id=1) 
     pt0 = SVector{2,eltype(pt0)}(pt0)
     pt1 = SVector{2,eltype(pt1)}(pt1)
     x, y = pt1 .- pt0        
     L = hypot(x,y)
-    return LineSegment(pt0,pt1,orientation,L,bc)
+    return LineSegment(pt0,pt1,orientation,L,bc, domain_id, segment_id)
 end
 
 

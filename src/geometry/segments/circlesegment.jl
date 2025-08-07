@@ -13,18 +13,20 @@ struct CircleSegment{T,BC}  <: AbsCurve{BC} where {T<:Real}
     orientation::Int64
     length::T
     bc::BC
+    domain_id::Int64
+    segment_id::Int64
 end
 
-function CircleSegment(R, arc_angle, shift_angle, center; bc = SpecularReflection(), orientation = 1)
+function CircleSegment(R, arc_angle, shift_angle, center; bc = SpecularReflection(), orientation = 1, domain_id=1, segment_id=1)
     center = SVector{2,eltype(center)}(center)
     L = R*arc_angle 
-    return CircleSegment(R,arc_angle,shift_angle,center,orientation,L,bc)
+    return CircleSegment(R,arc_angle,shift_angle,center,orientation,L,bc,domain_id,segment_id)
 end
 
-function CircleSegment(R, arc_angle, shift_angle, x0, y0; bc = SpecularReflection(), orientation = 1)
+function CircleSegment(R, arc_angle, shift_angle, x0, y0; bc = SpecularReflection(), orientation = 1, domain_id=1, segment_id=1)
     center = SVector(x0,y0)
     L = R*arc_angle 
-    return CircleSegment(R,arc_angle,shift_angle,center,orientation,L,bc)
+    return CircleSegment(R,arc_angle,shift_angle,center,orientation,L,bc,domain_id,segment_id)
 end
 
 # returns SVector(x,y)
