@@ -31,3 +31,55 @@ end
 function get_boundary_curves(billiard::B) where B<:AbsBilliard
     return get_boundary_curves(billiard.fundamental_domain)
 end
+
+function get_all_domains(billiard::B) where B<:AbsBilliard
+    domain = billiard.fundamental_domain
+    if typeof(domain) <: AbsCompositeDomain
+        subdomains = domain.subdomains
+    else
+        subdomains = domain
+    end
+    return subdomains
+end
+
+function get_domain(billiard::B, id) where B<:AbsBilliard
+    domains = get_all_domains(billiard)
+    for dom in domains
+        if dom.id == id
+            return dom
+        end
+    end
+    return nothing
+end
+
+function get_all_curves(billiard::B) where B<:AbsBilliard
+    subdomains = get_all_domains(billiard)
+    curves = Vector{AbsCurve}()
+    for dom in subdomains
+        append!(curves, dom.boundary)
+    end
+    return curves
+end
+
+function get_all_curves(domain::D) where D<:AbsDomain
+    if typeof(domain) <: AbsCompositeDomain
+        subdomains = domain.subdomains
+    else
+        subdomains = domain
+    end
+    curves = Vector{AbsCurve}()
+    for dom in subdomains
+        append!(curves, dom.boundary)
+    end
+    return curves
+end
+
+function get_curve(billiard, domain_id, segment_id)
+    curves = get_all_curves(billiard)
+    for crv in curves
+        if (domain_id == crv.domain_id && segment_id == crv.segment_id)
+            return crv
+        end
+    end
+    return nothing
+end
