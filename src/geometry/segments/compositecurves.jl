@@ -2,6 +2,7 @@ struct CompositeCurve{T} <: AbsCompositeCurve where {T<:Real}
     subcurves::Vector{AbsCurve}
     end_lengths::Vector{T}
     corners::Vector{SVector{2,T}}
+    length::T
 end
 
 function CompositeCurve(subcurves) 
@@ -18,5 +19,5 @@ function CompositeCurve(subcurves)
         push!(end_lengths, L)
         push!(corners, curve(crv,1.0)) 
     end
-    return CompositeCurve{type}(crvs,end_lengths,corners)
+    return CompositeCurve{type}(crvs,end_lengths,corners,L)
 end

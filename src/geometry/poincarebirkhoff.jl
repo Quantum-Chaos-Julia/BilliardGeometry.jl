@@ -3,21 +3,33 @@ struct PoincareBirkhoff{T} <: AbsCoords where {T<:Real}
     p::T
 end 
 
-function pb_coords(curve::C, pt::SVector{2,T}, velocity::SVector{2,T}) where {C<:AbsCurve, T<:Real}
+function fundamental_pb_coords(L::T, curve::C, pt::SVector{2,T}, velocity::SVector{2,T}) where {C<:AbsCurve, T<:Real}
     s = arc_length(curve, pt)
     g = domain_gradient_vector(curve, pt)
     n =  g./norm(g)
     v = velocity ./ norm(velocity) 
     p = sin(angle(v, n))
-    return PoincareBirkhoff(s,p)
+    return L+s, p
 end
 
-function get_pb_curve(composite_curve::C, domain_id, segment_id) where C<:AbsCompositeCurve
+function get_pb_curve(composite_curve::C, segment_id, domain_id) where C<:AbsCompositeCurve
     curves = composite_curve.subcurves
     for (i,crv) in enumerate(curves)
         if (domain_id == crv.domain_id && segment_id == crv.segment_id)
             return composite_curve.end_lengths[i], crv
         end
     end
-    return nothing, nothing
+end
+
+
+function pb_coords(billiard::B, subsegment::Int64, subdomain::Int64, sym_sector::Int64, pt::SVector{2,T}, velocity::SVector{2,T}) where {B<:AbsBilliard, T<:Real}
+    symmetries = billiard.symmetries
+    fundamental_boundary = CompositeCurve(get_boundary_curves(billiard))
+    L = fundamental_boundary.length
+    println(subsegment, subdomain)
+    l, crv = get_pb_curve(fundamental_boundary, subsegment, subdomain)
+    s, p = fundamental_pb_coords(l, crv, pt, velocity) #l is length of prevoius curves
+    
+    s, p = apply_symmetry_pb(symmetries[sym_sector], sym_sector, s, p, L)
+    return PoincareBirkhoff(s,p)
 end

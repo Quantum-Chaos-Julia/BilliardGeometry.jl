@@ -14,6 +14,7 @@ end
 function apply_symmetry(sym::XAxisReflection, pt::SVector{2,T}) where T<:Real
     return reflect_y(pt)
 end
+
 function apply_symmetry(sym::XAxisReflection, pts)
     return [reflect_y(pt) for pt in pts]
 end
@@ -30,6 +31,18 @@ function apply_symmetry(sym::XYAxisReflection, pt::SVector{2,T})  where T<:Real
 end
 function apply_symmetry(sym::XYAxisReflection, pts)
     return [reflect_xy(pt) for pt in pts]
+end
+
+function apply_symmetry_pb(sym::AbsReflection, sym_sector::Int64, s::T, p::T, L::T) where T<:Real
+    if sym_sector == 1
+        return s, p
+    elseif sym_sector == 2
+        return 2*L-s, -p
+    elseif sym_sector == 3
+        return 2*L+s, p
+    elseif sym_sector == 4    
+        return 4*L-s, -p
+    end
 end
 
 D2_symmetry = [YAxisReflection(), XYAxisReflection(), XAxisReflection()]
