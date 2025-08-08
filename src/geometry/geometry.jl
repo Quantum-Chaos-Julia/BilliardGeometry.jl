@@ -25,7 +25,7 @@ export PolarBilliard, PolarDomain
 include("billiards/limacon.jl")
 export Limacon, LimaconSegment
 include("poincarebirkhoff.jl")
-export PoincareBirkhoff, pb_coords
+export PoincareBirkhoff, pb_coords, get_pb_curve
 
 export is_inside, curve, domain_fun, domain_gradient_vector, arc_length
 
