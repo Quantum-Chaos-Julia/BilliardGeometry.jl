@@ -29,7 +29,8 @@ function pb_coords(billiard::B, subsegment::Int64, subdomain::Int64, sym_sector:
     println(subsegment, subdomain)
     l, crv = get_pb_curve(fundamental_boundary, subsegment, subdomain)
     s, p = fundamental_pb_coords(l, crv, pt, velocity) #l is length of prevoius curves
-    
-    s, p = apply_symmetry_pb(symmetries[sym_sector], sym_sector, s, p, L)
+    if sym_sector > 1 
+        s, p = apply_symmetry_pb(symmetries[sym_sector-1], sym_sector, s, p, L)
+    end
     return PoincareBirkhoff(s,p)
 end
