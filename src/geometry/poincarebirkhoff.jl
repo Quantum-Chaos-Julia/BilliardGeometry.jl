@@ -26,7 +26,6 @@ function pb_coords(billiard::B, subsegment::Int64, subdomain::Int64, sym_sector:
     symmetries = billiard.symmetries
     fundamental_boundary = CompositeCurve(get_boundary_curves(billiard))
     L = fundamental_boundary.length
-    println(subsegment, subdomain)
     l, crv = get_pb_curve(fundamental_boundary, subsegment, subdomain)
     s, p = fundamental_pb_coords(l, crv, pt, velocity) #l is length of prevoius curves
     if sym_sector > 1 
