@@ -1,5 +1,5 @@
 
-export is_overlaping, is_connected, is_closed, angle, connect_curves
+export is_overlaping, is_connected, is_closed, angle, connect_curves, find_unique_elements
 
 function is_overlaping(pt1, pt2)
     x = isapprox(pt1[1],pt2[1])
@@ -63,3 +63,12 @@ end
 
 angle(a, b) = atan(norm(cross(a,b)),dot(a,b))
 
+function find_unique_elements(vector)    
+    unique = [true for p in vector]
+    for i in 1:(length(vector)-1)
+        if isapprox(vector[i],vector[i+1])
+            vector[i] = false
+        end
+    end
+    return vector[unique]
+end

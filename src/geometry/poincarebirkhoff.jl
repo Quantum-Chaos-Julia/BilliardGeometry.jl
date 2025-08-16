@@ -33,3 +33,16 @@ function pb_coords(billiard::B, subsegment::Int64, subdomain::Int64, sym_sector:
     end
     return PoincareBirkhoff(s,p)
 end
+
+function pb_sectors(billiard)
+    boundary = CompositeCurve(get_boundary_curves(billiard))
+    L = boundary.length
+    ends = boundary.end_lengths
+    all_sectors = copy(boundary.end_lengths)
+    for sym_sector in 2:(length(billiard.symmetries)+1)
+        println(sym_sector)
+        sym_ends = [apply_symmetry_pb(billiard.symmetries[sym_sector-1], sym_sector, s, 0.0, L)[1] for s in ends]
+        append!(all_sectors, sym_ends)
+    end
+    return find_unique_elements(sort(all_sectors))
+end

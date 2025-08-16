@@ -7,7 +7,7 @@ end
 
 function CompositeCurve(subcurves) 
     type = typeof(subcurves[1]).parameters[1] 
-    end_lengths = Vector{type}(undef,0)
+    end_lengths =[zero(type)]
     corners = Vector{SVector{2,type}}(undef,0)
 
     crvs = connect_curves(subcurves)
