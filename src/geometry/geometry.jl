@@ -65,8 +65,17 @@ function domain_gradient_vector(curve::C, pts::AbstractArray) where {C<:AbsCurve
     return gs
 end
 
-function arc_length(circle::L, pts::AbstractArray) where {L<:AbsCurve}
-    return collect(arc_length(circle, pt) for pt in pts)
+function arc_length(crv::C, t1::T; M = 100) where {C<:AbsCurve, T<:Real}
+    f(t) = curve(crv,t)
+    integrand(t) = norm(ForwardDiff.derivative(f, t))
+    x, w = gausslegendre(M)
+    ts = t1 * 0.5 .* x  .+ t1 * 0.5
+    dt = w .* t1 * 0.5
+    return dot(dt, integrand.(ts))
+end
+
+function arc_length(crv::C, pts::AbstractArray) where {C<:AbsCurve}
+    return collect(arc_length(crv, pt) for pt in pts)
 end
 
 
