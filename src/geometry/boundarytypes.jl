@@ -49,7 +49,6 @@ function get_domain(billiard::B, id) where B<:AbsBilliard
             return dom
         end
     end
-    return nothing
 end
 
 function get_all_curves(billiard::B) where B<:AbsBilliard
@@ -81,7 +80,6 @@ function get_curve(billiard::B, domain_id, segment_id) where B<:AbsBilliard
             return crv
         end
     end
-    return nothing
 end
 
 function get_curve(composite_curve::C, domain_id, segment_id) where C<:AbsCompositeCurve
@@ -91,6 +89,5 @@ function get_curve(composite_curve::C, domain_id, segment_id) where C<:AbsCompos
             return crv
         end
     end
-    return nothing
 end
 

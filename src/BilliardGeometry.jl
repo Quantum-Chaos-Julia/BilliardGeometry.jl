@@ -8,6 +8,7 @@ using Accessors
 using FastGaussQuadrature
 using StatsBase
 using Elliptic
+using Roots
 
 abstract type AbsBoundaryCondition end
 abstract type AbsCurve{BC} end 

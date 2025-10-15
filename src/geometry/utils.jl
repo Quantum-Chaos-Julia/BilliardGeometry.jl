@@ -1,5 +1,5 @@
 
-export is_overlaping, is_connected, is_closed, angle, connect_curves, find_unique_elements
+export is_overlaping, is_connected, is_closed, angle, connect_curves, find_unique_elements, point_curve_parameter
 
 function is_overlaping(pt1, pt2)
     x = isapprox(pt1[1],pt2[1])
@@ -72,3 +72,24 @@ function find_unique_elements(vector)
     end
     return vector[unique]
 end
+
+
+function point_curve_parameter(crv::C, pt) where {C<:AbsCurve}
+    inv_x(theta) = curve(crv,theta)[1] - pt[1] 
+    inv_y(theta) = curve(crv,theta)[2] - pt[2]
+    roots_y = find_zeros(inv_y, (0.0, 1.0))
+
+    if length(roots_y)>1
+        roots_x = find_zeros(inv_x, (0.0, 1.0))
+        for t_y in roots_y
+            for t_x in roots_x
+                if isapprox(t_y, t_x)
+                    return t_y
+                end
+            end
+        end
+    else
+        return roots_y[1]
+    end
+end
+
