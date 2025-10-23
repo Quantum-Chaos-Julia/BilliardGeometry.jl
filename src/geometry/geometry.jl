@@ -17,13 +17,13 @@ export CircleWedge
 include("domains/compositedomains.jl")
 export SimpleDomain, CompositeDomain, reset_ids!
 include("billiards/stadium.jl")
-export Stadium
+export StadiumBilliard
 include("billiards/mushroom.jl")
-export Mushroom
+export MushroomBilliard
 include("billiards/polar.jl")
 export PolarBilliard, PolarDomain
 include("billiards/limacon.jl")
-export Limacon, LimaconSegment
+export LimaconBilliard, LimaconSegment
 include("poincarebirkhoff.jl")
 export PoincareBirkhoff, pb_coords, get_pb_curve, pb_sectors
 

@@ -13,6 +13,8 @@ struct ReflectionSymmetry{S} <:AbsBoundaryCondition where S<:AbsReflection
     N_sectors::Int64
 end
 
+struct QuantumSolverIgnore <:AbsBoundaryCondition end
+
 function get_boundary_curves(domain::D) where D<:AbsSimpleDomain
     is_outer(crv) = typeof(crv.bc) <: SpecularReflection
     boundary = filter(is_outer, domain.boundary)

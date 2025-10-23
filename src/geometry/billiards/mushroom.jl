@@ -1,9 +1,9 @@
-struct Mushroom{T} <: AbsBilliard where T<:Real
+struct MushroomBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::CompositeDomain
     symmetries::Vector{AbsSymmetry}
 end
 
-function Mushroom(half_width,stem_heigth=1.0;R=1.0,origin=[0.0,0.0])
+function MushroomBilliard(half_width,stem_heigth=1.0;R=1.0,origin=[0.0,0.0])
     type = typeof(half_width)     
     cx,cy = origin #center of circle segment
     #mushroom cap consists of two domains
@@ -22,7 +22,7 @@ function Mushroom(half_width,stem_heigth=1.0;R=1.0,origin=[0.0,0.0])
     bcs=[ReflectionSymmetry(YAxisReflection(),2),SpecularReflection(),SpecularReflection(),Transparent(2)])
 
     symmetries = [YAxisReflection()] #order coresponds to symmetry sectors
-    return Mushroom{typeof(half_width)}(CompositeDomain([circle_dom, triangle_dom, stem_dom]), symmetries)
+    return MushroomBilliard{typeof(half_width)}(CompositeDomain([circle_dom, triangle_dom, stem_dom]), symmetries)
 end
 
 
