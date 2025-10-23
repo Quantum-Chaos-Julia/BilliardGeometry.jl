@@ -1,7 +1,7 @@
 include("symmetry.jl")
 export XAxisReflection, YAxisReflection, XYAxisReflection, NFoldRotation, apply_symmetry, apply_symmetry_pb, D2_symmetry, Cn_symmetry
 include("boundarytypes.jl")
-export SpecularReflection, Transparent, PeriodicX, ReflectionSymmetry, get_boundary_curves, get_all_curves, get_curve, get_all_domains, get_domain
+export SpecularReflection, QuantumSolverIgnore, Transparent, PeriodicX, ReflectionSymmetry, get_boundary_curves, get_all_curves, get_curve, get_all_domains, get_domain
 include("segments/linesegment.jl")
 export LineSegment
 include("segments/polarcurves.jl")

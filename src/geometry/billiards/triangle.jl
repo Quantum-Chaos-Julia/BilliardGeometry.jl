@@ -7,7 +7,7 @@ function triangle_corners(angles, x0, y0, h) #x0, y0 position of gamma corner
 end
 
 struct TriangleBilliard{T} <: AbsBilliard where T<:Real
-    fundamental_domain::SimpleDomain
+    fundamental_domain::Polygon{T}
     symmetries::Vector{AbsSymmetry}
 end
 
