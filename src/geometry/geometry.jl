@@ -16,6 +16,8 @@ include("domains/circular.jl")
 export CircleWedge
 include("domains/compositedomains.jl")
 export SimpleDomain, CompositeDomain, reset_ids!
+include("billiards/triangle.jl")
+export TriangleBilliard
 include("billiards/stadium.jl")
 export StadiumBilliard
 include("billiards/mushroom.jl")
