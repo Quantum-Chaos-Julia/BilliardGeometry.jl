@@ -29,6 +29,16 @@ export PoincareBirkhoff, pb_coords, get_pb_curve, pb_sectors
 
 export is_inside, curve, domain_fun, domain_gradient_vector, arc_length
 
+function is_inside(billiard::B, pt::SVector{2,T}) where {B<:AbsBilliard, T<:Real}
+    d = [all(is_inside(domain, pt)) for domain in get_all_domains(billiard)]
+    return any(d)
+end
+
+function is_inside(billiard::B, pts::AbstractArray) where {B<:AbsBilliard}
+    return [is_inside(billiard, pt) for pt in pts]
+end
+
+
 function is_inside(domain::D, pt::SVector{2,T}) where {D<:AbsDomain, T<:Real}
     d = [is_inside(crv, pt) for crv in domain.boundary]
     return d
