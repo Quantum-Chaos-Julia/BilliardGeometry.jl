@@ -39,7 +39,7 @@ function get_all_domains(billiard::B) where B<:AbsBilliard
     if typeof(domain) <: AbsCompositeDomain
         subdomains = domain.subdomains
     else
-        subdomains = domain
+        subdomains = [domain]
     end
     return subdomains
 end
