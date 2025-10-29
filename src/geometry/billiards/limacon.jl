@@ -63,7 +63,7 @@ end
 ####################################################################################
 
 struct LimaconBilliard{T} <: AbsBilliard where T<:Real
-    fundamental_domain::PolarDomain
+    fundamental_domain::PolarDomain{T}
     symmetries::Vector{AbsSymmetry}
 end
 

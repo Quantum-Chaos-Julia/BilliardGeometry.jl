@@ -14,8 +14,9 @@ end
 function PolarSegment(coef; R=1.0, arc_angle =2.0*pi, shift_angle=0.0, center = [0.0,0.0], orientation = 1, bc = SpecularReflection(), domain_id=1, segment_id=1)
     N = length(coef)
     type = eltype(coef)
-    L = 1.0
-    return PolarSegment{N,type,typeof(bc)}(R,coef,arc_angle,shift_angle,center,orientation,L,bc,domain_id,segment_id)
+    polar_curve = PolarSegment{N,type,typeof(bc)}(R,coef,arc_angle,shift_angle,center,orientation,0.0,bc,domain_id,segment_id)
+    L = arc_length(polar_curve, 1.0)
+    return @set polar_curve.length = L
 end
 
 function polar_radius(polar_segment::L, phi::T) where {L<:PolarSegment, T<:Real}

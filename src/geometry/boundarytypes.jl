@@ -93,3 +93,19 @@ function get_curve(composite_curve::C, domain_id, segment_id) where C<:AbsCompos
     end
 end
 
+
+function update_boundary_condition(billiard::B, domain_id, segment_id, bc::BC) where {B<:AbsBilliard, BC<:AbsBoundaryCondition}
+    fundamental_domain = billiard.fundamental_domain
+    
+    if typeof(fundamental_domain) <: AbsCompositeDomain
+        subdomains = fundamental_domain.subdomains
+        dom_idx = findfirst(d -> d.id == domain_id, subdomains)
+        curves = subdomains[dom_idx].boundary
+        seg_idx = findfirst(crv -> crv.segment_id == segment_id, curves)
+        return @set billiard.fundamental_domain.subdomains[dom_idx].boundary[seg_idx].bc = bc
+    else
+        curves =fundamental_domain.boundary
+        seg_idx = findfirst(crv -> crv.segment_id == segment_id, curves) 
+        return @set billiard.fundamental_domain.boundary[seg_idx].bc = bc
+    end
+end

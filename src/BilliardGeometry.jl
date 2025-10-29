@@ -5,10 +5,11 @@ using CoordinateTransformations, Rotations
 using ForwardDiff
 using CircularArrays
 using Accessors
-using FastGaussQuadrature
+using FastGaussQuadrature, QuadGK
 using StatsBase
 using Elliptic
 using Roots
+using DataInterpolations
 
 abstract type AbsBoundaryCondition end
 abstract type AbsCurve{BC} end 

@@ -1,7 +1,7 @@
 include("symmetry.jl")
 export XAxisReflection, YAxisReflection, XYAxisReflection, NFoldRotation, apply_symmetry, apply_symmetry_pb, D2_symmetry, Cn_symmetry
 include("boundarytypes.jl")
-export SpecularReflection, QuantumSolverIgnore, Transparent, PeriodicX, ReflectionSymmetry, get_boundary_curves, get_all_curves, get_curve, get_all_domains, get_domain
+export SpecularReflection, QuantumSolverIgnore, Transparent, PeriodicX, ReflectionSymmetry, get_boundary_curves, get_all_curves, get_curve, get_all_domains, get_domain, update_boundary_condition
 include("segments/linesegment.jl")
 export LineSegment
 include("segments/polarcurves.jl")
@@ -77,17 +77,14 @@ function domain_gradient_vector(curve::C, pts::AbstractArray) where {C<:AbsCurve
     return gs
 end
 
-function arc_length(crv::C, t1::T; M = 100) where {C<:AbsCurve, T<:Real}
+function _arc_length_integrand(crv::C, t::T) where {C<:AbsCurve, T<:Real}
     f(t) = curve(crv,t)
-    integrand(t) = norm(ForwardDiff.derivative(f, t))
-    x, w = gausslegendre(M)
-    ts = t1 * 0.5 .* x  .+ t1 * 0.5
-    dt = w .* t1 * 0.5
-    return dot(dt, integrand.(ts))
+    return norm(ForwardDiff.derivative(f, t))
 end
 
-function arc_length(crv::C, pts::AbstractArray) where {C<:AbsCurve}
-    return collect(arc_length(crv, pt) for pt in pts)
+function arc_length(crv::C, t1::T; rtol=sqrt(eps(T)), atol=zero(T)) where {C<:AbsCurve, T<:Real}
+        f(t) = _arc_length_integrand(crv,t)
+    return quadgk(f, zero(T), t1; rtol, atol)[1]
 end
 
 
