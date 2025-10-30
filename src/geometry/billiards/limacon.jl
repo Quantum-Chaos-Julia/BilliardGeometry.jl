@@ -34,7 +34,7 @@ function LimaconSegment(a; orientation=1, bc = SpecularReflection(), domain_id=1
     arc = type(pi)
     shift = zero(type)
     center = SVector(zero(type),zero(type))
-    L = limacon_arc_length(a, R, arc)
+    L = 0.0
     
     limacon = LimaconSegment(a, R, arc, shift, center, orientation, L, center, center, bc, domain_id, segment_id)
     r0, r1 = curve(limacon, [0.0,1.0])
@@ -43,8 +43,8 @@ function LimaconSegment(a; orientation=1, bc = SpecularReflection(), domain_id=1
     limacon = LimaconSegment(a, R, arc, shift, -center, orientation, L, r1, r0, bc, domain_id, segment_id)
     r0, r1 = curve(limacon, [0.0,1.0]) 
     limacon = LimaconSegment(a, R, arc, shift, -center, orientation, L, r1, r0, bc, domain_id, segment_id)   
-
-    return limacon
+    L = arc_length(limacon, 1.0)
+    return @set limacon.length = L
 end
 
 function polar_radius(limacon::L, phi::T) where {L<:LimaconSegment, T<:Real}
@@ -52,13 +52,14 @@ function polar_radius(limacon::L, phi::T) where {L<:LimaconSegment, T<:Real}
 end
 
 # arc length
+#=
 function arc_length(limacon::L, pt::SVector{2,T}) where {L<:LimaconSegment, T<:Real}
     let center = limacon.center, a=limacon.parameter, R=limacon.R
         pt_polar = PolarFromCartesian()(Translation(-center)(pt))
         return limacon_arc_length(a,R,pt_polar.θ)
     end
 end
-
+=#
 
 ####################################################################################
 

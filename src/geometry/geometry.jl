@@ -26,10 +26,12 @@ include("billiards/polar.jl")
 export PolarBilliard, PolarDomain
 include("billiards/limacon.jl")
 export LimaconBilliard, LimaconSegment
+include("arclength.jl")
+export arc_length, construct_arc_length_interpolation
 include("poincarebirkhoff.jl")
 export PoincareBirkhoff, pb_coords, get_pb_curve, pb_sectors
 
-export is_inside, curve, domain_fun, domain_gradient_vector, arc_length
+export is_inside, curve, domain_fun, domain_gradient_vector
 
 function is_inside(billiard::B, pt::SVector{2,T}) where {B<:AbsBilliard, T<:Real}
     d = [all(is_inside(domain, pt)) for domain in get_all_domains(billiard)]
@@ -77,15 +79,8 @@ function domain_gradient_vector(curve::C, pts::AbstractArray) where {C<:AbsCurve
     return gs
 end
 
-function _arc_length_integrand(crv::C, t::T) where {C<:AbsCurve, T<:Real}
-    f(t) = curve(crv,t)
-    return norm(ForwardDiff.derivative(f, t))
-end
 
-function arc_length(crv::C, t1::T; rtol=sqrt(eps(T)), atol=zero(T)) where {C<:AbsCurve, T<:Real}
-        f(t) = _arc_length_integrand(crv,t)
-    return quadgk(f, zero(T), t1; rtol, atol)[1]
-end
+
 
 
 #=
