@@ -61,7 +61,12 @@ function is_closed(boundary; check_periodic=false,  start_intial = true)
     end
 end 
 
+
 angle(a, b) = atan(norm(cross(a,b)),dot(a,b))
+
+function signed_angle(a,b)
+    return atan(a[1]*b[2] - a[2]*b[1], dot(a, b))
+end
 
 function find_unique_elements(vector)    
     unique = [true for p in vector]

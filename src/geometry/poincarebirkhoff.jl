@@ -8,7 +8,7 @@ function fundamental_pb_coords(L::T, curve::C, pt::SVector{2,T}, velocity::SVect
     g = domain_gradient_vector(curve, pt)
     n =  g./norm(g)
     v = velocity ./ norm(velocity) 
-    p = sin(angle(v, n))
+    p = sin(signed_angle(v, n))
     return L+s, p
 end
 

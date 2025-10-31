@@ -26,6 +26,8 @@ include("billiards/polar.jl")
 export PolarBilliard, PolarDomain
 include("billiards/limacon.jl")
 export LimaconBilliard, LimaconSegment
+include("inversions.jl")
+export invert_curve
 include("arclength.jl")
 export arc_length, construct_arc_length_interpolation
 include("poincarebirkhoff.jl")

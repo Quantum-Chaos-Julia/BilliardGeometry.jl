@@ -8,7 +8,7 @@ using Accessors
 using FastGaussQuadrature, QuadGK
 using StatsBase
 using Elliptic
-using Roots
+using Roots, Optim
 using DataInterpolations
 
 abstract type AbsBoundaryCondition end

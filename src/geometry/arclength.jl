@@ -4,7 +4,13 @@ function _arc_length_integrand(crv::C, t::T) where {C<:AbsCurve, T<:Real}
 end
 
 function arc_length(crv::C, t1::T; rtol=sqrt(eps(T)), atol=zero(T)) where {C<:AbsCurve, T<:Real}
-        f(t) = _arc_length_integrand(crv,t)
+    f(t) = _arc_length_integrand(crv,t)
+    return quadgk(f, zero(T), t1; rtol, atol)[1]
+end
+
+function arc_length(crv::C, pt::SVector{2,T}; rtol=sqrt(eps(T)), atol=zero(T)) where {C<:AbsCurve, T<:Real}
+    t1 = invert_curve(crv, pt)
+    f(t) = _arc_length_integrand(crv,t)
     return quadgk(f, zero(T), t1; rtol, atol)[1]
 end
 
