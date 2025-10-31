@@ -77,8 +77,8 @@ function invert_curve_optim(crv::C, pt::SVector{2,T}, t_init, rtol, atol, maxeva
     result = optimize(objective, gradient!, [t_init], BFGS(),
                      Optim.Options(
                          g_tol=atol,
-                         f_tol=atol,
-                         x_tol=rtol,
+                         f_abstol=atol,
+                         f_reltol=atol,
                          iterations=maxevals,
                          show_trace=false
                      ))
