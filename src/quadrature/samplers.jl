@@ -29,52 +29,47 @@ function chebyshev_nodes(N::Int)
 end
 =#
 
-struct FourierNodes <: AbsSampler where T<:Real
+struct FourierNodes{T<:Real} <: AbsSampler
     primes::Union{Vector{Int64},Nothing}
-    lengths::Union{Vector{Float64},Nothing} 
+    lengths::Vector{T}
 end 
 
-FourierNodes() = FourierNodes(nothing,nothing)
-FourierNodes(lengths::Vector{Float64}) = FourierNodes(nothing,lengths)
+# Simple outer constructor
+FourierNodes(lengths::Vector{T}) where {T<:Real} = FourierNodes{T}(nothing, lengths)
 
+
+#TODO thread safe
 function sample_points(sampler::FourierNodes, N::Int)
+    T = typeof(sampler.lengths[1])
     if isnothing(sampler.primes) 
         M = N
     else
         M = nextprod(sampler.primes,N)
     end
 
-    ts = Vector{Vector{Float64}}(undef,0)
-    dts = Vector{Vector{Float64}}(undef,0)
-    t::Vector{Float64} = Vector{Float64}(undef,0)
-    dt::Vector{Float64} = Vector{Float64}(undef,0)
-    if isnothing(sampler.lengths)
-        t = collect(i/M for i in 0:(M-1))
-        dt = diff(t)
-        dt = push!(dt,dt[1])
-        push!(ts,t)
-        push!(dts,dt)
-    else
-        crv_lengths::Vector{Float64} = sampler.lengths
-        L::Float64 = sum(crv_lengths)
+    ts = Vector{Vector{T}}(undef,0)
+    dts = Vector{Vector{T}}(undef,0)
+    t::Vector{T} = Vector{T}(undef,0)
+    dt::Vector{T} = Vector{T}(undef,0)
 
-        start::Float64 = 0.0
-        dt_end::Float64 = 0.0
-        ds::Float64 = 0.0
-        for l in crv_lengths
-            ds = L/(l*M) 
-            println(start*ds)
-            t = collect(range(start*ds,1.0,step=ds))
-            #println(t)
-            dt_end = 1.0 - t[end]
-            start = (ds - dt_end)/ds
-            push!(ts,t)
-            dt = diff(t)
-            push!(dt,dt_end)
-            push!(dts,dt)
-        end
+    crv_lengths::Vector{T} = sampler.lengths
+    L::T = sum(crv_lengths)
+
+    start::T = zero(T)
+    dt_end::T = zero(T)
+    ds::T = zero(T)
+    for l in crv_lengths
+        ds = L/(l*M) 
+        #println(start*ds)
+        t = collect(range(start*ds,one(T),step=ds))
+        #println(t)
+        dt_end = one(T) - t[end]
+        start = (ds - dt_end)/ds
+        push!(ts,t)
+        dt = diff(t)
+        push!(dt,dt_end)
+        push!(dts,dt)
     end
-    
     return ts,dts
 end
 
