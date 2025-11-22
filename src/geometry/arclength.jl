@@ -8,6 +8,10 @@ function arc_length(crv::C, t1::T; rtol=sqrt(eps(T)), atol=zero(T)) where {C<:Ab
     return quadgk(f, zero(T), t1; rtol, atol)[1]
 end
 
+function arc_length(crv::C, ts::AbstractArray; rtol=sqrt(eps(eltype(ts))), atol=zero(eltype(ts))) where {C<:AbsCurve}
+    return [arc_length(crv,t; rtol, atol) for t in ts]
+end
+
 function arc_length(crv::C, pt::SVector{2,T}; rtol=sqrt(eps(T)), atol=zero(T)) where {C<:AbsCurve, T<:Real}
     t1 = invert_curve(crv, pt)
     f(t) = _arc_length_integrand(crv,t)
