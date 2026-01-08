@@ -1,10 +1,11 @@
+#=
 include("symmetry.jl")
 export XAxisReflection, YAxisReflection, XYAxisReflection, NFoldRotation, apply_symmetry, apply_symmetry_pb, D2_symmetry, Cn_symmetry
 include("boundarytypes.jl")
 export SpecularReflection, QuantumSolverIgnore, Transparent, PeriodicX, ReflectionSymmetry, get_boundary_curves, get_all_curves, get_curve, get_all_domains, get_domain, update_boundary_condition
 include("segments/linesegment.jl")
 export LineSegment
-include("segments/polarcurves.jl")
+include("segments/polarsegment.jl")
 export PolarSegment, polar_radius
 include("segments/circlesegment.jl")
 export CircleSegment
@@ -32,6 +33,7 @@ include("arclength.jl")
 export arc_length, construct_arc_length_interpolation
 include("poincarebirkhoff.jl")
 export PoincareBirkhoff, pb_coords, get_pb_curve, pb_sectors
+=#
 
 export is_inside, curve, domain_fun, domain_gradient_vector
 
@@ -81,7 +83,18 @@ function domain_gradient_vector(curve::C, pts::AbstractArray) where {C<:AbsCurve
     return gs
 end
 
-
+function curvature(crv::L,t) where {L<:AbsCurve}
+    let 
+        r(t)=curve(crv,t)
+        dr(t)=ForwardDiff.derivative(r,t)
+        ddr(t)=ForwardDiff.derivative(dr,t)
+        der=dr(t)
+        der2=ddr(t)
+        norm=hypot(der[1],der[2])^3
+        kap=der[1]*der2[2]-der[2]*der2[1]
+        return kap/norm
+    end
+end
 
 
 

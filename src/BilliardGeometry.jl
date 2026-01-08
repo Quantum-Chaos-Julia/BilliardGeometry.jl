@@ -9,7 +9,7 @@ using FastGaussQuadrature, QuadGK
 using StatsBase
 using Elliptic
 using Roots, Optim
-using DataInterpolations
+#using DataInterpolations
 
 abstract type AbsBoundaryCondition end
 abstract type AbsCurve{BC} end 
@@ -32,6 +32,21 @@ export AbsCurve, AbsPolarCurve, AbsCompositeCurve, AbsCoords, AbsDomain, AbsPola
 include("geometry/utils.jl")
 include("geometry/geometry.jl")
 
+include("geometry/segments/linesegment.jl")
+include("geometry/segments/circlesegment.jl")
+include("geometry/segments/compositecurves.jl")
+include("geometry/segments/polarsegment.jl")
+
+include("interpolations/cheb_interp.jl")
+
+include("geometry/domains/circular.jl")
+include("geometry/domains/compositedomains.jl")
+include("geometry/domains/polygons.jl")
+
+include("geometry/arclength.jl")
+include("geometry/boundarytypes.jl")
+include("geometry/inversions.jl")
+include("geometry/poincarebirkhoff.jl")
 
 include("quadrature/samplers.jl")
 export LinearNodes, GaussLegendreNodes, FourierNodes, sample_points

@@ -58,4 +58,17 @@ function arc_length(line::L, pt::SVector{2,T}) where {L<:AbsLine, T<:Real}
     return hypot(x, y)
 end
 
+function tangent(line::L,ts::AbstractArray) where {T<:Real,L<:LineSegment{T}}
+    let pt0=line.cs.affine_map(line.pt0),pt1=line.cs.affine_map(line.pt1),orient=T(line.orientation)
+        r(t::T)=line_eq(pt0,pt1,t)                 # SVector{2,T}
+        return collect(orient*ForwardDiff.derivative(r,T(t)) for t in ts)
+    end
+end
+
+@inline function tangent(line::L,t) where {T<:Real,L<:LineSegment{T}}
+    pt0=line.pt0;pt1=line.pt1;orient=T(line.orientation)
+    r(τ::T)=line_eq(pt0,pt1,τ)
+    return orient*ForwardDiff.derivative(r,t)
+end
+
 
