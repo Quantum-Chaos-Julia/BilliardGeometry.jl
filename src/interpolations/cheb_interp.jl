@@ -392,25 +392,25 @@ end
 end
 
 struct Panel{T<:Real}
-    a::T
-    b::T
-    L::T
-    qord::Int
+    a::T # panel start in parameter t - left endpoint. Note: t=0 is the start of the curve, t=1 is the end.
+    b::T # panel end in parameter t - right endpoint
+    L::T # panel length estimate (arc-length)
+    qord::Int # quadrature order used for length estimate (16/32/64)
 end
 
 struct PanelData{T<:Real}
-    panel::Panel{T}
-    tnodes::Vector{T}
-    wbar::Vector{T}
-    xs::Vector{T}
-    ys::Vector{T}
-    ss::Vector{T}
-    vs::Vector{T}
-    L16::T
-    L32::T
-    s_sorted::Vector{T}
-    t_sorted::Vector{T}
-    dt_ds::Vector{T}
+    panel::Panel{T} # panel info (endpoints, length, quadrature order)
+    tnodes::Vector{T} # Chebyshev nodes mapped to panel [a,b]
+    wbar::Vector{T} # barycentric weights for Chebyshev nodes
+    xs::Vector{T} # x(t) evaluated at Chebyshev nodes
+    ys::Vector{T} # y(t) evaluated at Chebyshev nodes
+    ss::Vector{T} # s(t) evaluated at Chebyshev nodes
+    vs::Vector{T} # speed |tangent| evaluated at Chebyshev nodes
+    L16::T # GL16 length estimate for panel
+    L32::T # GL32 length estimate for panel
+    s_sorted::Vector{T} # s values at Chebyshev nodes, sorted in increasing order
+    t_sorted::Vector{T} # t values at Chebyshev nodes, sorted according to s_sorted
+    dt_ds::Vector{T} # dt/ds = 1/speed evaluated at Chebyshev nodes, sorted according to s_sorted
 end
 
 ###############################################################
@@ -435,11 +435,11 @@ end
 # - Else reject panel (ok_quad=false), return L64, qord=64
 ###############################################################
 @inline function _panel_length_and_order(::Type{T},f::F,a::T,b::T,quad_rtol::T) where {T<:Real,F<:Function}
-    L16=_gl16(f,a,b);L32=_gl32(f,a,b)
-    if abs(L32-L16)<=quad_rtol*max(one(T),abs(L32));return L16,16,true;end
-    L64=_gl64(f,a,b)
-    if abs(L64-L32)<=quad_rtol*max(one(T),abs(L64));return L32,32,true;end
-    return L64,64,false
+    L16=_gl16(f,a,b);L32=_gl32(f,a,b) # compute GL16 and GL32 estimates so we can compare them
+    if abs(L32-L16)<=quad_rtol*max(one(T),abs(L32));return L16,16,true;end # if GL16 and GL32 agree to quad_rtol, accept GL16 estimate and order 16
+    L64=_gl64(f,a,b) # otherwise compute GL64 for a more accurate estimate
+    if abs(L64-L32)<=quad_rtol*max(one(T),abs(L64));return L32,32,true;end # if GL32 and GL64 agree to quad_rtol, accept GL32 estimate and order 32
+    return L64,64,false # otherwise return best possible - GL64
 end
 
 ###############################################################
@@ -531,29 +531,29 @@ function _build_panels(::Type{T},crv;q::T=T(8),init_panels::Int=8,max_panels::In
     invN=one(T)/T(init_panels)
     @inbounds for i in 1:init_panels
         a=T(i-1)*invN;b=T(i)*invN
-        panels[i]=Panel{T}(a,b,zero(T),0)
+        panels[i]=Panel{T}(a,b,zero(T),0) # initialize with dummy length/order since only a,b are known beforehand (logically as they are independant on the quadrature)
     end
-    f_speed(t::T)=_speed(crv,t)
+    f_speed(t::T)=_speed(crv,t) # just to get the absolute value of the speed 
     i=1
     while i<=length(panels)
         p=panels[i];a=p.a;b=p.b
         κmax=zero(T);vmin=T(Inf);vmax=zero(T)
-        @inbounds for k in 0:(nprobe-1)
+        @inbounds for k in 0:(nprobe-1) # probe points uniform in t on [a,b] for max curvature and speed estimation (min/max)
             t=a+(b-a)*(T(k)/T(nprobe-1))
             κ=abs(curvature(crv,t));v=f_speed(t)
             κmax=max(κmax,κ);vmin=min(vmin,v);vmax=max(vmax,v)
         end
-        ok_speed=(vmin!=zero(T))&&(vmax/vmin<=speed_ratio_max)
-        L,qord,ok_quad=_panel_length_and_order(T,f_speed,a,b,quad_rtol)
-        ok_curv=(κmax==zero(T))||L<=one(T)/(q*κmax)
-        if ok_curv && ok_speed && ok_quad
+        ok_speed=(vmin!=zero(T))&&(vmax/vmin<=speed_ratio_max) # speed variation must be bounded to ensure a “regular” parameterization (t→s is not too stiff) or speed is identivally zero (e.g. a line curve - should be handled separately in that case)
+        L,qord,ok_quad=_panel_length_and_order(T,f_speed,a,b,quad_rtol) # based on the GL16/GL32 (and GL64 fallback) length estimates, decide whether the panel is “geometrically resolved” or needs refinement
+        ok_curv=(κmax==zero(T))||L<=one(T)/(q*κmax) # curvature criterion: panel length must be small enough relative to maximum curvature. This is where the q parameter comes in as a “Nyquist” factor: we want several samples across the smallest radius of curvature to ensure good interpolation accuracy.
+        if ok_curv && ok_speed && ok_quad # if all is well, store the panel data and move on
             panels[i]=Panel{T}(a,b,L,qord)
             i+=1;continue
         end
-        if length(panels)>=max_panels;error("Too many panels");end
-        m=(a+b)/T(2)
+        if length(panels)>=max_panels;error("Too many panels");end # safety check to avoid infinite refinement (e.g. cusps, bad parameterization)
+        m=(a+b)/T(2) # otherwise, bisect the panel and check the halves (insert new panel after current one, so it will be checked next)
         panels[i]=Panel{T}(a,m,zero(T),0)
-        insert!(panels,i+1,Panel{T}(m,b,zero(T),0))
+        insert!(panels,i+1,Panel{T}(m,b,zero(T),0)) # TODO if too small to resolve, this will eventually trigger the max_panels check and error out, preventing infinite loops
     end
     return panels
 end

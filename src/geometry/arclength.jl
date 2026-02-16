@@ -1,21 +1,21 @@
-function _arc_length_integrand(crv::C, t::T) where {C<:AbsCurve, T<:Real}
-    f(t) = curve(crv,t)
-    return norm(ForwardDiff.derivative(f, t))
+function _arc_length_integrand(crv::C,t::T) where {C<:AbsCurve,T<:Real}
+    f(t)=curve(crv,t)
+    return norm(ForwardDiff.derivative(f,t))
 end
 
-function arc_length(crv::C, t1::T; rtol=sqrt(eps(T)), atol=zero(T)) where {C<:AbsCurve, T<:Real}
-    f(t) = _arc_length_integrand(crv,t)
-    return quadgk(f, zero(T), t1; rtol, atol)[1]
+function arc_length(crv::C,t1::T;rtol=sqrt(eps(T)),atol=zero(T)) where {C<:AbsCurve,T<:Real}
+    f(t)=_arc_length_integrand(crv,t)
+    return quadgk(f,zero(T),t1;rtol,atol)[1]
 end
 
-function arc_length(crv::C, ts::AbstractArray; rtol=sqrt(eps(eltype(ts))), atol=zero(eltype(ts))) where {C<:AbsCurve}
-    return [arc_length(crv,t; rtol, atol) for t in ts]
+function arc_length(crv::C,ts::AbstractArray;rtol=sqrt(eps(eltype(ts))),atol=zero(eltype(ts))) where {C<:AbsCurve}
+    return [arc_length(crv,t;rtol,atol) for t in ts]
 end
 
-function arc_length(crv::C, pt::SVector{2,T}; rtol=sqrt(eps(T)), atol=zero(T)) where {C<:AbsCurve, T<:Real}
+function arc_length(crv::C,pt::SVector{2,T};rtol=sqrt(eps(T)),atol=zero(T)) where {C<:AbsCurve,T<:Real}
     t1 = invert_curve(crv, pt)
-    f(t) = _arc_length_integrand(crv,t)
-    return quadgk(f, zero(T), t1; rtol, atol)[1]
+    f(t)=_arc_length_integrand(crv,t)
+    return quadgk(f,zero(T),t1;rtol,atol)[1]
 end
 
 ##################################
@@ -53,6 +53,11 @@ function construct_arc_length_interpolation(crv::CircleSegment{T,BC}) where {T<:
     return s_of_t,t_of_s
 end
 
+# q is defined as the ration of the maximum speed to the minimum speed along the curve, used for adaptive panel refinement.
+# speed_ratio_max is the maximum allowed speed ratio for the adaptive panel refinement. If the actual speed ratio exceeds this value, the algorithm will refine the panels further to ensure better accuracy in the arc length interpolation.
+# init_panels is the initial number of panels used for the adaptive refinement process. The algorithm will start with this number of panels and then refine them based on the speed ratio until the desired accuracy is achieved.
+# nprobe is the number of probe points used to estimate the speed ratio along each panel. The algorithm will evaluate the speed at these probe points to determine if further refinement is needed.
+# tol_newton is the tolerance for the Newton's method used to find the inverse mapping from arc length to parameter t. The algorithm will iterate until the difference between successive approximations is less than this tolerance, ensuring that the inverse mapping is accurate.
 function construct_arc_length_interpolation(crv::PolarSegment{T,BC};q=3.0,p::Int=8,quad_rtol=1e-8,speed_ratio_max=3.0,init_panels::Int=8,nprobe::Int=9,tol_newton=1e-11) where {T<:Real,BC}
     obj=build_panel_cheb_arc(T,crv;q=q,init_panels=init_panels,nprobe=nprobe,quad_rtol=quad_rtol,speed_ratio_max=speed_ratio_max,p_cheb=p)
     s_of_t=(tq)->_s_of_t(obj,T(tq))
@@ -60,6 +65,7 @@ function construct_arc_length_interpolation(crv::PolarSegment{T,BC};q=3.0,p::Int
     return s_of_t,t_of_s
 end
 
+# OLD VERSION, JUST NEEDED FOR REFERENCE (CUBIC SPLINE INTERPOLATION)
 #=
 function construct_arc_length_interpolation(crv::C; rtol=1e-10, n_samples=100, interp_method=CubicSpline) where {C<:AbsCurve}
     t_samples = collect(range(0.0, 1.0, length=n_samples))
