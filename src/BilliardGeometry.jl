@@ -49,7 +49,7 @@ export SimpleDomain,CompositeDomain,reset_ids!
 include("geometry/domains/polygons.jl")
 export Polygon
 include("geometry/billiards/limacon.jl")
-export LimaconBilliard
+export LimaconSegment
 include("geometry/billiards/mushroom.jl")
 export MushroomBilliard
 include("geometry/billiards/stadium.jl")
