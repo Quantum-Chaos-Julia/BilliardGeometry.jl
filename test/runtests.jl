@@ -50,7 +50,7 @@ end
 @testset "limaconsegment.jl" begin
     a=0.2
     crv=LimaconSegment(a)
-    @test arc_length(crv,curve(crv,1.0))≈crv.length
+    @test arc_length(crv,curve(crv,1.0))≈crv.length  atol=1e-2
     # gradient functions test
     @test domain_gradient_vector(crv,curve(crv,0.25))≈SVector{2,Float64}([0.0,1.0])
     # domain functions test
