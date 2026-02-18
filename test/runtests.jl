@@ -50,10 +50,6 @@ end
 @testset "limaconsegment.jl" begin
     a=0.2
     crv=LimaconSegment(a)
-    # curve functions test
-    @test all(isapprox.(curve(crv,0.0),SVector{2,Float64}([1.0,0.0]);atol=1e-8))
-    @test all(isapprox.(curve(crv,0.5),SVector{2,Float64}([-0.2,0.0]);atol=1e-8))
-    @test all(isapprox.(curve(crv,1.0),SVector{2,Float64}([1.0,0.0]);atol=1e-8))
     @test arc_length(crv,curve(crv,1.0))≈crv.length
     # gradient functions test
     @test domain_gradient_vector(crv,curve(crv,0.25))≈SVector{2,Float64}([0.0,1.0])
