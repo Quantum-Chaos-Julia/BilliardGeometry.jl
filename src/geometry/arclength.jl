@@ -58,7 +58,7 @@ end
 # init_panels is the initial number of panels used for the adaptive refinement process. The algorithm will start with this number of panels and then refine them based on the speed ratio until the desired accuracy is achieved.
 # nprobe is the number of probe points used to estimate the speed ratio along each panel. The algorithm will evaluate the speed at these probe points to determine if further refinement is needed.
 # tol_newton is the tolerance for the Newton's method used to find the inverse mapping from arc length to parameter t. The algorithm will iterate until the difference between successive approximations is less than this tolerance, ensuring that the inverse mapping is accurate.
-function construct_arc_length_interpolation(crv::C;q=3.0,p::Int=8,quad_rtol=1e-8,speed_ratio_max=3.0,init_panels::Int=8,nprobe::Int=9,tol_newton=1e-11) where {T<:Real,BC,C<:AbsPolarCurve{BC}}
+function construct_arc_length_interpolation(crv::C;q=3.0,p::Int=8,quad_rtol=1e-8,speed_ratio_max=3.0,init_panels::Int=8,nprobe::Int=9,tol_newton=1e-11) where {BC,C<:AbsPolarCurve{BC}}
     obj=build_panel_cheb_arc(T,crv;q=q,init_panels=init_panels,nprobe=nprobe,quad_rtol=quad_rtol,speed_ratio_max=speed_ratio_max,p_cheb=p)
     s_of_t=(tq)->_s_of_t(obj,T(tq))
     t_of_s=(sq)->_t_of_s(obj,T(sq);tol=tol_newton)

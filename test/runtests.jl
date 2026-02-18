@@ -1,6 +1,7 @@
 using BilliardGeometry
 using Test
 using StaticArrays
+using LinearAlgebra
 
 @testset "linesegment.jl" begin
     pt0,pt1=[0.0,0.0],[1.0,1.0]
