@@ -50,17 +50,18 @@ end
 @testset "limaconsegment.jl" begin
     a=0.2
     crv=LimaconSegment(a)
-    @test arc_length(crv,curve(crv,1.0))≈crv.length  atol=1e-2
-    # gradient functions test
-    @test domain_gradient_vector(crv,curve(crv,0.25))≈SVector{2,Float64}([0.0,1.0])
-    # domain functions test
-    testpt1=SVector{2,Float64}([0.1,0.2])
-    testpt2=SVector{2,Float64}([-0.3,0.0])
-    @test domain_fun(crv,testpt1)<0.0
-    @test domain_fun(crv,testpt2)>0.0
-    @test is_inside(crv,[testpt1,testpt2])==[true,false]
-    # arclength test
-    s_of_t,t_of_s=construct_arc_length_interpolation(crv)
+    @test arc_length(crv,curve(crv,1.0))≈crv.length atol=1e-2
+    p=curve(crv,0.25)
+    g=domain_gradient_vector(crv,p)
+    @test isapprox(norm(g),1.0;atol=1e-10)
+    ϵ=1e-3
+    @test domain_fun(crv,p-ϵ*g)<0
+    @test domain_fun(crv,p+ϵ*g)>0
+    # is_inside consistent with domain_fun sign
+    pts=SVector(p-ϵ*g,p+ϵ*g)
+    @test is_inside(crv,pts)==SVector(true,false)
+    # arclength interpolation
+    s_of_t,t_of_s=construct_arc_length_interpolation(crv,q=5.0,p=12)
     @test s_of_t(0.5)≈0.5*crv.length atol=1e-2
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-2
 end
