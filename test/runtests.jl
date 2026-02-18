@@ -69,10 +69,9 @@ end
 end
 =#
 
-@testset "polarbilliard_segment.jl" begin
-    N=7;center=[0.0,0.0];coef=0.05.*rand(Float64,N);coef[1]+=1.0
-    b=PolarBilliard(coef;center=center)
-    seg=b.fundamental_domain.curves[1]
+@testset "polarsegment.jl" begin
+    N=7;coef=0.05.*rand(Float64,N);coef[1]+=1.0
+    seg=PolarSegment(coef;center=[0.0,0.0])
     @test arc_length(seg,curve(seg,1.0))≈seg.length atol=1e-2
     t=0.25;p=curve(seg,t)
     g=domain_gradient_vector(seg,p)
