@@ -13,7 +13,7 @@ function limacon_arc_length(a, R, phi)
     return 2.0 *(1.0 + a) * res
 end
 
-struct LimaconSegment{T,BC} <: AbsPolarCurve{BC} where T<:Real
+struct LimaconSegment{T<:Real,BC} <: AbsPolarCurve{BC}
     parameter::T
     R::T
     arc_angle::T
