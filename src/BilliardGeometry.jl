@@ -48,6 +48,14 @@ include("geometry/domains/compositedomains.jl")
 export SimpleDomain,CompositeDomain,reset_ids!
 include("geometry/domains/polygons.jl")
 export Polygon
+include("geometry/billiards/limacon.jl")
+export LimaconBilliard
+include("geometry/billiards/mushroom.jl")
+export MushroomBilliard
+include("geometry/billiards/stadium.jl")
+export StadiumBilliard
+include("geometry/billiards/triangle.jl")
+export TriangleBilliard
 
 include("geometry/arclength.jl")
 export _arc_length_integrand,construct_arc_length_interpolation
