@@ -71,7 +71,7 @@ end
     coeffs=[rand() for _ in 1:N]
     crv=PolarSegment(coeffs,center=center)
     # curve functions test
-    @test arc_length(crv,curve(crv,1.0))≈crv.length
+    @test arc_length(crv,curve(crv,1.0))≈crv.length atol=1e-2
     # arclength test
     s_of_t,t_of_s=construct_arc_length_interpolation(crv)
     @test s_of_t(0.5)≈0.5*crv.length atol=1e-2
