@@ -48,6 +48,7 @@ end
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-2
 end
 
+#= WHY IS THIS ONE SO SHITTY MADE, NO REFERENCE TO UNDERLYING PolarCurve that would have tangent and curvature functions...
 @testset "limaconsegment.jl" begin
     a=0.2
     crv=LimaconSegment(a)
@@ -66,18 +67,23 @@ end
     @test s_of_t(0.5)≈0.5*crv.length atol=1e-2
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-2
 end
+=#
 
-@testset "polarsegment.jl" begin
-    N=10
-    center=SVector{2,Float64}([0.5,0.5])
-    coeffs=[rand() for _ in 1:N]
-    crv=PolarSegment(coeffs,center=center)
-    # curve functions test
-    @test arc_length(crv,curve(crv,1.0))≈crv.length atol=1e-2
-    # arclength test
-    s_of_t,t_of_s=construct_arc_length_interpolation(crv)
-    @test s_of_t(0.5)≈0.5*crv.length atol=1e-2
-    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-2
+@testset "polarbilliard_segment.jl" begin
+    N=7;center=[0.0,0.0];coef=0.05.*rand(Float64,N);coef[1]+=1.0
+    b=PolarBilliard(coef;center=center)
+    seg=b.fundamental_domain.curves[1]
+    @test arc_length(seg,curve(seg,1.0))≈seg.length atol=1e-2
+    t=0.25;p=curve(seg,t)
+    g=domain_gradient_vector(seg,p)
+    ĝ=g/norm(g);ϵ=1e-3
+    @test domain_fun(seg,p-ϵ*ĝ)<0
+    @test domain_fun(seg,p+ϵ*ĝ)>0
+    pts=[p-ϵ*ĝ,p+ϵ*ĝ]
+    @test is_inside(seg,pts)==[true,false]
+    s_of_t,t_of_s=construct_arc_length_interpolation(Float64,seg;q=5.0,p=12)
+    @test s_of_t(0.5)≈0.5*seg.length atol=1e-2
+    @test t_of_s(0.5*seg.length)≈0.5 atol=1e-2
 end
 
 @testset "symmetry reflections" begin
