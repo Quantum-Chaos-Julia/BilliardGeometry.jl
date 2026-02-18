@@ -62,7 +62,7 @@ end
     pts=SVector(p-ϵ*g,p+ϵ*g)
     @test is_inside(crv,pts)==SVector(true,false)
     # arclength interpolation
-    s_of_t,t_of_s=construct_arc_length_interpolation(crv,q=5.0,p=12)
+    s_of_t,t_of_s=construct_arc_length_interpolation(Float64,crv,q=5.0,p=12)
     @test s_of_t(0.5)≈0.5*crv.length atol=1e-2
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-2
 end
