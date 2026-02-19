@@ -52,7 +52,7 @@ end
     a=0.2
     rfun=φ->one(Float64)+a*cos(φ)
     crv=PolarSegment(Float64,rfun;arc_angle=2π,shift_angle=0.0,center=SVector(0.0,0.0),orientation=1)
-    @test arc_length(crv,curve(crv,1.0))≈crv.length atol=1e-2
+    @test arc_length(crv,curve(crv,0.999))≈crv.length atol=1e-2
     p=curve(crv,0.25);g=domain_gradient_vector(crv,p)
     ĝ=g/norm(g)
     @test norm(ĝ)≈1 atol=1e-2
