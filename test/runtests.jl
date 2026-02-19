@@ -20,8 +20,8 @@ using LinearAlgebra
     @test is_inside(crv,[testpt1,testpt2])==[true,false]
     # arclength test
     s_of_t,t_of_s=construct_arc_length_interpolation(crv)
-    @test s_of_t(0.5)≈0.5*crv.length atol=1e-6
-    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-6
+    @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
+    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
 end
 
 @testset "circlesegment.jl" begin
@@ -44,15 +44,15 @@ end
     @test is_inside(crv,[testpt1,testpt2])==[true,false]
     # arclength test
     s_of_t,t_of_s=construct_arc_length_interpolation(crv)
-    @test s_of_t(0.5)≈0.5*crv.length atol=1e-6
-    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-6
+    @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
+    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
 end
 
 @testset "limacon_polarsegment.jl" begin
     a=0.2
     rfun=φ->one(Float64)+a*cos(φ)
     crv=PolarSegment(Float64,rfun;arc_angle=2π,shift_angle=0.0,center=SVector(0.0,0.0),orientation=1)
-    @test arc_length(crv,curve(crv,0.999))≈crv.length atol=1e-2
+    @test arc_length(crv,curve(crv,0.999))≈crv.length atol=1e-4
     p=curve(crv,0.25);g=domain_gradient_vector(crv,p)
     ĝ=g/norm(g)
     @test norm(ĝ)≈1 atol=1e-2
@@ -61,15 +61,15 @@ end
     @test domain_fun(crv,p+ϵ*ĝ)>0
     @test is_inside(crv,[p-ϵ*ĝ,p+ϵ*ĝ])==[true,false]
     s_of_t,t_of_s=construct_arc_length_interpolation(Float64,crv;q=5.0,p=12)
-    @test s_of_t(0.5)≈0.5*crv.length atol=1e-6
-    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-6
+    @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
+    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
 end
 
 @testset "ellipse_polarsegment.jl" begin
     a=1.0;b=0.6
     rfun=φ->(a*b)/sqrt((b*cos(φ))^2+(a*sin(φ))^2)
     crv=PolarSegment(Float64,rfun;arc_angle=2π,shift_angle=0.0,center=SVector(0.0,0.0),orientation=1)
-    @test arc_length(crv,curve(crv,0.999))≈crv.length atol=1e-2
+    @test arc_length(crv,curve(crv,0.999))≈crv.length atol=1e-4
     p=curve(crv,0.33);g=domain_gradient_vector(crv,p)
     ĝ=g/norm(g)
     @test norm(ĝ)≈1 atol=1e-2
@@ -78,15 +78,15 @@ end
     @test domain_fun(crv,p+ϵ*ĝ)>0
     @test is_inside(crv,[p-ϵ*ĝ,p+ϵ*ĝ])==[true,false]
     s_of_t,t_of_s=construct_arc_length_interpolation(Float64,crv;q=5.0,p=12)
-    @test s_of_t(0.5)≈0.5*crv.length atol=1e-6
-    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-6
+    @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
+    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
 end
 
 @testset "prosen_polarsegment.jl" begin
     a=0.08
     rfun=φ->one(Float64)+a*cos(4*φ)
     crv=PolarSegment(Float64,rfun;arc_angle=2π,shift_angle=0.0,center=SVector(0.0,0.0),orientation=1)
-    @test arc_length(crv,curve(crv,0.999))≈crv.length atol=1e-2
+    @test arc_length(crv,curve(crv,0.999))≈crv.length atol=1e-4
     p=curve(crv,0.41);g=domain_gradient_vector(crv,p)
     ĝ=g/norm(g)
     @test norm(ĝ)≈1 atol=1e-2
@@ -95,14 +95,14 @@ end
     @test domain_fun(crv,p+ϵ*ĝ)>0
     @test is_inside(crv,[p-ϵ*ĝ,p+ϵ*ĝ])==[true,false]
     s_of_t,t_of_s=construct_arc_length_interpolation(Float64,crv;q=5.0,p=12)
-    @test s_of_t(0.5)≈0.5*crv.length atol=1e-6
-    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-6
+    @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
+    @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
 end
 
 @testset "polarsegment.jl" begin
-    N=7;coeffs=0.05.*rand(Float64,N);coeffs[1]+=1.0
+    N=20;coeffs=0.05.*rand(Float64,N);coeffs[1]+=1.0
     seg=PolarSegment(coeffs)
-    @test arc_length(seg,curve(seg,0.999))≈seg.length atol=1e-2
+    @test arc_length(seg,curve(seg,0.999))≈seg.length atol=1e-4
     t=0.25;p=curve(seg,t)
     g=domain_gradient_vector(seg,p)
     ĝ=g/norm(g);ϵ=1e-3
@@ -111,8 +111,8 @@ end
     pts=[p-ϵ*ĝ,p+ϵ*ĝ]
     @test is_inside(seg,pts)==[true,false]
     s_of_t,t_of_s=construct_arc_length_interpolation(Float64,seg;q=5.0,p=12)
-    @test s_of_t(0.5)≈0.5*seg.length atol=1e-6
-    @test t_of_s(0.5*seg.length)≈0.5 atol=1e-6
+    @test s_of_t(0.5)≈0.5*seg.length atol=1e-8
+    @test t_of_s(0.5*seg.length)≈0.5 atol=1e-8
 end
 
 @testset "symmetry reflections" begin
