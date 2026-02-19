@@ -79,11 +79,11 @@ function _construct_arc_length_interpolation(crv::C;rtol=1e-10,n_samples=100,int
 end
 
 # Possible are :chebyshev, :cubic_spline
-function construct_arc_length_interpolation(::Type{T},crv::C;method::Symbol=:chebyshev,q=3.0,p::Int=8,quad_rtol=1e-8,speed_ratio_max=3.0,init_panels::Int=8,nprobe::Int=9,tol_newton=1e-11) where {BC,T<:Real,C<:AbsPolarCurve{BC}}
+function construct_arc_length_interpolation(::Type{T},crv::C;method::Symbol=:chebyshev,n_samples=100,q=3.0,p::Int=8,quad_rtol=1e-10,speed_ratio_max=3.0,init_panels::Int=8,nprobe::Int=9,tol_newton=1e-11) where {BC,T<:Real,C<:AbsPolarCurve{BC}}
     if method==:chebyshev
         return _construct_arc_length_interpolation(T,crv;q=q,p=p,quad_rtol=quad_rtol,speed_ratio_max=speed_ratio_max,init_panels=init_panels,nprobe=nprobe,tol_newton=tol_newton)
     elseif method==:cubic_spline
-        return _construct_arc_length_interpolation(crv;rtol=quad_rtol,n_samples=p,interp_method=CubicSpline)
+        return _construct_arc_length_interpolation(crv;rtol=quad_rtol,n_samples=n_samples,interp_method=CubicSpline)
     else
         error("Unsupported interpolation method: $method")
     end
