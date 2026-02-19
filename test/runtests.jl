@@ -65,7 +65,7 @@ end
     @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
     # cubic spline interpolation test
-    s_of_t_cs,t_of_s_cs=construct_arc_length_interpolation(crv;method=:cubic_spline,n_samples=2000)
+    s_of_t_cs,t_of_s_cs=construct_arc_length_interpolation(Float64,crv;method=:cubic_spline,n_samples=2000)
     @test s_of_t_cs(0.5)≈0.5*crv.length atol=1e-8
     @test t_of_s_cs(0.5*crv.length)≈0.5 atol=1e-8
 end
@@ -87,7 +87,7 @@ end
     @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
     # cubic spline interpolation test
-    s_of_t_cs,t_of_s_cs=construct_arc_length_interpolation(crv;method=:cubic_spline,n_samples=2000)
+    s_of_t_cs,t_of_s_cs=construct_arc_length_interpolation(Float64,crv;method=:cubic_spline,n_samples=2000)
     @test s_of_t_cs(0.5)≈0.5*crv.length atol=1e-8
     @test t_of_s_cs(0.5*crv.length)≈0.5 atol=1e-8
 end
@@ -109,7 +109,7 @@ end
     @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
     # cubic spline interpolation test
-    s_of_t_cs,t_of_s_cs=construct_arc_length_interpolation(crv;method=:cubic_spline,n_samples=2000)
+    s_of_t_cs,t_of_s_cs=construct_arc_length_interpolation(Float64,crv;method=:cubic_spline,n_samples=2000)
     @test s_of_t_cs(0.5)≈0.5*crv.length atol=1e-8
     @test t_of_s_cs(0.5*crv.length)≈0.5 atol=1e-8
 end
