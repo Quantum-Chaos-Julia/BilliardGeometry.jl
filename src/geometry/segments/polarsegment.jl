@@ -17,8 +17,8 @@ function PolarSegment(::Type{T},rfun::F;arc_angle=T(2*π),shift_angle=zero(T),ce
     return @set seg.length=L
 end
 
-@inline polar_radius(seg::PolarSegment{T},φ::T) where {T<:Real}=seg.rfun(φ)
-@inline polar_radius_derivative(crv::AbsPolarCurve,φ::T) where {T<:Real}=ForwardDiff.derivative(Base.Fix1(polar_radius,crv),φ)
+@inline polar_radius(seg::PolarSegment{T},φ) where {T<:Real}=seg.rfun(φ)
+@inline polar_radius_derivative(crv::AbsPolarCurve,φ)=ForwardDiff.derivative(Base.Fix1(polar_radius,crv),φ)
 
 function PolarSegment(coef::AbstractVector{T};R=one(T),arc_angle=T(2*π),shift_angle=zero(T),center=SVector{2,T}(zero(T),zero(T)),orientation=1,bc=SpecularReflection(),domain_id=1,segment_id=1) where {T<:Real}
     @assert iseven(length(coef)) "coef must be [sin1,cos1,sin2,cos2,...] (even length)"
@@ -35,7 +35,7 @@ function PolarSegment(coef::AbstractVector{T};R=one(T),arc_angle=T(2*π),shift_a
     return PolarSegment(T,rfun;arc_angle=arc_angle,shift_angle=shift_angle,center=center,orientation=orientation,bc=bc,domain_id=domain_id,segment_id=segment_id)
 end
 
-@inline function curve(polar_curve::L,t::T) where {L<:AbsPolarCurve,T<:Real}
+@inline function curve(polar_curve::L,t) where {L<:AbsPolarCurve}
     phi=polar_curve.shift_angle+t*polar_curve.arc_angle
     radius=polar_radius(polar_curve,phi)
     pt=Polar(radius,phi) #in polar coordinates
@@ -43,8 +43,7 @@ end
 end
 
 function curve(crv::AbsPolarCurve,ts::AbstractArray)
-    T=eltype(ts)
-    return collect(curve(crv,T(t)) for t in ts)
+    return collect(curve(crv,t) for t in ts)
 end
 
 function polar_radius(crv::AbsPolarCurve,phis::AbstractArray)
@@ -67,7 +66,7 @@ function domain_fun(polar_curve::L,pts::AbstractArray) where {L<:AbsPolarCurve}
     return collect(polar_domain(polar_curve,pt)*polar_curve.orientation for pt in pts)
 end
 
-@inline function tangent(crv::AbsPolarCurve,t::T) where T<:Real
+@inline function tangent(crv::AbsPolarCurve,t)
     φ=crv.shift_angle+t*crv.arc_angle
     r=polar_radius(crv,φ)
     rp=polar_radius_derivative(crv,φ)
