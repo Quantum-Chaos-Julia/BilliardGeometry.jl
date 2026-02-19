@@ -103,16 +103,23 @@ end
     N=20;coeffs=0.1.*rand(Float64,N)
     seg=PolarSegment(coeffs)
     @test arc_length(seg,curve(seg,1-1e-4))≈seg.length atol=1e-1
-    t=0.25;p=curve(seg,t)
-    g=domain_gradient_vector(seg,p)
-    ĝ=g/norm(g);ϵ=1e-3
+    t=0.25;p=curve(seg,t);g=domain_gradient_vector(seg,p);ĝ=g/norm(g);ϵ=1e-3
     @test domain_fun(seg,p-ϵ*ĝ)<0
     @test domain_fun(seg,p+ϵ*ĝ)>0
-    pts=[p-ϵ*ĝ,p+ϵ*ĝ]
-    @test is_inside(seg,pts)==[true,false]
+    @test is_inside(seg,[p-ϵ*ĝ,p+ϵ*ĝ])==[true,false]
     s_of_t,t_of_s=construct_arc_length_interpolation(Float64,seg;q=5.0,p=12)
-    @test s_of_t(0.5)≈0.5*seg.length atol=1e-8
-    @test t_of_s(0.5*seg.length)≈0.5 atol=1e-8
+    @test s_of_t(0.0)≈0.0 atol=1e-8
+    @test s_of_t(1.0)≈seg.length atol=1e-6
+    @test t_of_s(0.0)≈0.0 atol=1e-8
+    @test t_of_s(seg.length)≈1.0 atol=1e-6
+    for tq in (0.1,0.25,0.5,0.77,0.9)
+        sq=s_of_t(tq)
+        @test t_of_s(sq)≈tq atol=1e-6
+    end
+    for sq in (0.1,0.33,0.5,0.8,0.95).*seg.length
+        tq=t_of_s(sq)
+        @test s_of_t(tq)≈sq atol=1e-6
+    end
 end
 
 @testset "symmetry reflections" begin
