@@ -55,8 +55,6 @@ include("geometry/domains/polygons.jl")
 export Polygon
 include("geometry/billiards/polar.jl")
 export PolarDomain,PolarBilliard
-include("geometry/billiards/limacon.jl")
-export LimaconSegment
 include("geometry/billiards/mushroom.jl")
 export MushroomBilliard
 include("geometry/billiards/stadium.jl")
