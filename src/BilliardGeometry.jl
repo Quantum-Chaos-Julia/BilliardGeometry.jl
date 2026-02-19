@@ -9,7 +9,7 @@ using FastGaussQuadrature, QuadGK
 using StatsBase
 using Elliptic
 using Roots,Optim
-#using DataInterpolations
+using DataInterpolations
 
 abstract type AbsBoundaryCondition end
 abstract type AbsCurve{BC} end 
