@@ -17,6 +17,7 @@ Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
 
 [compat]
 Elliptic = "1.0.1"
@@ -26,6 +27,7 @@ QuadGK = "2.11.0"
 Roots = "2.2.8"
 StatsBase = "0.34.4"
 julia = "1.9"
+DataInterpolations = "8.9.0"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
