@@ -48,8 +48,10 @@ end
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-6
 end
 
-@testset "limaconsegment.jl" begin
-    a=0.2;crv=LimaconSegment(a)
+@testset "limacon_polarsegment.jl" begin
+    a=0.2
+    rfun=φ->one(Float64)+a*cos(φ)
+    crv=PolarSegment(Float64,rfun;arc_angle=2π,shift_angle=0.0,center=SVector(0.0,0.0),orientation=1)
     @test arc_length(crv,curve(crv,1.0))≈crv.length atol=1e-2
     p=curve(crv,0.25);g=domain_gradient_vector(crv,p);ĝ=g/norm(g)
     @test norm(g)≈1 atol=1e-2
@@ -62,8 +64,10 @@ end
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-6
 end
 
-@testset "ellipsesegment.jl" begin
-    a=1.0;b=0.6;crv=EllipseSegment(a,b)
+@testset "ellipse_polarsegment.jl" begin
+    a=1.0;b=0.6
+    rfun=φ->(a*b)/sqrt((b*cos(φ))^2+(a*sin(φ))^2)
+    crv=PolarSegment(Float64,rfun;arc_angle=2π,shift_angle=0.0,center=SVector(0.0,0.0),orientation=1)
     @test arc_length(crv,curve(crv,1.0))≈crv.length atol=1e-2
     p=curve(crv,0.33);g=domain_gradient_vector(crv,p);ĝ=g/norm(g)
     @test norm(g)≈1 atol=1e-2
@@ -76,8 +80,10 @@ end
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-6
 end
 
-@testset "prosenbilliard.jl" begin
-    coef=[1.0,0.12,0.03,0.08];crv=ProsenBilliard(coef)
+@testset "prosen_polarsegment.jl" begin
+    a=0.08
+    rfun=φ->one(Float64)+a*cos(4*φ)
+    crv=PolarSegment(Float64,rfun;arc_angle=2π,shift_angle=0.0,center=SVector(0.0,0.0),orientation=1)
     @test arc_length(crv,curve(crv,1.0))≈crv.length atol=1e-2
     p=curve(crv,0.41);g=domain_gradient_vector(crv,p);ĝ=g/norm(g)
     @test norm(g)≈1 atol=1e-2
