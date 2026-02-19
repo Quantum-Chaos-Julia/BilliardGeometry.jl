@@ -60,9 +60,14 @@ end
     @test domain_fun(crv,p-ϵ*ĝ)<0
     @test domain_fun(crv,p+ϵ*ĝ)>0
     @test is_inside(crv,[p-ϵ*ĝ,p+ϵ*ĝ])==[true,false]
+    # chebyshev interpolation test
     s_of_t,t_of_s=construct_arc_length_interpolation(Float64,crv;q=5.0,p=12)
     @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
+    # cubic spline interpolation test
+    s_of_t_cs,t_of_s_cs=construct_arc_length_interpolation(crv;method=:cubic_spline,n_samples=2000)
+    @test s_of_t_cs(0.5)≈0.5*crv.length atol=1e-8
+    @test t_of_s_cs(0.5*crv.length)≈0.5 atol=1e-8
 end
 
 @testset "ellipse_polarsegment.jl" begin
@@ -77,9 +82,14 @@ end
     @test domain_fun(crv,p-ϵ*ĝ)<0
     @test domain_fun(crv,p+ϵ*ĝ)>0
     @test is_inside(crv,[p-ϵ*ĝ,p+ϵ*ĝ])==[true,false]
+    # chebyshev interpolation test
     s_of_t,t_of_s=construct_arc_length_interpolation(Float64,crv;q=5.0,p=12)
     @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
+    # cubic spline interpolation test
+    s_of_t_cs,t_of_s_cs=construct_arc_length_interpolation(crv;method=:cubic_spline,n_samples=2000)
+    @test s_of_t_cs(0.5)≈0.5*crv.length atol=1e-8
+    @test t_of_s_cs(0.5*crv.length)≈0.5 atol=1e-8
 end
 
 @testset "prosen_polarsegment.jl" begin
@@ -95,8 +105,13 @@ end
     @test domain_fun(crv,p+ϵ*ĝ)>0
     @test is_inside(crv,[p-ϵ*ĝ,p+ϵ*ĝ])==[true,false]
     s_of_t,t_of_s=construct_arc_length_interpolation(Float64,crv;q=5.0,p=12)
+    # chebyshev interpolation test
     @test s_of_t(0.5)≈0.5*crv.length atol=1e-8
     @test t_of_s(0.5*crv.length)≈0.5 atol=1e-8
+    # cubic spline interpolation test
+    s_of_t_cs,t_of_s_cs=construct_arc_length_interpolation(crv;method=:cubic_spline,n_samples=2000)
+    @test s_of_t_cs(0.5)≈0.5*crv.length atol=1e-8
+    @test t_of_s_cs(0.5*crv.length)≈0.5 atol=1e-8
 end
 
 @testset "polarsegment.jl" begin

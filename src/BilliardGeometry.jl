@@ -28,6 +28,9 @@ abstract type AbsRotation<:AbsSymmetry end
 
 export AbsCurve,AbsPolarCurve,AbsCompositeCurve,AbsCoords,AbsDomain,AbsPolarDomain,AbsCompositeDomain,AbsSimpleDomain,AbsBilliard,AbsBoundaryCondition,AbsSampler,AbsSymmetry
 
+include("geometry/symmetry.jl")
+export XAxisReflection,YAxisReflection,XYAxisReflection,Rotation,apply_symmetry,apply_symmetry_normals,D2_symmetry,Cn_symmetry
+
 include("geometry/utils.jl")
 export is_overlaping,connect_curves,is_connected,is_closed,angle,signed_angle,find_unique_elements,point_curve_parameter
 include("geometry/geometry.jl")
