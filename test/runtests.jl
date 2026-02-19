@@ -100,7 +100,7 @@ end
 end
 
 @testset "polarsegment.jl" begin
-    N=20;coeffs=0.05.*rand(Float64,N);coeffs[1]+=1.0
+    N=20;coeffs=0.1.*rand(Float64,N)
     seg=PolarSegment(coeffs)
     @test arc_length(seg,curve(seg,1-1e-4))≈seg.length atol=1e-1
     t=0.25;p=curve(seg,t)
