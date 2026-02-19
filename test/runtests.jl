@@ -147,21 +147,21 @@ end
     sy=XAxisReflection(y0)          # reflect across y = y0 (flip y)
     sxy=XYAxisReflection(x0, y0)    # both flips
     # point reflections
-    @test apply_symmetry(sx,pt)==SVector{2,T}(2*x0-pt[1],pt[2]) atol=1e-10
-    @test apply_symmetry(sy,pt)==SVector{2,T}(pt[1],2*y0-pt[2]) atol=1e-10
-    @test apply_symmetry(sxy,pt)==SVector{2,T}(2*x0-pt[1],2*y0-pt[2]) atol=1e-10
+    @test apply_symmetry(sx,pt)≈SVector{2,T}(2*x0-pt[1],pt[2]) atol=1e-10
+    @test apply_symmetry(sy,pt)≈SVector{2,T}(pt[1],2*y0-pt[2]) atol=1e-10
+    @test apply_symmetry(sxy,pt)≈SVector{2,T}(2*x0-pt[1],2*y0-pt[2]) atol=1e-10
     # involution property: reflecting twice gives original (for points)
-    @test apply_symmetry(sx,apply_symmetry(sx,pt))==pt atol=1e-10
-    @test apply_symmetry(sy,apply_symmetry(sy,pt))==pt atol=1e-10
-    @test apply_symmetry(sxy,apply_symmetry(sxy,pt))==pt
+    @test apply_symmetry(sx,apply_symmetry(sx,pt))≈pt atol=1e-10
+    @test apply_symmetry(sy,apply_symmetry(sy,pt))≈pt atol=1e-10
+    @test apply_symmetry(sxy,apply_symmetry(sxy,pt))≈pt atol=1e-10
     # normals: shifts do NOT matter (only sign flips)
-    @test apply_symmetry_normals(sx,n)==SVector{2,T}(-n[1],n[2]) atol=1e-10
-    @test apply_symmetry_normals(sy,n)==SVector{2,T}(n[1],-n[2]) atol=1e-10
-    @test apply_symmetry_normals(sxy,n)==-n atol=1e-10
+    @test apply_symmetry_normals(sx,n)≈SVector{2,T}(-n[1],n[2]) atol=1e-10
+    @test apply_symmetry_normals(sy,n)≈SVector{2,T}(n[1],-n[2]) atol=1e-10
+    @test apply_symmetry_normals(sxy,n)≈-n atol=1e-10
     # involution for normals too
-    @test apply_symmetry_normals(sx,apply_symmetry_normals(sx,n))==n atol=1e-10
-    @test apply_symmetry_normals(sy,apply_symmetry_normals(sy,n))==n atol=1e-10
-    @test apply_symmetry_normals(sxy,apply_symmetry_normals(sxy,n))==n atol=1e-10
+    @test apply_symmetry_normals(sx,apply_symmetry_normals(sx,n))≈n atol=1e-10
+    @test apply_symmetry_normals(sy,apply_symmetry_normals(sy,n))≈n atol=1e-10
+    @test apply_symmetry_normals(sxy,apply_symmetry_normals(sxy,n))≈n atol=1e-10
 end
 
 @testset "symmetry rotations" begin
@@ -207,16 +207,16 @@ end
     ns2=apply_symmetry_normals(sxy,ns)
     @test length(pts2)==length(pts)
     @test length(ns2)==length(ns)
-    @test pts2[1]==apply_symmetry(sxy,pts[1]) atol=1e-10
-    @test ns2[3]==apply_symmetry_normals(sxy,ns[3]) atol=1e-10
+    @test pts2[1]≈apply_symmetry(sxy,pts[1]) atol=1e-10
+    @test ns2[3]≈apply_symmetry_normals(sxy,ns[3]) atol=1e-10
     # input vectors not mutated
-    @test pts[1]==SVector{2,T}(0.1,0.2)
-    @test ns[2]==SVector{2,T}(0.0,1.0)
+    @test pts[1]≈SVector{2,T}(0.1,0.2) atol=1e-10
+    @test ns[2]≈SVector{2,T}(0.0,1.0) atol=1e-10
     # D2 generator sanity (assuming D2_symmetry(x0,y0) returns [YAxisReflection(x0), XYAxisReflection(x0,y0), XAxisReflection(y0)])
     syms=D2_symmetry(x0,y0)
     @test length(syms)==3
-    @test apply_symmetry(syms[1],pts[1])==apply_symmetry(YAxisReflection(x0),pts[1]) atol=1e-10
-    @test apply_symmetry(syms[3],pts[1])==apply_symmetry(XAxisReflection(y0),pts[1]) atol=1e-10
+    @test apply_symmetry(syms[1],pts[1])≈apply_symmetry(YAxisReflection(x0),pts[1]) atol=1e-10
+    @test apply_symmetry(syms[3],pts[1])≈apply_symmetry(XAxisReflection(y0),pts[1]) atol=1e-10
 end
 
 @testset "Cn_symmetry generator" begin
