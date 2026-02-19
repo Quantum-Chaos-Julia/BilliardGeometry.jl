@@ -1,4 +1,4 @@
-
+const TWO_PI=2*pi
 @inline _x_coord_reflect(pt::SVector{2,T},sx::T) where {T<:Real}=SVector{2,T}((sx+sx)-pt[1],pt[2])
 @inline _y_coord_reflect(pt::SVector{2,T},sy::T) where {T<:Real}=SVector{2,T}(pt[1],(sy+sy)-pt[2])
 @inline _xy_coord_reflect(pt::SVector{2,T},sx::T,sy::T) where {T<:Real}=SVector{2,T}((sx+sx)-pt[1],(sy+sy)-pt[2])
