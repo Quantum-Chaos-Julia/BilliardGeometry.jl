@@ -66,42 +66,37 @@ function _construct_arc_length_interpolation_CHEBYSHEV(::Type{T},crv::C;q=3.0,p:
 end
 
 # CubicSpline interpolation, reasonably fast butr not as accurate as the chebyshev adaptive panel refinement for the same number of panels. Not recommended for curves with large curvature variations.
-function _arc_length_interpolation_CUBIC(crv::C;rtol=1e-11,n_samples=100,interp_method=CubicSpline) where {C<:AbsCurve}
-    t_samples=collect(range(0.0,1.0;length=n_samples))
-    s_samples=zeros(Float64,n_samples)
-    f(t)=_arc_length_integrand(crv,t)
-    for i in 2:n_samples
-        s_samples[i],_=quadgk(f,0.0,t_samples[i];rtol=rtol)
-    end
-    s_of_t=interp_method(s_samples,t_samples) # t(s)
-    t_of_s=interp_method(t_samples,s_samples) # s(t)
-    return s_of_t,t_of_s,t_samples,s_samples
-end
-
-
 function _construct_arc_length_interpolation_CUBIC_SPLINE(crv::C;target_prec=1e-8,test_points::Int=100,verbose=false) where {C<:AbsCurve}
-    max_iters=50;errors_s=Float64[];errors_t=Float64[]
+    max_iters=50
+    errors_s=Float64[]
+    errors_t=Float64[]
     n_samples=100;best=Inf
     ts=collect(range(0.0,1.0;length=test_points))
     s_true=arc_length(crv,ts)
+    local s_of_t,t_of_s,s_samples,t_samples
     for i in 0:max_iters-1
-        s_of_t,t_of_s=_arc_length_interpolation_CUBIC(crv;n_samples=n_samples,rtol=1e-2*target_prec)
-        # clamp t-queries
-        s_interp=s_of_t.(_clamp_t.(ts))
-        # clamp s-queries to the spline domain of t_of_s
-        smin=first(t_of_s.u) 
-        smax=last(t_of_s.u)
-        t_interp=t_of_s.(clamp.(s_true,smin,smax))
+        t_samples=collect(range(0.0,1.0;length=n_samples))
+        s_samples=zeros(Float64,n_samples)
+        f(t)=_arc_length_integrand(crv,t)
+        for k in 2:n_samples
+            s_samples[k],_=quadgk(f,0.0,t_samples[k];rtol=1e-2*target_prec)
+        end
+        s_of_t=CubicSpline(s_samples,t_samples) # s(t)
+        t_of_s=CubicSpline(t_samples,s_samples) # t(s)
+        s_interp=t_of_s.(ts)
+        s_clamp=clamp.(s_true,first(s_samples),last(s_samples))
+        t_interp=s_of_t.(s_clamp)
         err_s=maximum(abs.(s_interp.-s_true))
         err_t=maximum(abs.(t_interp.-ts))
         running=max(err_s,err_t)
         push!(errors_s,err_s);push!(errors_t,err_t)
-        verbose && println("Iteration $i: max|Δs|=$err_s, max|Δt|=$err_t")
-        running<=target_prec && return verbose ? (s_of_t,t_of_s,errors_s,errors_t) : (s_of_t,t_of_s)
-        if running>=best;break;end
+        verbose && println("iter $i: n=$n_samples  Δs=$err_s  Δt=$err_t")
+        running<=target_prec && break
+        running>=best && (verbose && @warn "No further improvement (best=$best, now=$running).";break)
         best=running;n_samples*=2
     end
-    return verbose ? (s_of_t,t_of_s,errors_s,errors_t) : (s_of_t,t_of_s)
+
+    return verbose ? (t_of_s,s_of_t,errors_s,errors_t) : (t_of_s,s_of_t)
 end
 
 # Possible are :chebyshev, :cubic_spline
