@@ -63,7 +63,7 @@ include("geometry/billiards/triangle.jl")
 export TriangleBilliard
 
 include("geometry/arclength.jl")
-export _arc_length_integrand,construct_arc_length_interpolation
+export _arc_length_integrand,construct_arc_length_interpolation,_construct_arc_length_interpolation_CUBIC_SPLINE,_construct_arc_length_interpolation_CHEBYSHEV
 include("geometry/inversions.jl")
 export invert_curve,invert_curve_roots,invert_curve_optim,invert_curve_grid_search,invert_curve_nelder_mead
 include("geometry/poincarebirkhoff.jl")
