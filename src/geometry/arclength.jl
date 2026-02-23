@@ -78,7 +78,7 @@ function _arc_length_interpolation_CUBIC(crv::C;rtol=1e-11,n_samples=100,interp_
     return s_of_t,t_of_s
 end
 
-function _construct_arc_length_interpolation_CUBIC_SPLINE(crv::C;target_prec=1e-8,test_points::Int=100,verbose=false) where {C<:AbsCurve}
+function _construct_arc_length_interpolation_CUBIC_SPLINE(crv::C;target_prec=1e-8,verbose=false) where {C<:AbsCurve}
     final_prec=Inf # temp
     max_iters=50 # to prevent infinite loops in case of convergence issues, usually should converge for well-behaved curves
     errors_s=Vector{Float64}() 
