@@ -87,7 +87,7 @@ function _construct_arc_length_interpolation_CUBIC_SPLINE(crv::C;target_prec=1e-
     i=0
     while final_prec>target_prec && i<max_iters
         i>max_iters && @warn "Reached maximum iterations ($max_iters) without achieving target precision. Final precision: $final_prec"
-        ts=collect(range(0.0,1.0,length=test_points))
+        ts=collect(range(0.0,1.0,length=n_samples))
         s_true=arc_length(crv,ts)
         s_of_t,t_of_s=_arc_length_interpolation_CUBIC(crv;n_samples=n_samples,rtol=1e-2*target_prec) # rtol for quadgk should be stricter than the actual wanted tolerance for the interpolation to ensure that the error in the arc length values used for interpolation is not dominating the final interpolation error
         s_interp=[s_of_t(t) for t in ts]
