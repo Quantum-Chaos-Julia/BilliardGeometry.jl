@@ -67,49 +67,41 @@ end
 
 # CubicSpline interpolation, reasonably fast butr not as accurate as the chebyshev adaptive panel refinement for the same number of panels. Not recommended for curves with large curvature variations.
 function _arc_length_interpolation_CUBIC(crv::C;rtol=1e-11,n_samples=100,interp_method=CubicSpline) where {C<:AbsCurve}
-    t_samples=collect(range(0.0,1.0,length=n_samples))
-    s_samples=zeros(n_samples)
-    integrand(t)=_arc_length_integrand(crv,t)
+    t_samples=collect(range(0.0,1.0;length=n_samples))
+    s_samples=zeros(Float64,n_samples)
+    f(t)=_arc_length_integrand(crv,t)
     for i in 2:n_samples
-        s_samples[i],_=quadgk(integrand,0.0,t_samples[i],rtol=rtol)
+        s_samples[i],_=quadgk(f,0.0,t_samples[i];rtol=rtol)
     end
-    s_of_t=interp_method(s_samples,t_samples)
-    t_of_s=interp_method(t_samples,s_samples)
-    return s_of_t,t_of_s
+    s_of_t=interp_method(s_samples,t_samples) # t(s)
+    t_of_s=interp_method(t_samples,s_samples) # s(t)
+    return s_of_t,t_of_s,t_samples,s_samples
 end
 
-function _construct_arc_length_interpolation_CUBIC_SPLINE(crv::C;target_prec=1e-8,verbose=false) where {C<:AbsCurve}
-    final_prec=Inf # temp
-    max_iters=50 # to prevent infinite loops in case of convergence issues, usually should converge for well-behaved curves
-    errors_s=Vector{Float64}() 
-    errors_t=Vector{Float64}() # store errors for s_of_t and t_of_s separately for better diagnostics since usually t errors are a bit larger
-    n_samples=100 # initial panel num for cubic splines
-    i=0
-    while final_prec>target_prec && i<max_iters
-        i>max_iters && @warn "Reached maximum iterations ($max_iters) without achieving target precision. Final precision: $final_prec"
-        ts=collect(range(0.0,1.0,length=n_samples))
-        s_true=arc_length(crv,ts)
-        s_of_t,t_of_s=_arc_length_interpolation_CUBIC(crv;n_samples=n_samples,rtol=1e-2*target_prec) # rtol for quadgk should be stricter than the actual wanted tolerance for the interpolation to ensure that the error in the arc length values used for interpolation is not dominating the final interpolation error
-        s_interp=[s_of_t(t) for t in ts]
-        t_interp=[t_of_s(s) for s in s_true]
-        final_prec_s=maximum(abs.(s_interp-s_true))
-        final_prec_t=maximum(abs.(t_interp-ts))
-        push!(errors_s,final_prec_s)
-        push!(errors_t,final_prec_t)
-        running_prec=max(final_prec_s,final_prec_t)
-        verbose && println("Iteration $i: max error in s: $final_prec_s, max error in t: $final_prec_t")
-        if running_prec<final_prec 
-            break
-        else
-            n_samples*=2 # double the number of samples for the next iteration to improve accuracy
-            i+=1
-        end
+
+function _construct_arc_length_interpolation_CUBIC_SPLINE(crv::C;target_prec=1e-8,test_points::Int=100,verbose=false) where {C<:AbsCurve}
+    max_iters=50;errors_s=Float64[];errors_t=Float64[]
+    n_samples=100;best=Inf
+    ts=collect(range(0.0,1.0;length=test_points))
+    s_true=arc_length(crv,ts)
+    for i in 0:max_iters-1
+        s_of_t,t_of_s=_arc_length_interpolation_CUBIC(crv;n_samples=n_samples,rtol=1e-2*target_prec)
+        # clamp t-queries
+        s_interp=s_of_t.(_clamp_t.(ts))
+        # clamp s-queries to the spline domain of t_of_s
+        smin=first(t_of_s.u) 
+        smax=last(t_of_s.u)
+        t_interp=t_of_s.(clamp.(s_true,smin,smax))
+        err_s=maximum(abs.(s_interp.-s_true))
+        err_t=maximum(abs.(t_interp.-ts))
+        running=max(err_s,err_t)
+        push!(errors_s,err_s);push!(errors_t,err_t)
+        verbose && println("Iteration $i: max|Δs|=$err_s, max|Δt|=$err_t")
+        running<=target_prec && return verbose ? (s_of_t,t_of_s,errors_s,errors_t) : (s_of_t,t_of_s)
+        if running>=best;break;end
+        best=running;n_samples*=2
     end
-    if verbose
-        return s_of_t,t_of_s,errors_s,errors_t
-    else
-        return s_of_t,t_of_s
-    end
+    return verbose ? (s_of_t,t_of_s,errors_s,errors_t) : (s_of_t,t_of_s)
 end
 
 # Possible are :chebyshev, :cubic_spline
