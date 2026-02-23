@@ -67,9 +67,7 @@ end
 
 # CubicSpline interpolation, reasonably fast butr not as accurate as the chebyshev adaptive panel refinement for the same number of panels. Not recommended for curves with large curvature variations.
 function _construct_arc_length_interpolation_CUBIC_SPLINE(crv::C;target_prec=1e-8,test_points::Int=100,verbose=false) where {C<:AbsCurve}
-    max_iters=50
-    errors_s=Float64[]
-    errors_t=Float64[]
+    max_iters=50;errors_s=Float64[];errors_t=Float64[]
     n_samples=100;best=Inf
     ts=collect(range(0.0,1.0;length=test_points))
     s_true=arc_length(crv,ts)
@@ -83,9 +81,8 @@ function _construct_arc_length_interpolation_CUBIC_SPLINE(crv::C;target_prec=1e-
         end
         s_of_t=CubicSpline(s_samples,t_samples) # s(t)
         t_of_s=CubicSpline(t_samples,s_samples) # t(s)
-        s_interp=t_of_s.(ts)
-        s_clamp=clamp.(s_true,first(s_samples),last(s_samples))
-        t_interp=s_of_t.(s_clamp)
+        s_interp=s_of_t.(ts)
+        t_interp=t_of_s.(clamp.(s_true,first(s_samples),last(s_samples)))
         err_s=maximum(abs.(s_interp.-s_true))
         err_t=maximum(abs.(t_interp.-ts))
         running=max(err_s,err_t)
@@ -95,8 +92,7 @@ function _construct_arc_length_interpolation_CUBIC_SPLINE(crv::C;target_prec=1e-
         running>=best && (verbose && @warn "No further improvement (best=$best, now=$running).";break)
         best=running;n_samples*=2
     end
-
-    return verbose ? (t_of_s,s_of_t,errors_s,errors_t) : (t_of_s,s_of_t)
+    return verbose ? (s_of_t,t_of_s,errors_s,errors_t) : (s_of_t,t_of_s)
 end
 
 # Possible are :chebyshev, :cubic_spline
