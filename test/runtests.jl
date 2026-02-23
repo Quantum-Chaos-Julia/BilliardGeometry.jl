@@ -3,7 +3,7 @@ using Test
 using StaticArrays
 using LinearAlgebra
 
-const n_samples=1000
+const n_samples=100 # initial guess, for large curvature not enough for cubic splines
 
 @testset "linesegment.jl" begin
     pt0,pt1=[0.0,0.0],[1.0,1.0]
