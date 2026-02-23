@@ -58,7 +58,7 @@ end
 # init_panels is the initial number of panels used for the adaptive refinement process. The algorithm will start with this number of panels and then refine them based on the speed ratio until the desired accuracy is achieved.
 # nprobe is the number of probe points used to estimate the speed ratio along each panel. The algorithm will evaluate the speed at these probe points to determine if further refinement is needed.
 # tol_newton is the tolerance for the Newton's method used to find the inverse mapping from arc length to parameter t. The algorithm will iterate until the difference between successive approximations is less than this tolerance, ensuring that the inverse mapping is accurate.
-function _construct_arc_length_interpolation(::Type{T},crv::C;q=3.0,p::Int=8,quad_rtol=1e-8,speed_ratio_max=3.0,init_panels::Int=8,nprobe::Int=9,tol_newton=1e-11) where {BC,T<:Real,C<:AbsPolarCurve{BC}}
+function _construct_arc_length_interpolation_CHEBYSHEV(::Type{T},crv::C;q=3.0,p::Int=8,quad_rtol=1e-8,speed_ratio_max=3.0,init_panels::Int=8,nprobe::Int=9,tol_newton=1e-11) where {BC,T<:Real,C<:AbsPolarCurve{BC}}
     obj=build_panel_cheb_arc(T,crv;q=q,init_panels=init_panels,nprobe=nprobe,quad_rtol=quad_rtol,speed_ratio_max=speed_ratio_max,p_cheb=p)
     s_of_t=(tq)->_s_of_t(obj,T(tq))
     t_of_s=(sq)->_t_of_s(obj,T(sq);tol=tol_newton)
@@ -66,7 +66,7 @@ function _construct_arc_length_interpolation(::Type{T},crv::C;q=3.0,p::Int=8,qua
 end
 
 # CubicSpline interpolation, reasonably fast butr not as accurate as the chebyshev adaptive panel refinement for the same number of panels. Not recommended for curves with large curvature variations.
-function _construct_arc_length_interpolation(crv::C;rtol=1e-10,n_samples=100,interp_method=CubicSpline) where {C<:AbsCurve}
+function _arc_length_interpolation_CUBIC(crv::C;rtol=1e-11,n_samples=100,interp_method=CubicSpline) where {C<:AbsCurve}
     t_samples=collect(range(0.0,1.0,length=n_samples))
     s_samples=zeros(n_samples)
     integrand(t)=_arc_length_integrand(crv,t)
@@ -78,12 +78,46 @@ function _construct_arc_length_interpolation(crv::C;rtol=1e-10,n_samples=100,int
     return s_of_t,t_of_s
 end
 
+function _construct_arc_length_interpolation_CUBIC_SPLINE(crv::C;target_prec=1e-8,test_points::Int=100,verbose=false) where {C<:AbsCurve}
+    final_prec=Inf # temp
+    max_iters=50 # to prevent infinite loops in case of convergence issues, usually should converge for well-behaved curves
+    errors_s=Vector{Float64}() 
+    errors_t=Vector{Float64}() # store errors for s_of_t and t_of_s separately for better diagnostics since usually t errors are a bit larger
+    n_samples=100 # initial panel num for cubic splines
+    i=0
+    while final_prec>target_prec && i<max_iters
+        i>max_iters && @warn "Reached maximum iterations ($max_iters) without achieving target precision. Final precision: $final_prec"
+        ts=collect(range(0.0,1.0,length=test_points))
+        s_true=arc_length(crv,ts)
+        s_of_t,t_of_s=_arc_length_interpolation_CUBIC(crv;n_samples=n_samples,rtol=1e-2*target_prec) # rtol for quadgk should be stricter than the actual wanted tolerance for the interpolation to ensure that the error in the arc length values used for interpolation is not dominating the final interpolation error
+        s_interp=s_of_t.(ts)
+        t_interp=t_of_s.(s_true)
+        final_prec_s=maximum(abs.(s_interp-s_true))
+        final_prec_t=maximum(abs.(t_interp-ts))
+        push!(errors_s,final_prec_s)
+        push!(errors_t,final_prec_t)
+        running_prec=max(final_prec_s,final_prec_t)
+        verbose && println("Iteration $i: max error in s: $final_prec_s, max error in t: $final_prec_t")
+        if running_prec<final_prec 
+            break
+        else
+            n_samples*=2 # double the number of samples for the next iteration to improve accuracy
+            i+=1
+        end
+    end
+    if verbose
+        return s_of_t,t_of_s,errors_s,errors_t
+    else
+        return s_of_t,t_of_s
+    end
+end
+
 # Possible are :chebyshev, :cubic_spline
-function construct_arc_length_interpolation(::Type{T},crv::C;method::Symbol=:chebyshev,n_samples=100,q=3.0,p::Int=8,quad_rtol=1e-10,speed_ratio_max=3.0,init_panels::Int=8,nprobe::Int=9,tol_newton=1e-11) where {BC,T<:Real,C<:AbsPolarCurve{BC}}
+function construct_arc_length_interpolation(::Type{T},crv::C;method::Symbol=:chebyshev,n_samples=100,q=3.0,p::Int=8,quad_rtol=1e-10,speed_ratio_max=3.0,init_panels::Int=8,nprobe::Int=9,tol_newton=1e-11,verbose=false) where {BC,T<:Real,C<:AbsPolarCurve{BC}}
     if method==:chebyshev
-        return _construct_arc_length_interpolation(T,crv;q=q,p=p,quad_rtol=quad_rtol,speed_ratio_max=speed_ratio_max,init_panels=init_panels,nprobe=nprobe,tol_newton=tol_newton)
+        return _construct_arc_length_interpolation_CHEBYSHEV(T,crv;q=q,p=p,quad_rtol=quad_rtol,speed_ratio_max=speed_ratio_max,init_panels=init_panels,nprobe=nprobe,tol_newton=tol_newton)
     elseif method==:cubic_spline
-        return _construct_arc_length_interpolation(crv;rtol=quad_rtol,n_samples=n_samples,interp_method=CubicSpline)
+        return _construct_arc_length_interpolation_CUBIC_SPLINE(crv;target_prec=100*quad_rtol,rtol=quad_rtol,n_samples=n_samples,interp_method=CubicSpline,verbose=verbose) # this one is usually always less precise, but might be faster in some situtations
     else
         error("Unsupported interpolation method: $method")
     end
