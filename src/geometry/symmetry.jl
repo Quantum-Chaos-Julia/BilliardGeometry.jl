@@ -3,7 +3,7 @@ const TWO_PI=2*pi
 @inline _y_coord_reflect(pt::SVector{2,T},sy::T) where {T<:Real}=SVector{2,T}(pt[1],(sy+sy)-pt[2])
 @inline _xy_coord_reflect(pt::SVector{2,T},sx::T,sy::T) where {T<:Real}=SVector{2,T}((sx+sx)-pt[1],(sy+sy)-pt[2])
 
-@inline _x_normal_reflect(n::SVector{2,T}) where {T<:Real}=SVector{2,T}(-n[1],n[2])
+@inline _x_normal_reflect(n::SVector{2,T}) where {T<:Real}=SVector{2,T}(-n[1],n[2]) # fine as long as affine transformation
 @inline _y_normal_reflect(n::SVector{2,T}) where {T<:Real}=SVector{2,T}(n[1],-n[2])
 @inline _xy_normal_reflect(n::SVector{2,T}) where {T<:Real}=-n
 
@@ -28,15 +28,19 @@ end
 
 struct XAxisReflection{T}<:AbsReflection
     y0::T
+    parity_x::Int
 end
 
 struct YAxisReflection{T}<:AbsReflection
     x0::T
+    parity_y::Int
 end
 
 struct XYAxisReflection{T}<:AbsReflection
     x0::T
     y0::T
+    parity_x::Int
+    parity_y::Int
 end
 
 struct Rotation{T}<:AbsRotation
@@ -45,17 +49,24 @@ struct Rotation{T}<:AbsRotation
     c0::SVector{2,T}
 end
 
-XAxisReflection()=XAxisReflection{Float64}(0.0)
-XAxisReflection(::Type{T}) where {T<:Real}=XAxisReflection{T}(zero(T))
-XAxisReflection(y0::T) where {T<:Real}=XAxisReflection{T}(y0)
+# by default the parity is -1, implying the wavefunction is odd under reflection
+XAxisReflection()=XAxisReflection{Float64}(0.0,-1)
+XAxisReflection(::Type{T}) where {T<:Real}=XAxisReflection{T}(zero(T),-1)
+XAxisReflection(y0::T) where {T<:Real}=XAxisReflection{T}(y0,-1)
+XAxisReflection(y0::T,parity_x::Int) where {T<:Real}=XAxisReflection{T}(y0,parity_x)
+XAxisReflection(parity_x::Int)=XAxisReflection{Float64}(0.0,parity_x)
 
-YAxisReflection()=YAxisReflection{Float64}(0.0)
-YAxisReflection(::Type{T}) where {T<:Real}=YAxisReflection{T}(zero(T))
-YAxisReflection(x0::T) where {T<:Real}=YAxisReflection{T}(x0)
+YAxisReflection()=YAxisReflection{Float64}(0.0,-1)
+YAxisReflection(::Type{T}) where {T<:Real}=YAxisReflection{T}(zero(T),-1)
+YAxisReflection(x0::T) where {T<:Real}=YAxisReflection{T}(x0,-1)
+YAxisReflection(x0::T,parity_y::Int) where {T<:Real}=YAxisReflection{T}(x0,parity_y)
+YAxisReflection(parity_y::Int)=YAxisReflection{Float64}(0.0,parity_y)
 
-XYAxisReflection()=XYAxisReflection{Float64}(0.0,0.0)
-XYAxisReflection(::Type{T}) where {T<:Real}=XYAxisReflection{T}(zero(T),zero(T))
-XYAxisReflection(x0::T,y0::T) where {T<:Real} = XYAxisReflection{T}(x0,y0)
+XYAxisReflection()=XYAxisReflection{Float64}(0.0,0.0,-1,-1)
+XYAxisReflection(::Type{T}) where {T<:Real}=XYAxisReflection{T}(zero(T),zero(T),-1,-1)
+XYAxisReflection(x0::T,y0::T) where {T<:Real}=XYAxisReflection{T}(x0,y0,-1,-1)
+XYAxisReflection(x0::T,y0::T,parity_x::Int,parity_y::Int) where {T<:Real}=XYAxisReflection{T}(x0,y0,parity_x,parity_y)
+XYAxisReflection(parity_x::Int,parity_y::Int)=XYAxisReflection{Float64}(0.0,0.0,parity_x,parity_y)
 
 Rotation(order::Int,m::Int)=Rotation{Float64}(order,m,SVector{2,Float64}(0.0,0.0))
 Rotation(::Type{T},order::Int,m::Int) where {T<:Real}=Rotation{T}(order,m,SVector{2,T}(zero(T),zero(T)))
