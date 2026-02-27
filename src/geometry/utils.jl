@@ -42,9 +42,9 @@ function is_connected(boundary; start_intial = true)
     start_pts = CircularArray([curve(crv,0.0) for crv in boundary])
     end_pts = CircularArray([curve(crv,1.0) for crv in boundary])    
     if start_intial
-        test = [is_overlaping(end_pts[i-1], start_pts[i]) for i in 1:length(start_pts)]
+        test = [is_overlaping(end_pts[i-1], start_pts[i]) for i in eachindex(start_pts)]
     else
-        test = [is_overlaping(end_pts[i], start_pts[i+1]) for i in 1:length(start_pts)]
+        test = [is_overlaping(end_pts[i], start_pts[i+1]) for i in eachindex(start_pts)]
     end
     return test
 end

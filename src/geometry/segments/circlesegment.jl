@@ -57,3 +57,17 @@ function arc_length(circle::L, pt::SVector{2,T}) where {L<:CircleSegment, T<:Rea
     angle = atan(pt[2]-center[2], pt[1]-center[1]) - circle.shift_angle
     return circle.radius*angle
 end
+
+function tangent(circle::L,ts::AbstractArray) where {T<:Real,L<:CircleSegment{T}}
+    let R=circle.radius,c=circle.center,a=circle.arc_angle,s=circle.shift_angle,orient=T(circle.orientation)
+        r(t::T)=circle_eq(R,a,s,c,t)
+        return collect(orient*ForwardDiff.derivative(r,t) for t in ts)
+    end
+end
+
+@inline function tangent(circle::L,t::T) where {T<:Real,L<:CircleSegment{T}}
+    R=circle.radius;c=circle.center;a=circle.arc_angle;s=circle.shift_angle
+    orient=T(circle.orientation)
+    r(τ::T)=circle_eq(R,a,s,c,τ) 
+    return orient*ForwardDiff.derivative(r,t)
+end
