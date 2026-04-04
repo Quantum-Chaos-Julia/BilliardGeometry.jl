@@ -69,13 +69,13 @@ function signed_angle(a,b)
 end
 
 function find_unique_elements(vector)    
-    unique = [true for p in vector]
+    u = [true for p in vector]
     for i in 1:(length(vector)-1)
         if isapprox(vector[i],vector[i+1])
             vector[i] = false
         end
     end
-    return vector[unique]
+    return unique(vector[u])
 end
 
 
