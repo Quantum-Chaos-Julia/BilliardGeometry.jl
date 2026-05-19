@@ -58,13 +58,13 @@ end
 
 #check if points inside for general curves
 function is_inside(curve::C, pt::SVector{2,T}) where {C<:AbsCurve, T<:Real}
-    return domain_fun(curve, pt) .< zero(eltype(pt)) 
+    return domain_fun(curve, pt) .<= zero(eltype(pt)) 
 end
 
 function is_inside(curve::C, pts::AbstractArray) where {C<:AbsCurve}
     let
     d = domain_fun(curve, pts)
-    return d .< zero(eltype(pts[1])) 
+    return d .<= zero(eltype(pts[1])) 
     end
 end
 
