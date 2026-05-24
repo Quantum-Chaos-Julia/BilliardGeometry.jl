@@ -81,13 +81,3 @@ function domain_gradient_vector(curve::C, pts::AbstractArray) where {C<:AbsCurve
     return gs
 end
 
-
-
-
-
-#=
-struct Billiard{T} <: AbsBilliard where T<:Real
-    subdomains::Vector{AbsDomain}
-    #symmetries::
-end
-=#
