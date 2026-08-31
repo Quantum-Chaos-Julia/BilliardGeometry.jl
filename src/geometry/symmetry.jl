@@ -1,6 +1,8 @@
 const ident=IdentityTransformation()
 const reflect_x=LinearMap(SMatrix{2,2}([-1.0 0.0;0.0 1.0]))
 const reflect_y=LinearMap(SMatrix{2,2}([1.0 0.0;0.0 -1.0]))
+const reflect_diag=LinearMap(SMatrix{2,2}([0.0 1.0;1.0 0.0]))
+const reflect_antidiag=LinearMap(SMatrix{2,2}([0.0 -1.0;-1.0 0.0]))
 const reflect_xy=reflect_x∘reflect_y
 @inline function rotation_matrix_z(θ::T) where {T<:Real}
     s,c=sincos(θ)
@@ -54,10 +56,20 @@ struct XYAxisReflection<:AbsReflection
     parity_y::Int
 end
 
+struct DiagonalReflection<:BilliardGeometry.AbsReflection
+    parity::Int
+end
+
+struct AntiDiagonalReflection<:BilliardGeometry.AbsReflection
+    parity::Int
+end
+
 # defaults 
 XAxisReflection()=XAxisReflection(-1)
 YAxisReflection()=YAxisReflection(-1)
 XYAxisReflection()=XYAxisReflection(-1,-1)
+DiagonalReflection()=DiagonalReflection(-1)
+AntiDiagonalReflection()=AntiDiagonalReflection(-1)
 
 """
     apply_symmetry(sym,pt)
@@ -76,6 +88,8 @@ The transformed point or collection of transformed points.
 @inline apply_symmetry(::XAxisReflection,pt::SVector{2,T}) where {T<:Real}=SVector{2,T}(reflect_y(pt))
 @inline apply_symmetry(::YAxisReflection,pt::SVector{2,T}) where {T<:Real}=SVector{2,T}(reflect_x(pt))
 @inline apply_symmetry(::XYAxisReflection,pt::SVector{2,T}) where {T<:Real}=SVector{2,T}(reflect_xy(pt))
+@inline apply_symmetry(::DiagonalReflection,pt::SVector{2,T}) where {T<:Real}=SVector{2,T}(reflect_diag(pt))
+@inline apply_symmetry(::AntiDiagonalReflection,pt::SVector{2,T}) where {T<:Real}=SVector{2,T}(reflect_antidiag(pt))
 apply_symmetry(sym::AbsReflection,pts::AbstractVector)=[apply_symmetry(sym,pt) for pt in pts]
 
 """
@@ -184,3 +198,5 @@ The corresponding `Complex{T}` parity or character factor.
 @inline symmetry_irrep_character(::Type{T},sym::YAxisReflection) where {T<:Real}=Complex{T}(sym.parity_x)
 @inline symmetry_irrep_character(::Type{T},sym::XYAxisReflection) where {T<:Real}=Complex{T}(sym.parity_x*sym.parity_y)
 @inline symmetry_irrep_character(::Type{T},sym::NFoldRotation) where {T<:Real}=cis(T(2pi)*T(sym.sector*sym.m)/T(sym.order))
+@inline symmetry_irrep_character(::Type{T},sym::DiagonalReflection) where {T<:Real}=Complex{T}(sym.parity)
+@inline symmetry_irrep_character(::Type{T},sym::AntiDiagonalReflection) where {T<:Real}=Complex{T}(sym.parity)
