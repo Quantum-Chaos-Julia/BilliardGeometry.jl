@@ -2,6 +2,10 @@ const ident=IdentityTransformation()
 const reflect_x=LinearMap(SMatrix{2,2}([-1.0 0.0;0.0 1.0]))
 const reflect_y=LinearMap(SMatrix{2,2}([1.0 0.0;0.0 -1.0]))
 const reflect_xy=reflect_x∘reflect_y
+@inline function rotation_matrix_z(θ::T) where {T<:Real}
+    s,c=sincos(θ)
+    return SMatrix{2,2,T}(c,-s,s,c)
+end
 
 """
     XAxisReflection(parity_y=-1)
@@ -129,7 +133,7 @@ end
 function NFoldRotation(N::Int,m::Int,sector::Int=0)
     angle=2pi/N
     mm=mod(m,N)
-    return NFoldRotation(N,mm,mod(sector,N),angle,LinearMap(RotZ(angle*mm)))
+    return NFoldRotation(N,mm,mod(sector,N),angle,LinearMap(rotation_matrix_z(angle*mm)))
 end
 
 """
