@@ -149,7 +149,7 @@ with
 
 the derivative is evaluated analytically.
 """
-@inline function _polar_radius_derivative(polar::L,phi::T) where {L<:PolarSegment,T<:Real}
+@inline function _polar_radius_derivative(polar::L,phi::T) where {L<:FourierCoeffPolarSegment,T<:Real}
     dr=zero(T)
     sin_coef=polar.coef[1:2:end]
     cos_coef=polar.coef[2:2:end]
@@ -163,14 +163,14 @@ the derivative is evaluated analytically.
 end
 
 """
-    _polar_radius_derivative_2(polar::L,phi::T) where {L<:PolarSegment,T<:Real} → T
+    _polar_radius_derivative_2(polar::L,phi::T) where {L<:FourierCoeffPolarSegment,T<:Real} → T
 
 Return the second angular derivative `d²r/dphi²` of the Fourier radius stored by
-a `PolarSegment`.
+a `FourierCoeffPolarSegment`.
 
 The derivative is evaluated analytically from the Fourier coefficients.
 """
-@inline function _polar_radius_derivative_2(polar::L,phi::T) where {L<:PolarSegment,T<:Real}
+@inline function _polar_radius_derivative_2(polar::L,phi::T) where {L<:FourierCoeffPolarSegment,T<:Real}
     ddr=zero(T)
     sin_coef=polar.coef[1:2:end]
     cos_coef=polar.coef[2:2:end]
@@ -184,7 +184,7 @@ The derivative is evaluated analytically from the Fourier coefficients.
 end
 
 """
-    tangent(polar::L,t::T) where {L<:PolarSegment,T<:Real}
+    tangent(polar::L,t::T) where {L<:FourierCoeffPolarSegment,T<:Real}
 
 Return the first parameter derivative of a Fourier polar segment.
 
@@ -213,7 +213,7 @@ Both `r` and `r'` are evaluated directly from the Fourier representation.
 ## Returns
 * `dr`: First parameter derivative `dr/dt`.
 """
-@inline function tangent(polar::L,t::T) where {L<:PolarSegment,T<:Real}
+@inline function tangent(polar::L,t::T) where {L<:FourierCoeffPolarSegment,T<:Real}
     phi=polar.shift_angle+t*polar.arc_angle
     r=polar_radius(polar,phi)
     dr=_polar_radius_derivative(polar,phi)
@@ -222,7 +222,7 @@ Both `r` and `r'` are evaluated directly from the Fourier representation.
 end
 
 """
-    tangent_2(polar::L,t::T) where {L<:PolarSegment,T<:Real}
+    tangent_2(polar::L,t::T) where {L<:FourierCoeffPolarSegment,T<:Real}
 
 Return the second parameter derivative of a Fourier polar segment.
 
@@ -244,13 +244,81 @@ Fourier coefficients.
 ## Returns
 * `ddr`: Second parameter derivative `d²r/dt²`.
 """
-@inline function tangent_2(polar::L,t::T) where {L<:PolarSegment,T<:Real}
+@inline function tangent_2(polar::L,t::T) where {L<:FourierCoeffPolarSegment,T<:Real}
     phi=polar.shift_angle+t*polar.arc_angle
     r=polar_radius(polar,phi)
     dr=_polar_radius_derivative(polar,phi)
     ddr=_polar_radius_derivative_2(polar,phi)
     dphi2=polar.arc_angle^2
     return dphi2*SVector(ddr*cos(phi)-2*dr*sin(phi)-r*cos(phi),ddr*sin(phi)+2*dr*cos(phi)-r*sin(phi))
+end
+
+"""
+    tangent(polar_curve::L,t::T) where {L<:PolarSegment,T<:Real}
+
+Evaluate the first parameter derivative of a polar segment.
+
+## Arguments
+* `polar_curve::L`: Polar segment.
+* `t::T`: Curve parameter.
+
+## Returns
+* `SVector{2}`: Tangent vector `dx/dt`.
+"""
+function tangent(polar_curve::L,t::T) where {L<:PolarSegment,T<:Real}
+    dx=ForwardDiff.derivative(u->curve(polar_curve,u)[1],t)
+    dy=ForwardDiff.derivative(u->curve(polar_curve,u)[2],t)
+    return SVector(dx,dy)
+end
+
+"""
+    tangent(polar_curve::L,ts::AbstractArray) where {L<:PolarSegment}
+
+Evaluate tangent vectors at multiple parameters.
+
+## Arguments
+* `polar_curve::L`: Polar segment.
+* `ts::AbstractArray`: Curve parameters.
+
+## Returns
+* `Vector`: Tangent vectors.
+"""
+function tangent(polar_curve::L,ts::AbstractArray) where {L<:PolarSegment}
+    return [tangent(polar_curve,t) for t in ts]
+end
+
+"""
+    tangent_2(polar_curve::L,t::T) where {L<:PolarSegment,T<:Real}
+
+Evaluate the second parameter derivative of a polar segment.
+
+## Arguments
+* `polar_curve::L`: Polar segment.
+* `t::T`: Curve parameter.
+
+## Returns
+* `SVector{2}`: Second derivative `d²x/dt²`.
+"""
+function tangent_2(polar_curve::L,t::T) where {L<:PolarSegment,T<:Real}
+    ddx=ForwardDiff.derivative(u->ForwardDiff.derivative(v->curve(polar_curve,v)[1],u),t)
+    ddy=ForwardDiff.derivative(u->ForwardDiff.derivative(v->curve(polar_curve,v)[2],u),t)
+    return SVector(ddx,ddy)
+end
+
+"""
+    tangent_2(polar_curve::L,ts::AbstractArray) where {L<:PolarSegment}
+
+Evaluate second derivatives at multiple parameters.
+
+## Arguments
+* `polar_curve::L`: Polar segment.
+* `ts::AbstractArray`: Curve parameters.
+
+## Returns
+* `Vector`: Second derivative vectors.
+"""
+function tangent_2(polar_curve::L,ts::AbstractArray) where {L<:PolarSegment}
+    return [tangent_2(polar_curve,t) for t in ts]
 end
 
 """
