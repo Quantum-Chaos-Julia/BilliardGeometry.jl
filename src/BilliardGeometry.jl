@@ -38,13 +38,22 @@ include("geometry/domains/polygons.jl")
 include("geometry/domains/circular.jl")
 include("geometry/domains/compositedomains.jl")
 include("geometry/segments/curve_derivatives.jl")
-include("geometry/billiards/stadium.jl")
-include("geometry/billiards/polar.jl")
+include("billiards/circle.jl")
+include("billiards/rectangle.jl")
+include("billiards/limacon.jl")
+include("billiards/prosen.jl")
+include("billiards/triangle.jl")
+include("billiards/star.jl")
+include("billiards/circle_with_hole.jl")
+include("billiards/sinai.jl")
+include("billiards/rectangle_in_rectangle.jl")
+include("billiards/c3.jl")
 include("geometry/geometry.jl")
 include("geometry/inversions.jl")
 include("geometry/arclength.jl")
 include("geometry/poincarebirkhoff.jl")
 include("quadrature/samplers.jl")
+include("geometry/boundarypoints.jl")
 
 export AbsBoundaryCondition
 export AbsCurve,AbsPolarCurve,AbsCompositeCurve
@@ -65,11 +74,23 @@ export get_boundary_curves,get_all_curves,get_curve
 export get_all_domains,get_domain,update_boundary_condition
 
 export LineSegment
-export PolarSegment,polar_radius
+export PolarSegment,PolarSegment,polar_radius
 export CircleSegment
 export CompositeCurve
 export curve,domain_fun
 export tangent,tangent_2,tangent_vec,normal_vec,curvature
+
+export CircleBilliard
+export RectangleBilliard
+export TriangleBilliard,IsoscelesTriangleBilliard
+export LimaconBilliard
+export ProsenBilliard
+export StarBilliard
+export CircleStarBilliard,AnnularBilliard
+export SinaiBilliard
+export RectangleWithinRectangleBilliard
+export C3Billiard
+export EllipseBilliard
 
 export is_overlaping,is_connected,is_closed
 export angle,signed_angle
@@ -95,5 +116,6 @@ export pb_coords,get_pb_curve,pb_sectors
 
 export LinearNodes,GaussLegendreNodes,FourierNodes
 export sample_points,random_interior_points
+export boundary_coords
 
 end
