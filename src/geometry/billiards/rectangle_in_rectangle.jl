@@ -148,9 +148,6 @@ struct DiagonalRectangleWithinRectangleBilliard{T}<:BilliardGeometry.AbsBilliard
     full_boundary::Vector{BilliardGeometry.AbsCurve}
     fundamental_domain::BilliardGeometry.SimpleDomain{T}
     symmetries::Vector{BilliardGeometry.AbsSymmetry}
-    cafb_corner::SVector{2,T}
-    cafb_corner_angle::T
-    cafb_rotation_angle::T
 end
 
 function DiagonalRectangleWithinRectangleBilliard(a_outer::T,a_inner::T,shift::T) where {T<:Real}
@@ -238,16 +235,9 @@ function DiagonalRectangleWithinRectangleBilliard(a_outer::T,a_inner::T,shift::T
         BilliardGeometry.DiagonalReflection()
     ]
 
-    cafb_corner=E
-    cafb_corner_angle=T(3pi/4)
-    cafb_rotation_angle=T(3*pi/4)
-
     return DiagonalRectangleWithinRectangleBilliard{T}(
         boundary,
         fundamental_domain,
         symmetries,
-        cafb_corner,
-        cafb_corner_angle,
-        cafb_rotation_angle
     )
 end
