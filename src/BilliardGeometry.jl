@@ -30,7 +30,7 @@ abstract type AbsSampler end
 include("geometry/symmetry.jl")
 include("geometry/boundarytypes.jl")
 include("geometry/segments/linesegment.jl")
-include("geometry/segments/polarcurves.jl")
+include("geometry/segments/polarsegment.jl")
 include("geometry/segments/circlesegment.jl")
 include("geometry/utils.jl")
 include("geometry/segments/compositecurves.jl")
