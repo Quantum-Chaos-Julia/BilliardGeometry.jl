@@ -9,12 +9,12 @@ The billiard has fourfold rotational symmetry. The stored fundamental domain is
 one quarter of the full billiard, spanning an angular interval of `π/2`.
 
 ## Attributes
-* `fundamental_domain::BilliardGeometry.PolarDomain{T}`: Quarter-domain fundamental region.
+* `fundamental_domain::BilliardGeometry.SimpleDomain{T}`: Quarter-domain fundamental region.
 * `full_boundary::Vector{BilliardGeometry.AbsCurve}`: Complete physical boundary.
 * `symmetries::Vector{BilliardGeometry.AbsSymmetry}`: Geometric symmetries of the billiard.
 """
 struct ProsenBilliard{T}<:BilliardGeometry.AbsBilliard
-    fundamental_domain::BilliardGeometry.PolarDomain{T}
+    fundamental_domain::BilliardGeometry.SimpleDomain{T}
     full_boundary::Vector{BilliardGeometry.AbsCurve}
     symmetries::Vector{BilliardGeometry.AbsSymmetry}
 end
@@ -47,7 +47,7 @@ function ProsenBilliard(a::T;center=SVector{2,T}(zero(T),zero(T))) where {T<:Rea
     wall2=BilliardGeometry.LineSegment(p1,c;bc=BilliardGeometry.ReflectionSymmetry(BilliardGeometry.YAxisReflection(),4),domain_id=1,segment_id=3)
     fundamental_boundary=BilliardGeometry.AbsCurve[arc,wall2,wall1]
     vertices=SVector{2,T}[p0,p1,c]
-    fundamental_domain=BilliardGeometry.PolarDomain{T}(fundamental_boundary,vertices,1)
+    fundamental_domain=BilliardGeometry.SimpleDomain{T}(fundamental_boundary,vertices,1)
     full=BilliardGeometry.FourierCoeffPolarSegment(coef;R=one(T),arc_angle=T(2pi),shift_angle=zero(T),center=c,bc=bc,domain_id=1,segment_id=1)
     full_boundary=BilliardGeometry.AbsCurve[full]
     symmetries=BilliardGeometry.AbsSymmetry[BilliardGeometry.XAxisReflection(),BilliardGeometry.YAxisReflection(),BilliardGeometry.XYAxisReflection()]

@@ -10,12 +10,12 @@ The full physical boundary is represented by one closed
 reflection across the x-axis, so the fundamental domain is the upper half.
 
 ## Attributes
-* `fundamental_domain::BilliardGeometry.PolarDomain{T}`: Upper-half fundamental domain.
+* `fundamental_domain::BilliardGeometry.SimpleDomain{T}`: Upper-half fundamental domain.
 * `full_boundary::Vector{BilliardGeometry.AbsCurve}`: Complete physical boundary.
 * `symmetries::Vector{BilliardGeometry.AbsSymmetry}`: Geometric symmetries of the billiard.
 """
 struct LimaconBilliard{T}<:BilliardGeometry.AbsBilliard
-    fundamental_domain::BilliardGeometry.PolarDomain{T}
+    fundamental_domain::BilliardGeometry.SimpleDomain{T}
     full_boundary::Vector{BilliardGeometry.AbsCurve}
     symmetries::Vector{BilliardGeometry.AbsSymmetry}
 end
@@ -48,7 +48,7 @@ function LimaconBilliard(ε::T;R::T=one(T),center=SVector{2,T}(zero(T),zero(T)))
     wall=BilliardGeometry.LineSegment(pL,pR;bc=BilliardGeometry.ReflectionSymmetry(BilliardGeometry.XAxisReflection(),2),domain_id=1,segment_id=2)
     fundamental_boundary=BilliardGeometry.AbsCurve[arc,wall]
     vertices=SVector{2,T}[pR,pL]
-    fundamental_domain=BilliardGeometry.PolarDomain{T}(fundamental_boundary,vertices,1)
+    fundamental_domain=BilliardGeometry.SimpleDomain{T}(fundamental_boundary,vertices,1)
     full=BilliardGeometry.FourierCoeffPolarSegment(coef;R=R,arc_angle=T(2pi),shift_angle=zero(T),center=c,bc=bc,domain_id=1,segment_id=1)
     full_boundary=BilliardGeometry.AbsCurve[full]
     symmetries=BilliardGeometry.AbsSymmetry[BilliardGeometry.XAxisReflection()]
