@@ -69,7 +69,7 @@ export PolarSegment,polar_radius
 export CircleSegment
 export CompositeCurve
 export curve,domain_fun
-export tangent,tangent_2,curvature
+export tangent,tangent_2,tangent_vec,normal_vec,curvature
 
 export is_overlaping,is_connected,is_closed
 export angle,signed_angle
