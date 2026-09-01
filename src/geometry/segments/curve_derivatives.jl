@@ -134,10 +134,10 @@ For `phi(t)=shift_angle+arc_angle*t`,
 end
 
 """
-    _polar_radius_derivative(polar::L,phi::T) where {L<:PolarSegment,T<:Real} → T
+    _polar_radius_derivative(polar::L,phi::T) where {L<:FourierCoeffPolarSegment,T<:Real} → T
 
 Return the first angular derivative `dr/dphi` of the Fourier radius stored by a
-`PolarSegment`.
+`FourierCoeffPolarSegment`.
 
 For the coefficient convention
 
