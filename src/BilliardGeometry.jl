@@ -90,7 +90,7 @@ export ProsenBilliard
 export StarBilliard
 export CircleStarBilliard,AnnularBilliard
 export SinaiBilliard
-export RectangleWithinRectangleBilliard
+export RectangleWithinRectangleBilliard,DiagonalRectangleWithinRectangleBilliard
 export C3Billiard
 export EllipseBilliard
 
