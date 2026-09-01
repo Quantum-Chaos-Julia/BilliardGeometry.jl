@@ -59,7 +59,7 @@ function AnnularBilliard(R_outer::T,R_inner::T;center=SVector{2,T}(zero(T),zero(
     i1=c+SVector{2,T}(zero(T),R_inner)
     outer_q=BilliardGeometry.CircleSegment(R_outer,T(pi/2),zero(T),c;bc=bc,domain_id=1,segment_id=1)
     ywall=BilliardGeometry.LineSegment(o1,i1;bc=BilliardGeometry.ReflectionSymmetry(BilliardGeometry.YAxisReflection(),4),domain_id=1,segment_id=2)
-    inner_q=BilliardGeometry.CircleSegment(R_inner,T(pi/2),T(pi/2),c;bc=bc,orientation=-1,domain_id=1,segment_id=3) # clockwise around the obstacle in the fundamental domain
+    inner_q=BilliardGeometry.CircleSegment(R_inner,-T(pi/2),T(pi/2),c;orientation=-1,bc=bc,domain_id=1,segment_id=3)
     xwall=BilliardGeometry.LineSegment(i0,o0;bc=BilliardGeometry.ReflectionSymmetry(BilliardGeometry.XAxisReflection(),4),domain_id=1,segment_id=4)
     fundamental_boundary=BilliardGeometry.AbsCurve[outer_q,ywall,inner_q,xwall]
     vertices=SVector{2,T}[o0,o1,i1,i0]
