@@ -65,6 +65,7 @@ export AbsBilliard,AbsSampler
 
 export XAxisReflection,YAxisReflection,XYAxisReflection
 export DiagonalReflection,AntiDiagonalReflection
+export CompositeReflection
 export NFoldRotation
 export apply_symmetry,apply_symmetry_pb
 export D2_symmetry,Cn_symmetry,symmetry_irrep_character
