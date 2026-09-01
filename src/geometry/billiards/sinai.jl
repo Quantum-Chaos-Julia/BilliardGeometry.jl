@@ -31,7 +31,6 @@ origin on the positive x-axis.
 """
 function SinaiBilliard(a::T,b::T,R_inner::T;center=SVector{2,T}(zero(T),zero(T))) where {T<:Real}
     c=SVector{2,T}(center)
-    iszero(c[1])&&iszero(c[2])||throw(ArgumentError("D2 symmetry currently requires center == (0,0); received center=$c"))
     zero(T)<R_inner<min(a,b)||throw(ArgumentError("Require 0<R_inner<min(a,b); received R_inner=$R_inner"))
     p0=c+SVector{2,T}(a,zero(T))
     p1=c+SVector{2,T}(a,b)

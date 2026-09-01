@@ -56,7 +56,6 @@ integer symmetry maps.
 """
 function RectangleWithinRectangleBilliard(a_outer::T,b_outer::T,a_inner::T,b_inner::T;center=SVector{2,T}(zero(T),zero(T))) where {T<:Real}
     c=SVector{2,T}(center)
-    iszero(c[1])&&iszero(c[2])||throw(ArgumentError("D2 symmetry currently requires center == (0,0); received center=$c"))
     o0=c+SVector{2,T}(a_outer,zero(T))
     o1=c+SVector{2,T}(a_outer,b_outer)
     o2=c+SVector{2,T}(-a_outer,b_outer)
