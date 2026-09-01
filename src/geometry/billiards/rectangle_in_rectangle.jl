@@ -239,8 +239,8 @@ function DiagonalRectangleWithinRectangleBilliard(a_outer::T,a_inner::T,shift::T
     ]
 
     cafb_corner=E
-    cafb_corner_angle=T(3pi/2)
-    cafb_rotation_angle=T(pi)
+    cafb_corner_angle=T(3pi/4)
+    cafb_rotation_angle=T(3*pi/4)
 
     return DiagonalRectangleWithinRectangleBilliard{T}(
         boundary,
