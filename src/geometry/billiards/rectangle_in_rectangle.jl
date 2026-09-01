@@ -154,90 +154,30 @@ function DiagonalRectangleWithinRectangleBilliard(a_outer::T,a_inner::T,shift::T
     a_outer>zero(T)||throw(ArgumentError("a_outer must be positive"))
     a_inner>zero(T)||throw(ArgumentError("a_inner must be positive"))
     a_inner<a_outer||throw(ArgumentError("a_inner must be smaller than a_outer"))
-
     lo=shift-a_inner
     hi=shift+a_inner
     -a_outer<lo<hi<a_outer||throw(ArgumentError("shifted inner square must lie strictly inside the outer square"))
-
     A0=SVector{2,T}(-a_outer,-a_outer)
     B0=SVector{2,T}(a_outer,-a_outer)
     C0=SVector{2,T}(a_outer,a_outer)
     D0=SVector{2,T}(hi,hi)
     E0=SVector{2,T}(hi,lo)
     F0=SVector{2,T}(lo,lo)
-
-    # CAFB formulas assume that the re-entrant corner is exactly the origin.
     A=A0-E0
     B=B0-E0
     C=C0-E0
     D=D0-E0
     E=SVector{2,T}(zero(T),zero(T))
     F=F0-E0
-
-    outer_bottom=BilliardGeometry.LineSegment(
-        A,B;
-        bc=BilliardGeometry.SpecularReflection(),
-        domain_id=1,
-        segment_id=1
-    )
-
-    outer_right=BilliardGeometry.LineSegment(
-        B,C;
-        bc=BilliardGeometry.SpecularReflection(),
-        domain_id=1,
-        segment_id=2
-    )
-
-    # Diagonal fundamental-domain boundary: NOT ignored.
-    diagonal_upper=BilliardGeometry.LineSegment(
-        C,D;
-        bc=BilliardGeometry.SpecularReflection(),
-        domain_id=1,
-        segment_id=3
-    )
-
-    # First CAFB corner ray: basis satisfies BC analytically.
-    corner_vertical=BilliardGeometry.LineSegment(
-        D,E;
-        bc=BilliardGeometry.QuantumSolverIgnore(),
-        domain_id=1,
-        segment_id=4
-    )
-
-    # Second CAFB corner ray: basis satisfies BC analytically.
-    corner_horizontal=BilliardGeometry.LineSegment(
-        E,F;
-        bc=BilliardGeometry.QuantumSolverIgnore(),
-        domain_id=1,
-        segment_id=5
-    )
-
-    # Diagonal fundamental-domain boundary: NOT ignored.
-    diagonal_lower=BilliardGeometry.LineSegment(
-        F,A;
-        bc=BilliardGeometry.SpecularReflection(),
-        domain_id=1,
-        segment_id=6
-    )
-
-    boundary=BilliardGeometry.AbsCurve[
-        outer_bottom,
-        outer_right,
-        diagonal_upper,
-        corner_vertical,
-        corner_horizontal,
-        diagonal_lower
-    ]
-
-    vertices=SVector{2,T}[A,B,C,D,E,F]
+    corner_vertical=BilliardGeometry.LineSegment(D,E;bc=BilliardGeometry.QuantumSolverIgnore(),domain_id=1,segment_id=1)
+    corner_horizontal=BilliardGeometry.LineSegment(E,F;bc=BilliardGeometry.QuantumSolverIgnore(),domain_id=1,segment_id=2)
+    diagonal_lower=BilliardGeometry.LineSegment(F,A;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=3)
+    outer_bottom=BilliardGeometry.LineSegment(A,B;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=4)
+    outer_right=BilliardGeometry.LineSegment(B,C;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=5)
+    diagonal_upper=BilliardGeometry.LineSegment(C,D;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=6)
+    boundary=BilliardGeometry.AbsCurve[corner_vertical,corner_horizontal,diagonal_lower,outer_bottom,outer_right,diagonal_upper]
+    vertices=SVector{2,T}[D,E,F,A,B,C]
     fundamental_domain=BilliardGeometry.SimpleDomain(boundary,vertices,1)
-    symmetries=BilliardGeometry.AbsSymmetry[
-        BilliardGeometry.DiagonalReflection()
-    ]
-
-    return DiagonalRectangleWithinRectangleBilliard{T}(
-        boundary,
-        fundamental_domain,
-        symmetries,
-    )
+    symmetries=BilliardGeometry.AbsSymmetry[BilliardGeometry.DiagonalReflection()]
+    return DiagonalRectangleWithinRectangleBilliard{T}(boundary,fundamental_domain,symmetries)
 end
