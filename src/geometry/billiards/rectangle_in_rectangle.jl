@@ -98,18 +98,51 @@ end
 
 """
     DiagonalRectangleWithinRectangleBilliard(a_outer::T,a_inner::T,shift::T) where {T<:Real}
-Construct the diagonal fundamental domain of a square-within-square billiard whose inner square is shifted by `(shift,shift)`.
-The returned simply connected fundamental domain is the half `y<=x`, with vertices
+
+Construct the diagonal fundamental domain of a square-within-square billiard
+whose inner square is shifted by `(shift,shift)`.
+
+The geometry is translated so that the re-entrant corner is exactly at the
+origin, as required by the corner-adapted Fourier-Bessel (CAFB) basis.
+
+Before translation the vertices are
+
     A=(-a_outer,-a_outer)
     B=( a_outer,-a_outer)
     C=( a_outer, a_outer)
     D=( shift+a_inner, shift+a_inner)
     E=( shift+a_inner, shift-a_inner)
     F=( shift-a_inner, shift-a_inner)
-ordered counterclockwise as
+
+with counterclockwise ordering
+
     A -> B -> C -> D -> E -> F -> A.
-The diagonal segments `C -> D` and `F -> A` are artificial symmetry cuts and are marked with `QuantumSolverIgnore()`, since the corresponding condition is satisfied analytically by the symmetry-adapted basis.
-The re-entrant corner `E` has opening angle `3π/2` and is the natural origin for a corner-adapted Fourier-Bessel basis.
+
+The whole geometry is translated by `-E`, so that
+
+    E=(0,0)
+    D=(0,2a_inner)
+    F=(-2a_inner,0).
+
+The two segments meeting at the re-entrant corner,
+
+    D -> E
+    E -> F,
+
+form the `3π/2` CAFB corner. Since the corner-adapted basis satisfies the
+boundary condition analytically on these two rays, these segments are marked
+with `QuantumSolverIgnore()`.
+
+The diagonal segments
+
+    C -> D
+    F -> A
+
+are boundaries of the diagonal fundamental domain and are therefore retained
+by the quantum solver.
+
+The missing inner-square sector is the upper-left quadrant relative to the
+CAFB origin, while the billiard occupies the complementary `3π/2` sector.
 """
 struct DiagonalRectangleWithinRectangleBilliard{T}<:BilliardGeometry.AbsBilliard
     full_boundary::Vector{BilliardGeometry.AbsCurve}
@@ -119,31 +152,102 @@ struct DiagonalRectangleWithinRectangleBilliard{T}<:BilliardGeometry.AbsBilliard
     cafb_corner_angle::T
     cafb_rotation_angle::T
 end
+
 function DiagonalRectangleWithinRectangleBilliard(a_outer::T,a_inner::T,shift::T) where {T<:Real}
     a_outer>zero(T)||throw(ArgumentError("a_outer must be positive"))
     a_inner>zero(T)||throw(ArgumentError("a_inner must be positive"))
     a_inner<a_outer||throw(ArgumentError("a_inner must be smaller than a_outer"))
+
     lo=shift-a_inner
     hi=shift+a_inner
     -a_outer<lo<hi<a_outer||throw(ArgumentError("shifted inner square must lie strictly inside the outer square"))
-    A=SVector{2,T}(-a_outer,-a_outer)
-    B=SVector{2,T}(a_outer,-a_outer)
-    C=SVector{2,T}(a_outer,a_outer)
-    D=SVector{2,T}(shift+a_inner,shift+a_inner)
-    E=SVector{2,T}(shift+a_inner,shift-a_inner)
-    F=SVector{2,T}(shift-a_inner,shift-a_inner)
-    outer_bottom=BilliardGeometry.LineSegment(A,B;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=1)
-    outer_right=BilliardGeometry.LineSegment(B,C;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=2)
-    diagonal_upper=BilliardGeometry.LineSegment(C,D;bc=BilliardGeometry.QuantumSolverIgnore(),domain_id=1,segment_id=3)
-    inner_right=BilliardGeometry.LineSegment(D,E;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=4)
-    inner_bottom=BilliardGeometry.LineSegment(E,F;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=5)
-    diagonal_lower=BilliardGeometry.LineSegment(F,A;bc=BilliardGeometry.QuantumSolverIgnore(),domain_id=1,segment_id=6)
-    boundary=BilliardGeometry.AbsCurve[outer_bottom,outer_right,diagonal_upper,inner_right,inner_bottom,diagonal_lower]
+
+    A0=SVector{2,T}(-a_outer,-a_outer)
+    B0=SVector{2,T}(a_outer,-a_outer)
+    C0=SVector{2,T}(a_outer,a_outer)
+    D0=SVector{2,T}(hi,hi)
+    E0=SVector{2,T}(hi,lo)
+    F0=SVector{2,T}(lo,lo)
+
+    # CAFB formulas assume that the re-entrant corner is exactly the origin.
+    A=A0-E0
+    B=B0-E0
+    C=C0-E0
+    D=D0-E0
+    E=SVector{2,T}(zero(T),zero(T))
+    F=F0-E0
+
+    outer_bottom=BilliardGeometry.LineSegment(
+        A,B;
+        bc=BilliardGeometry.SpecularReflection(),
+        domain_id=1,
+        segment_id=1
+    )
+
+    outer_right=BilliardGeometry.LineSegment(
+        B,C;
+        bc=BilliardGeometry.SpecularReflection(),
+        domain_id=1,
+        segment_id=2
+    )
+
+    # Diagonal fundamental-domain boundary: NOT ignored.
+    diagonal_upper=BilliardGeometry.LineSegment(
+        C,D;
+        bc=BilliardGeometry.SpecularReflection(),
+        domain_id=1,
+        segment_id=3
+    )
+
+    # First CAFB corner ray: basis satisfies BC analytically.
+    corner_vertical=BilliardGeometry.LineSegment(
+        D,E;
+        bc=BilliardGeometry.QuantumSolverIgnore(),
+        domain_id=1,
+        segment_id=4
+    )
+
+    # Second CAFB corner ray: basis satisfies BC analytically.
+    corner_horizontal=BilliardGeometry.LineSegment(
+        E,F;
+        bc=BilliardGeometry.QuantumSolverIgnore(),
+        domain_id=1,
+        segment_id=5
+    )
+
+    # Diagonal fundamental-domain boundary: NOT ignored.
+    diagonal_lower=BilliardGeometry.LineSegment(
+        F,A;
+        bc=BilliardGeometry.SpecularReflection(),
+        domain_id=1,
+        segment_id=6
+    )
+
+    boundary=BilliardGeometry.AbsCurve[
+        outer_bottom,
+        outer_right,
+        diagonal_upper,
+        corner_vertical,
+        corner_horizontal,
+        diagonal_lower
+    ]
+
     vertices=SVector{2,T}[A,B,C,D,E,F]
     fundamental_domain=BilliardGeometry.SimpleDomain(boundary,vertices,1)
-    symmetries=BilliardGeometry.AbsSymmetry[BilliardGeometry.DiagonalReflection()]
+    symmetries=BilliardGeometry.AbsSymmetry[
+        BilliardGeometry.DiagonalReflection()
+    ]
+
     cafb_corner=E
     cafb_corner_angle=T(3pi/2)
     cafb_rotation_angle=T(pi)
-    return DiagonalRectangleWithinRectangleBilliard{T}(boundary,fundamental_domain,symmetries,cafb_corner,cafb_corner_angle,cafb_rotation_angle)
+
+    return DiagonalRectangleWithinRectangleBilliard{T}(
+        boundary,
+        fundamental_domain,
+        symmetries,
+        cafb_corner,
+        cafb_corner_angle,
+        cafb_rotation_angle
+    )
 end
