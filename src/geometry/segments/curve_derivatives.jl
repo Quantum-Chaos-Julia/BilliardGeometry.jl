@@ -272,22 +272,6 @@ function tangent(polar_curve::L,t::T) where {L<:PolarSegment,T<:Real}
 end
 
 """
-    tangent(polar_curve::L,ts::AbstractArray) where {L<:PolarSegment}
-
-Evaluate tangent vectors at multiple parameters.
-
-## Arguments
-* `polar_curve::L`: Polar segment.
-* `ts::AbstractArray`: Curve parameters.
-
-## Returns
-* `Vector`: Tangent vectors.
-"""
-function tangent(polar_curve::L,ts::AbstractArray) where {L<:PolarSegment}
-    return [tangent(polar_curve,t) for t in ts]
-end
-
-"""
     tangent_2(polar_curve::L,t::T) where {L<:PolarSegment,T<:Real}
 
 Evaluate the second parameter derivative of a polar segment.
@@ -303,22 +287,6 @@ function tangent_2(polar_curve::L,t::T) where {L<:PolarSegment,T<:Real}
     ddx=ForwardDiff.derivative(u->ForwardDiff.derivative(v->curve(polar_curve,v)[1],u),t)
     ddy=ForwardDiff.derivative(u->ForwardDiff.derivative(v->curve(polar_curve,v)[2],u),t)
     return SVector(ddx,ddy)
-end
-
-"""
-    tangent_2(polar_curve::L,ts::AbstractArray) where {L<:PolarSegment}
-
-Evaluate second derivatives at multiple parameters.
-
-## Arguments
-* `polar_curve::L`: Polar segment.
-* `ts::AbstractArray`: Curve parameters.
-
-## Returns
-* `Vector`: Second derivative vectors.
-"""
-function tangent_2(polar_curve::L,ts::AbstractArray) where {L<:PolarSegment}
-    return [tangent_2(polar_curve,t) for t in ts]
 end
 
 """
