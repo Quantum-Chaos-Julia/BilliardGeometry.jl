@@ -169,8 +169,8 @@ function DiagonalRectangleWithinRectangleBilliard(a_outer::T,a_inner::T,shift::T
     D=D0-E0
     E=SVector{2,T}(zero(T),zero(T))
     F=F0-E0
-    corner_vertical=BilliardGeometry.LineSegment(D,E;bc=BilliardGeometry.QuantumSolverIgnore(),domain_id=1,segment_id=1)
-    corner_horizontal=BilliardGeometry.LineSegment(E,F;bc=BilliardGeometry.QuantumSolverIgnore(),domain_id=1,segment_id=2)
+    corner_vertical=BilliardGeometry.LineSegment(D,E;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=1)
+    corner_horizontal=BilliardGeometry.LineSegment(E,F;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=2)
     diagonal_lower=BilliardGeometry.LineSegment(F,A;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=3)
     outer_bottom=BilliardGeometry.LineSegment(A,B;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=4)
     outer_right=BilliardGeometry.LineSegment(B,C;bc=BilliardGeometry.SpecularReflection(),domain_id=1,segment_id=5)
