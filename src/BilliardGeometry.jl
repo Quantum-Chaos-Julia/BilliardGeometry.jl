@@ -47,6 +47,7 @@ include("geometry/billiards/star.jl")
 include("geometry/billiards/circle_with_hole.jl")
 include("geometry/billiards/sinai.jl")
 include("geometry/billiards/rectangle_in_rectangle.jl")
+include("geometry/billiards/polygon.jl")
 include("geometry/billiards/c3.jl")
 include("geometry/billiards/ellipse.jl")
 include("geometry/geometry.jl")
@@ -90,7 +91,8 @@ export ProsenBilliard
 export StarBilliard
 export CircleStarBilliard,AnnularBilliard
 export SinaiBilliard
-export RectangleWithinRectangleBilliard,DiagonalRectangleWithinRectangleBilliard
+export RectangleWithinRectangleBilliard,DiagonalRectangleWithinRectangleBilliard,DiagonallyShiftedRectangleWithinRectangleBilliard
+export PolygonBilliard,PentagonBilliard
 export C3Billiard
 export EllipseBilliard
 
