@@ -54,35 +54,116 @@ Base.length(orbits::SymmetryOrbitMap) = orbits.full_size
 """
     symmetry_node_multiple(symmetry::AbsSymmetry) → n::Int
 
-Returns the smallest full-boundary node count multiple compatible with folding
-onto a fundamental domain under `symmetry` (e.g. `2` for a single reflection,
-so that the boundary can be split evenly across the reflection axis).
+Returns the full-boundary node count multiple required for
+[`symmetry_index_orbits`](@ref) to fold the boundary onto a fundamental
+domain under `symmetry` using exact integer index permutations (no
+floating-point point matching).
 
-!!! note "Migration status"
-    API scaffold only: this generic function currently has no methods. Concrete
-    methods for [`XAxisReflection`](@ref), [`YAxisReflection`](@ref),
-    [`XYAxisReflection`](@ref) and [`NFoldRotation`](@ref) are pending (see the
-    `QuantumBilliardsTests` migration plan).
+## Description
+For [`XAxisReflection`](@ref), [`YAxisReflection`](@ref) and
+[`XYAxisReflection`](@ref) the node count must be divisible by `4` (matching
+the `-develop` reference solvers' node-count sizing, which requires this even
+though the reflection group itself has order `2`, so that the boundary can
+also accommodate the combined `D₂` action exactly). For
+[`NFoldRotation`](@ref), the multiple is the rotation order `sym.order`.
 """
-function symmetry_node_multiple end
+symmetry_node_multiple(::XAxisReflection) = 4
+symmetry_node_multiple(::YAxisReflection) = 4
+symmetry_node_multiple(::XYAxisReflection) = 4
+symmetry_node_multiple(sym::NFoldRotation) = sym.order
+
+# Canonical periodic boundary index actions (boundary assumed sampled by
+# midpoint nodes `s_mid(k,N) = 2π(k-1/2)/N` in canonical orientation, exactly
+# as ported to `QuantumBilliards.jl`/`BilliardGeometry.jl`'s BIM `evaluate_points`
+# methods). All actions below are exact integer permutations of node indices,
+# so no floating-point tolerance/point-matching is required.
+@inline _idx_reflect_x(q::Int, N::Int) = mod1(N-q+1, N)
+@inline _idx_reflect_y(q::Int, N::Int) = mod1(N÷2-q+1, N)
+@inline _idx_rotate_pi(q::Int, N::Int) = mod1(q+N÷2, N)
+@inline _idx_rotate(q::Int, N::Int, n::Int, l::Int) = mod1(q+l*(N÷n), N)
+
+"""
+    _build_symmetry_orbit_map(::Type{T}, N::Int, perms::Vector{Vector{Int}}) where {T<:Real} → orbits::SymmetryOrbitMap{T}
+
+Builds a [`SymmetryOrbitMap`](@ref) from a group of exact full-boundary index
+permutations `perms` (one per group element, `perms[1]` the identity), using
+the trivial representation (`phase` is `one(Complex{T})` everywhere).
+"""
+function _build_symmetry_orbit_map(::Type{T}, N::Int, perms::Vector{Vector{Int}}) where {T<:Real}
+    ng = length(perms)
+    N%ng==0 || throw(ArgumentError("Node count N=$N must be divisible by symmetry-group order $ng"))
+    nf = N÷ng
+    fundamental_indices = Vector{Int}(undef, nf)
+    orbit_of = Vector{Int}(undef, N)
+    phase = ones(Complex{T}, N)
+    seen = falses(N)
+    b = 0
+    @inbounds for q in 1:N
+        seen[q] && continue
+        b += 1
+        fundamental_indices[b] = q
+        for g in 1:ng
+            qi = perms[g][q]
+            orbit_of[qi] = b
+            seen[qi] = true
+        end
+    end
+    return SymmetryOrbitMap{T}(fundamental_indices, orbit_of, phase, N, nf)
+end
 
 """
     symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::AbsSymmetry) where {T<:Real} → orbits::SymmetryOrbitMap{T}
 
-Constructs the [`SymmetryOrbitMap`](@ref) folding the fully discretized boundary
-points `xy` onto a fundamental domain under `symmetry`.
+Constructs the [`SymmetryOrbitMap`](@ref) folding the fully discretized
+boundary points `xy` onto a fundamental domain under `symmetry`.
+
+## Description
+The reduction uses the exact integer index permutation the symmetry induces
+on a canonically ordered periodic boundary sampling (the same convention used
+by the BIM solvers' `evaluate_points` methods), not floating-point nearest-
+neighbor matching on `xy`: `length(xy)` must already be a multiple of
+[`symmetry_node_multiple`](@ref)`(symmetry)`. Only the trivial representation
+is supported (`phase` is `one(Complex{T})` for every node); odd/anti-symmetric
+BIM sectors are not yet implemented.
 
 ## Arguments
 * `T`: Real scalar type used by the boundary discretization.
-* `xy`: Complete (unfolded) boundary points in Cartesian coordinates.
+* `xy`: Complete (unfolded) boundary points in Cartesian coordinates, canonically ordered.
 * `symmetry`: The discrete symmetry the boundary points are invariant under.
 
 ## Returns
 * `orbits`: A [`SymmetryOrbitMap{T}`](@ref) instance.
-
-!!! note "Migration status"
-    API scaffold only: this generic function currently has no methods pending
-    the boundary-integral-method solver migration (see the
-    `QuantumBilliardsTests` migration plan).
 """
-function symmetry_index_orbits end
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::XAxisReflection) where {T<:Real}
+    N = length(xy)
+    N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("XAxisReflection requires N divisible by 4; received N=$N"))
+    id = collect(1:N)
+    refl = [_idx_reflect_x(q,N) for q in 1:N]
+    return _build_symmetry_orbit_map(T, N, [id,refl])
+end
+
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::YAxisReflection) where {T<:Real}
+    N = length(xy)
+    N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("YAxisReflection requires N divisible by 4; received N=$N"))
+    id = collect(1:N)
+    refl = [_idx_reflect_y(q,N) for q in 1:N]
+    return _build_symmetry_orbit_map(T, N, [id,refl])
+end
+
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::XYAxisReflection) where {T<:Real}
+    N = length(xy)
+    N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("XYAxisReflection requires N divisible by 4; received N=$N"))
+    id = collect(1:N)
+    rx = [_idx_reflect_x(q,N) for q in 1:N]
+    ry = [_idx_reflect_y(q,N) for q in 1:N]
+    rxy = [_idx_rotate_pi(q,N) for q in 1:N]
+    return _build_symmetry_orbit_map(T, N, [id,rx,ry,rxy])
+end
+
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::NFoldRotation) where {T<:Real}
+    N = length(xy)
+    n = symmetry_node_multiple(symmetry)
+    N%n==0 || throw(ArgumentError("NFoldRotation of order $n requires N divisible by $n; received N=$N"))
+    perms = [[_idx_rotate(q,N,n,l) for q in 1:N] for l in 0:n-1]
+    return _build_symmetry_orbit_map(T, N, perms)
+end

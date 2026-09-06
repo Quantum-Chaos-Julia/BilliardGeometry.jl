@@ -32,6 +32,10 @@ include("inversions.jl")
 export invert_curve
 include("arclength.jl")
 export arc_length, construct_arc_length_interpolation
+include("curvederivatives.jl")
+export tangent, tangent_2
+include("boundarycomponents.jl")
+export component_lengths, print_component_junctions
 include("poincarebirkhoff.jl")
 export PoincareBirkhoff, pb_coords, get_pb_curve, pb_sectors
 
