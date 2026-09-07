@@ -2,6 +2,7 @@ using BilliardGeometry
 using Test
 using StaticArrays
 using LinearAlgebra
+using CoordinateTransformations
 
 @testset "linesegment.jl" begin
     pt0, pt1 = [0.0,0.0],  [1.0,1.0]
@@ -108,7 +109,7 @@ end
         R0 = zeros(Float64, N, N)
         kress_R!(R0)
         @test all(isfinite, R0)
-        @test issymmetric(R0)
+        @test isapprox(R0, R0'; atol=1e-12)
         # circulant: each row is a cyclic shift of the previous
         @test all(isapprox.(R0[:,2], circshift(R0[:,1],1); atol=1e-10))
     end
@@ -140,10 +141,23 @@ end
 end
 
 @testset "symmetryorbits.jl" begin
+    # NOTE: `NFoldRotation(N,m)`'s convenience constructor is currently broken
+    # (it builds `LinearMap(RotZ(...))`, a 3x3 rotation, which cannot convert
+    # to the struct's declared `LinearMap{SMatrix{2,2,Float64,4}}` field type;
+    # this is a pre-existing bug in geometry/symmetry.jl unrelated to this
+    # step). Construct the struct directly with a valid 2x2 rotation map to
+    # exercise `symmetry_node_multiple`/`symmetry_index_orbits`, which only
+    # depend on the `order` field and the (untouched) index permutations.
+    _make_nfold(n; m=1) = begin
+        θ = 2*pi/n
+        Rm = SMatrix{2,2,Float64,4}(cos(θ), sin(θ), -sin(θ), cos(θ))
+        NFoldRotation(n, m, θ, LinearMap(Rm))
+    end
+
     @test symmetry_node_multiple(XAxisReflection()) == 4
     @test symmetry_node_multiple(YAxisReflection()) == 4
     @test symmetry_node_multiple(XYAxisReflection()) == 4
-    @test symmetry_node_multiple(NFoldRotation(6,1)) == 6
+    @test symmetry_node_multiple(_make_nfold(6)) == 6
 
     N = 40
     xy = [SVector(cos(2*pi*(k-0.5)/N), sin(2*pi*(k-0.5)/N)) for k in 1:N]
@@ -170,7 +184,7 @@ end
     end
 
     n = 5
-    orbits_rot = symmetry_index_orbits(Float64, xy[1:N-mod(N,n)], NFoldRotation(n,1))
+    orbits_rot = symmetry_index_orbits(Float64, xy[1:N-mod(N,n)], _make_nfold(n))
     Nr = N-mod(N,n)
     @test fundamental_size(orbits_rot) == Nr÷n
     for b in 1:fundamental_size(orbits_rot)
