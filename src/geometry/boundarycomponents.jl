@@ -99,3 +99,56 @@ function print_component_junctions(comp::Vector; T=Float64, angle_tol=1e-8)
         println("  $j -> $jr : σ = $σ, angle = $a, $flag")
     end
 end
+
+"""
+    _global_t_to_segment_u(::Type{T}, comp::Vector, t::T) where {T<:Real} → (j::Int, u::T)
+
+Maps a global periodic component parameter `t ∈ [0,2π)` to the corresponding
+curve segment index `j` and local curve parameter `u ∈ [0,1]`, for a
+composite boundary component `comp` parametrized proportionally to arc
+length (used by [`_eval_composite_geom_global_t`](@ref) to evaluate a
+globally Kress-graded composite boundary).
+"""
+function _global_t_to_segment_u(::Type{T}, comp::Vector, t::T) where {T<:Real}
+    lens, cum, Ltot = component_lengths(comp)
+    twopi = T(2*pi)
+    s = (t/twopi)*Ltot
+    s >= Ltot && return 1, zero(T)
+    j = clamp(searchsortedlast(cum, s), 1, length(comp))
+    while j < length(comp) && s >= cum[j+1]
+        j += 1
+    end
+    slocal = s - cum[j]
+    u = lens[j] == zero(T) ? zero(T) : slocal/lens[j]
+    return j, clamp(u, zero(T), one(T))
+end
+
+"""
+    _eval_composite_geom_global_t(::Type{T}, comp::Vector, t::T) where {T<:Real} → (xy, γt, γtt)
+
+Evaluates a composite boundary component `comp` at the global periodic
+parameter `t ∈ [0,2π)`.
+
+## Description
+The global parameter is mapped to the active curve segment and its local
+parameter via [`_global_t_to_segment_u`](@ref); the local curve derivatives
+are then transformed to derivatives with respect to the global periodic
+parameter via the chain rule (`du/dt` constant on each segment).
+
+## Returns
+* `xy`: Boundary point.
+* `γt`: First derivative with respect to the global parameter.
+* `γtt`: Second derivative with respect to the global parameter.
+"""
+function _eval_composite_geom_global_t(::Type{T}, comp::Vector, t::T) where {T<:Real}
+    lens, _, Ltot = component_lengths(comp)
+    j, u = _global_t_to_segment_u(T, comp, t)
+    crv = comp[j]
+    xy = curve(crv, u)
+    du_dt = lens[j] == zero(T) ? zero(T) : Ltot/(T(2*pi)*lens[j])
+    γu = tangent(crv, u)
+    γuu = tangent_2(crv, u)
+    γt = γu*du_dt
+    γtt = γuu*du_dt^2
+    return xy, γt, γtt
+end
