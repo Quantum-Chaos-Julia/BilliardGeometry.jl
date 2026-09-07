@@ -50,7 +50,6 @@ include("geometry/billiards/rectangle_in_rectangle.jl")
 include("geometry/billiards/polygon.jl")
 include("geometry/billiards/c3.jl")
 include("geometry/billiards/ellipse.jl")
-include("geometry/billiards/L.jl")
 include("geometry/geometry.jl")
 include("geometry/inversions.jl")
 include("geometry/arclength.jl")
@@ -96,7 +95,6 @@ export RectangleWithinRectangleBilliard,DiagonalRectangleWithinRectangleBilliard
 export PolygonBilliard,PentagonBilliard
 export C3Billiard
 export EllipseBilliard
-export LShapeBilliard
 
 export is_overlaping,is_connected,is_closed
 export angle,signed_angle
