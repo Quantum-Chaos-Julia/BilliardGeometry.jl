@@ -141,18 +141,13 @@ end
 end
 
 @testset "symmetryorbits.jl" begin
-    # NOTE: `NFoldRotation(N,m)`'s convenience constructor is currently broken
-    # (it builds `LinearMap(RotZ(...))`, a 3x3 rotation, which cannot convert
-    # to the struct's declared `LinearMap{SMatrix{2,2,Float64,4}}` field type;
-    # this is a pre-existing bug in geometry/symmetry.jl unrelated to this
-    # step). Construct the struct directly with a valid 2x2 rotation map to
-    # exercise `symmetry_node_multiple`/`symmetry_index_orbits`, which only
-    # depend on the `order` field and the (untouched) index permutations.
-    _make_nfold(n; m=1) = begin
-        θ = 2*pi/n
-        Rm = SMatrix{2,2,Float64,4}(cos(θ), sin(θ), -sin(θ), cos(θ))
-        NFoldRotation(n, m, θ, LinearMap(Rm))
-    end
+    # `NFoldRotation(N,m)`'s convenience constructor bug (it used to build
+    # `LinearMap(RotZ(...))`, a 3x3 rotation, which could not convert to the
+    # struct's declared `LinearMap{SMatrix{2,2,Float64,4}}` field type) was
+    # fixed as part of the Step 4 symmetry-infrastructure migration (now uses
+    # `rotation_matrix_z`), so the convenience constructor can be used
+    # directly here.
+    _make_nfold(n; m=1) = NFoldRotation(n, m)
 
     @test symmetry_node_multiple(XAxisReflection()) == 4
     @test symmetry_node_multiple(YAxisReflection()) == 4
@@ -190,4 +185,93 @@ end
     for b in 1:fundamental_size(orbits_rot)
         @test length(findall(==(b), orbits_rot.orbit_of)) == n
     end
+
+    # fund_to_full/fund_to_scale/symmetry_orbit: consistent with orbit_of/phase
+    for b in 1:fundamental_size(orbits_xy)
+        qs, χs = symmetry_orbit(orbits_xy, b)
+        @test orbit_size(orbits_xy) == length(qs) == 4
+        for (q,χ) in zip(qs,χs)
+            @test orbits_xy.orbit_of[q] == b
+            @test orbits_xy.phase[q] == χ
+        end
+    end
+    @test full_size(orbits_xy) == N
+
+    # DiagonalReflection / AntiDiagonalReflection: two-element orbits
+    @test symmetry_node_multiple(DiagonalReflection()) == 8
+    @test symmetry_node_multiple(AntiDiagonalReflection()) == 8
+    for (sym, reflect) in ((DiagonalReflection(), pt->SVector(pt[2],pt[1])),
+                           (AntiDiagonalReflection(), pt->SVector(-pt[2],-pt[1])))
+        orbits = symmetry_index_orbits(Float64, xy, sym)
+        @test fundamental_size(orbits) == N÷2
+        @test length(orbits) == N
+        for b in 1:fundamental_size(orbits)
+            members = findall(==(b), orbits.orbit_of)
+            @test length(members) == 2
+            q1,q2 = members
+            @test isapprox(reflect(xy[q1]), xy[q2]; atol=1e-10)
+        end
+    end
+
+    # CompositeReflection(XAxisReflection(),YAxisReflection()) generates the
+    # same D2 group as XYAxisReflection() by closure.
+    comp = CompositeReflection(XAxisReflection(), YAxisReflection())
+    @test symmetry_node_multiple(comp) == 4
+    orbits_comp = symmetry_index_orbits(Float64, xy, comp)
+    @test fundamental_size(orbits_comp) == N÷4
+    for b in 1:fundamental_size(orbits_comp)
+        @test length(findall(==(b), orbits_comp.orbit_of)) == 4
+    end
 end
+
+@testset "fullboundary.jl" begin
+    # Trivial symmetry: full_boundary reproduces get_boundary_curves exactly.
+    tri = TriangleBilliard(1.0, 1.0)
+    @test full_boundary(tri) == get_boundary_curves(tri)
+
+    # D2-symmetric stadium: full_boundary reconstructs the complete closed
+    # physical boundary from the quarter fundamental domain.
+    hw = 0.5
+    stad = StadiumBilliard(hw)
+    fb = full_boundary(stad)
+    @test length(fb) == 4*length(get_boundary_curves(stad))
+
+    # Total arc length equals the full stadium perimeter (two straight edges
+    # of length 2*hw each, plus the full circle circumference 2*pi).
+    Ltot = sum(c.length for c in fb)
+    @test isapprox(Ltot, 4*hw + 2*pi; atol=1e-10)
+
+    # Closed, continuous CCW loop: each curve's endpoint matches the next
+    # curve's start point.
+    for i in eachindex(fb)
+        p_end = curve(fb[i], 1.0)
+        p_start = curve(fb[mod1(i+1,length(fb))], 0.0)
+        @test isapprox(p_end, p_start; atol=1e-10)
+    end
+
+    # Exact index-permutation consistency: sampling full_boundary at N
+    # midpoint nodes and applying apply_symmetry must land on the node
+    # predicted by the canonical periodic reflection index maps.
+    N = 40
+    lens, cum, Lt = component_lengths(fb)
+    function _point_at_sigma(fb, sigma, Lt)
+        target = Lt*sigma/(2*pi)
+        offset = 0.0
+        for j in eachindex(fb)
+            Lj = fb[j].length
+            if target < offset+Lj || j==lastindex(fb)
+                u = clamp((target-offset)/Lj, 0.0, 1.0)
+                return curve(fb[j], u)
+            end
+            offset += Lj
+        end
+    end
+    xy = [_point_at_sigma(fb, 2*pi*(k-0.5)/N, Lt) for k in 1:N]
+    _idx_reflect_x(q,N) = mod1(N-q+1,N)
+    _idx_reflect_y(q,N) = mod1(N÷2-q+1,N)
+    for q in 1:N
+        @test isapprox(apply_symmetry(XAxisReflection(), xy[q]), xy[_idx_reflect_x(q,N)]; atol=1e-8)
+        @test isapprox(apply_symmetry(YAxisReflection(), xy[q]), xy[_idx_reflect_y(q,N)]; atol=1e-8)
+    end
+end
+

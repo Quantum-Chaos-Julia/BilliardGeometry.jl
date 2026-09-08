@@ -1,7 +1,7 @@
 include("symmetry.jl")
-export XAxisReflection, YAxisReflection, XYAxisReflection, NFoldRotation, apply_symmetry, apply_symmetry_pb, D2_symmetry, Cn_symmetry
+export XAxisReflection, YAxisReflection, XYAxisReflection, DiagonalReflection, AntiDiagonalReflection, CompositeReflection, NFoldRotation, apply_symmetry, apply_symmetry_pb, D2_symmetry, Cn_symmetry, symmetry_irrep_character
 include("symmetryorbits.jl")
-export SymmetryOrbitMap, fundamental_size, symmetry_node_multiple, symmetry_index_orbits
+export SymmetryOrbitMap, fundamental_size, full_size, orbit_size, symmetry_orbit, symmetry_node_multiple, symmetry_index_orbits
 include("boundarytypes.jl")
 export SpecularReflection, QuantumSolverIgnore, Transparent, PeriodicX, ReflectionSymmetry, get_boundary_curves, get_all_curves, get_curve, get_all_domains, get_domain, update_boundary_condition
 include("segments/linesegment.jl")
@@ -28,6 +28,8 @@ include("billiards/polar.jl")
 export PolarBilliard, PolarDomain
 include("billiards/limacon.jl")
 export LimaconBilliard, LimaconSegment
+include("fullboundary.jl")
+export full_boundary
 include("inversions.jl")
 export invert_curve
 include("arclength.jl")
