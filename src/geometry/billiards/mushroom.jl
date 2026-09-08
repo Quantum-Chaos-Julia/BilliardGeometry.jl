@@ -17,22 +17,37 @@ function MushroomBilliard(R::T,w::T,h::T;center=SVector{2,T}(zero(T),zero(T))) w
     0<w<R||throw(ArgumentError("Require 0<w<R; received w=$w, R=$R"))
     h>0||throw(ArgumentError("Require h>0; received h=$h"))
     c=SVector{2,T}(center);bc=BilliardGeometry.SpecularReflection()
-    pR=c+SVector{2,T}(R,0);pT=c+SVector{2,T}(0,R);pL=c+SVector{2,T}(-R,0)
+    pT=c+SVector{2,T}(0,R);pL=c+SVector{2,T}(-R,0);pR=c+SVector{2,T}(R,0)
     sL=c+SVector{2,T}(-w,0);sR=c+SVector{2,T}(w,0)
     bL=c+SVector{2,T}(-w,-h);bM=c+SVector{2,T}(0,-h);bR=c+SVector{2,T}(w,-h)
-    cap=BilliardGeometry.CircleSegment(R,T(pi),zero(T),c;bc=bc,domain_id=1,segment_id=1)
+
+    capL=BilliardGeometry.CircleSegment(R,T(pi/2),T(pi/2),c;bc=bc,domain_id=1,segment_id=1)
     shelfL=BilliardGeometry.LineSegment(pL,sL;bc=bc,domain_id=1,segment_id=2)
     stemL=BilliardGeometry.LineSegment(sL,bL;bc=bc,domain_id=1,segment_id=3)
-    bottom=BilliardGeometry.LineSegment(bL,bR;bc=bc,domain_id=1,segment_id=4)
-    stemR=BilliardGeometry.LineSegment(bR,sR;bc=bc,domain_id=1,segment_id=5)
-    shelfR=BilliardGeometry.LineSegment(sR,pR;bc=bc,domain_id=1,segment_id=6)
-    full_boundary=[BilliardGeometry.AbsCurve[cap,shelfL,stemL,bottom,stemR,shelfR]]
-    capR=BilliardGeometry.CircleSegment(R,T(pi/2),zero(T),c;bc=bc,domain_id=1,segment_id=1)
-    ywall=BilliardGeometry.LineSegment(pT,bM;bc=BilliardGeometry.ReflectionSymmetry(BilliardGeometry.YAxisReflection(),2),domain_id=1,segment_id=2)
-    bottomR=BilliardGeometry.LineSegment(bM,bR;bc=bc,domain_id=1,segment_id=3)
+    bottomL=BilliardGeometry.LineSegment(bL,bM;bc=bc,domain_id=1,segment_id=4)
+    bottomR=BilliardGeometry.LineSegment(bM,bR;bc=bc,domain_id=1,segment_id=5)
+    stemR=BilliardGeometry.LineSegment(bR,sR;bc=bc,domain_id=1,segment_id=6)
+    shelfR=BilliardGeometry.LineSegment(sR,pR;bc=bc,domain_id=1,segment_id=7)
+    capR=BilliardGeometry.CircleSegment(R,T(pi/2),zero(T),c;bc=bc,domain_id=1,segment_id=8)
+
+    full_boundary=[BilliardGeometry.AbsCurve[
+        capL,shelfL,stemL,bottomL,bottomR,stemR,shelfR,capR
+    ]]
+
+    ywall=BilliardGeometry.LineSegment(
+        pT,bM;
+        bc=BilliardGeometry.ReflectionSymmetry(BilliardGeometry.YAxisReflection(),2),
+        domain_id=1,
+        segment_id=2
+    )
+    capRq=BilliardGeometry.CircleSegment(R,T(pi/2),zero(T),c;bc=bc,domain_id=1,segment_id=1)
+    bottomRq=BilliardGeometry.LineSegment(bM,bR;bc=bc,domain_id=1,segment_id=3)
     stemRq=BilliardGeometry.LineSegment(bR,sR;bc=bc,domain_id=1,segment_id=4)
     shelfRq=BilliardGeometry.LineSegment(sR,pR;bc=bc,domain_id=1,segment_id=5)
-    fundamental_boundary=BilliardGeometry.AbsCurve[capR,ywall,bottomR,stemRq,shelfRq]
+
+    fundamental_boundary=BilliardGeometry.AbsCurve[
+        capRq,ywall,bottomRq,stemRq,shelfRq
+    ]
     vertices=SVector{2,T}[pR,pT,bM,bR,sR]
     fundamental_domain=BilliardGeometry.SimpleDomain{T}(fundamental_boundary,vertices,1)
     symmetries=BilliardGeometry.AbsSymmetry[BilliardGeometry.YAxisReflection()]
