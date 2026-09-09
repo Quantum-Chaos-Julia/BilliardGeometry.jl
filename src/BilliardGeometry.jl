@@ -51,6 +51,7 @@ include("geometry/billiards/polygon.jl")
 include("geometry/billiards/c3.jl")
 include("geometry/billiards/ellipse.jl")
 include("geometry/billiards/mushroom.jl")
+include("geometry/billiards/stadium.jl")
 include("geometry/geometry.jl")
 include("geometry/inversions.jl")
 include("geometry/arclength.jl")
@@ -97,6 +98,7 @@ export PolygonBilliard,PentagonBilliard
 export C3Billiard
 export EllipseBilliard
 export MushroomBilliard
+export StadiumBilliard
 
 export is_overlaping,is_connected,is_closed
 export angle,signed_angle
