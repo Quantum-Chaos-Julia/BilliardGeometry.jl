@@ -17,48 +17,44 @@ struct MushroomBilliard{T}<:BilliardGeometry.AbsBilliard
     symmetries::Vector{BilliardGeometry.AbsSymmetry}
 end
 
-function MushroomBilliard(R::T,w::T,h::T;center=SVector{2,T}(zero(T),zero(T))) where {T<:Real}
+function MushroomBilliard(R::T,w::T,h::T) where {T<:Real}
     R>0||throw(ArgumentError("Require R>0; received R=$R"))
     0<w<R||throw(ArgumentError("Require 0<w<R; received w=$w, R=$R"))
     h>0||throw(ArgumentError("Require h>0; received h=$h"))
+
+    bc=SpecularReflection();ign=QuantumSolverIgnore()
+    z=zero(T);cfull=SVector{2,T}(z,z)
     x0=((T(pi)+2)*R-2h)/4
-    w<x0<R||throw(ArgumentError("Canonical Y-symmetry origin x0=$x0 must satisfy w<x0<R; received R=$R, w=$w, h=$h"))
+    w<x0<R||throw(ArgumentError("Canonical Y-symmetry origin x0=$x0 must satisfy w<x0<R"))
 
-    c=SVector{2,T}(center);bc=BilliardGeometry.SpecularReflection()
-    p0=c+SVector{2,T}(x0,0);pm=c+SVector{2,T}(-x0,0)
-    pR=c+SVector{2,T}(R,0);pT=c+SVector{2,T}(0,R);pL=c+SVector{2,T}(-R,0)
-    sL=c+SVector{2,T}(-w,0);sR=c+SVector{2,T}(w,0)
-    bL=c+SVector{2,T}(-w,-h);bM=c+SVector{2,T}(0,-h);bR=c+SVector{2,T}(w,-h)
+    p0=cfull+SVector{2,T}(x0,z);pm=cfull+SVector{2,T}(-x0,z)
+    pR=cfull+SVector{2,T}(R,z);pL=cfull+SVector{2,T}(-R,z)
+    sL=cfull+SVector{2,T}(-w,z);sR=cfull+SVector{2,T}(w,z)
+    bL=cfull+SVector{2,T}(-w,-h);bR=cfull+SVector{2,T}(w,-h)
 
-    shelfRO=BilliardGeometry.LineSegment(p0,pR;bc=bc,domain_id=1,segment_id=1)
-    cap=BilliardGeometry.CircleSegment(R,T(pi),zero(T),c;bc=bc,domain_id=1,segment_id=2)
-    shelfLO=BilliardGeometry.LineSegment(pL,pm;bc=bc,domain_id=1,segment_id=3)
-    shelfLI=BilliardGeometry.LineSegment(pm,sL;bc=bc,domain_id=1,segment_id=4)
-    stemL=BilliardGeometry.LineSegment(sL,bL;bc=bc,domain_id=1,segment_id=5)
-    bottom=BilliardGeometry.LineSegment(bL,bR;bc=bc,domain_id=1,segment_id=6)
-    stemR=BilliardGeometry.LineSegment(bR,sR;bc=bc,domain_id=1,segment_id=7)
-    shelfRI=BilliardGeometry.LineSegment(sR,p0;bc=bc,domain_id=1,segment_id=8)
+    shelfRO=LineSegment(p0,pR;bc=bc,domain_id=1,segment_id=1)
+    cap=CircleSegment(R,T(pi),z,cfull;bc=bc,domain_id=1,segment_id=2)
+    shelfLO=LineSegment(pL,pm;bc=bc,domain_id=1,segment_id=3)
+    shelfLI=LineSegment(pm,sL;bc=bc,domain_id=1,segment_id=4)
+    stemL=LineSegment(sL,bL;bc=bc,domain_id=1,segment_id=5)
+    bottom=LineSegment(bL,bR;bc=bc,domain_id=1,segment_id=6)
+    stemR=LineSegment(bR,sR;bc=bc,domain_id=1,segment_id=7)
+    shelfRI=LineSegment(sR,p0;bc=bc,domain_id=1,segment_id=8)
+    full_boundary=[AbsCurve[shelfRO,cap,shelfLO,shelfLI,stemL,bottom,stemR,shelfRI]]
 
-    full_boundary=[BilliardGeometry.AbsCurve[
-        shelfRO,cap,shelfLO,shelfLI,stemL,bottom,stemR,shelfRI
-    ]]
+    cfd=SVector{2,T}(-w,z)
+    pRf=cfd+SVector{2,T}(R,z);pTf=cfd+SVector{2,T}(z,R)
+    sRf=cfd+SVector{2,T}(w,z)
+    bMf=cfd+SVector{2,T}(z,-h);bRf=cfd+SVector{2,T}(w,-h)
 
-    capR=BilliardGeometry.CircleSegment(R,T(pi/2),zero(T),c;bc=bc,domain_id=1,segment_id=1)
-    ywall=BilliardGeometry.LineSegment(
-        pT,bM;
-        bc=BilliardGeometry.ReflectionSymmetry(BilliardGeometry.YAxisReflection(),2),
-        domain_id=1,
-        segment_id=2
-    )
-    bottomR=BilliardGeometry.LineSegment(bM,bR;bc=bc,domain_id=1,segment_id=3)
-    stemRq=BilliardGeometry.LineSegment(bR,sR;bc=bc,domain_id=1,segment_id=4)
-    shelfRq=BilliardGeometry.LineSegment(sR,pR;bc=bc,domain_id=1,segment_id=5)
+    bottomR=LineSegment(bMf,bRf;bc=bc,domain_id=1,segment_id=1)
+    stemRq=LineSegment(bRf,sRf;bc=ign,domain_id=1,segment_id=2)
+    shelfRq=LineSegment(sRf,pRf;bc=ign,domain_id=1,segment_id=3)
+    capR=CircleSegment(R,T(pi/2),z,cfd;bc=bc,domain_id=1,segment_id=4)
+    ywall=LineSegment(pTf,bMf;bc=bc,domain_id=1,segment_id=5)
 
-    fundamental_boundary=BilliardGeometry.AbsCurve[
-        capR,ywall,bottomR,stemRq,shelfRq
-    ]
-    vertices=SVector{2,T}[pR,pT,bM,bR,sR]
-    fundamental_domain=BilliardGeometry.SimpleDomain{T}(fundamental_boundary,vertices,1)
-    symmetries=BilliardGeometry.AbsSymmetry[BilliardGeometry.YAxisReflection()]
-    return MushroomBilliard{T}(fundamental_domain,full_boundary,symmetries)
+    fundamental_boundary=AbsCurve[bottomR,stemRq,shelfRq,capR,ywall]
+    vertices=SVector{2,T}[bMf,bRf,sRf,pRf,pTf]
+    fundamental_domain=SimpleDomain{T}(fundamental_boundary,vertices,1)
+    return MushroomBilliard{T}(fundamental_domain,full_boundary,AbsSymmetry[])
 end
