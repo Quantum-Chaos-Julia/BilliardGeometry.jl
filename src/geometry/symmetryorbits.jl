@@ -172,9 +172,10 @@ The reduction uses the exact integer index permutation the symmetry induces
 on a canonically ordered periodic boundary sampling (the same convention used
 by the BIM solvers' `evaluate_points` methods), not floating-point nearest-
 neighbor matching on `xy`: `length(xy)` must already be a multiple of
-[`symmetry_node_multiple`](@ref)`(symmetry)`. Only the trivial representation
-is supported (`phase` is `one(Complex{T})` for every node); odd/anti-symmetric
-BIM sectors are not yet implemented.
+[`symmetry_node_multiple`](@ref)`(symmetry)`. The per-node `phase` factors are
+the irreducible-representation characters returned by
+[`symmetry_irrep_character`](@ref), so odd/anti-symmetric BIM sectors are
+supported for every `symmetry` with a `symmetry_irrep_character` method.
 
 ## Arguments
 * `T`: Real scalar type used by the boundary discretization.
@@ -189,7 +190,8 @@ function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symm
     N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("XAxisReflection requires N divisible by 4; received N=$N"))
     id = collect(1:N)
     refl = [_idx_reflect_x(q,N) for q in 1:N]
-    return _build_symmetry_orbit_map(T, N, [id,refl])
+    χ = symmetry_irrep_character(T, symmetry)
+    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), χ])
 end
 
 function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::YAxisReflection) where {T<:Real}
@@ -197,7 +199,8 @@ function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symm
     N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("YAxisReflection requires N divisible by 4; received N=$N"))
     id = collect(1:N)
     refl = [_idx_reflect_y(q,N) for q in 1:N]
-    return _build_symmetry_orbit_map(T, N, [id,refl])
+    χ = symmetry_irrep_character(T, symmetry)
+    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), χ])
 end
 
 function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::XYAxisReflection) where {T<:Real}
@@ -207,7 +210,13 @@ function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symm
     rx = [_idx_reflect_x(q,N) for q in 1:N]
     ry = [_idx_reflect_y(q,N) for q in 1:N]
     rxy = [_idx_rotate_pi(q,N) for q in 1:N]
-    return _build_symmetry_orbit_map(T, N, [id,rx,ry,rxy])
+    # χ_x/χ_y are the characters of the individual axis-reflection generators
+    # (same convention as the `CompositeReflection` expansion below); χ_xy, the
+    # character of the combined π-rotation, is `symmetry_irrep_character`.
+    χ_x = Complex{T}(symmetry.parity_y)
+    χ_y = Complex{T}(symmetry.parity_x)
+    χ_xy = symmetry_irrep_character(T, symmetry)
+    return _build_symmetry_orbit_map(T, N, [id,rx,ry,rxy], Complex{T}[one(Complex{T}), χ_x, χ_y, χ_xy])
 end
 
 function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::NFoldRotation) where {T<:Real}
@@ -215,7 +224,8 @@ function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symm
     n = symmetry_node_multiple(symmetry)
     N%n==0 || throw(ArgumentError("NFoldRotation of order $n requires N divisible by $n; received N=$N"))
     perms = [[_idx_rotate(q,N,n,l) for q in 1:N] for l in 0:n-1]
-    return _build_symmetry_orbit_map(T, N, perms)
+    scales = Complex{T}[cis(T(2*pi)*T(symmetry.sector*l)/T(n)) for l in 0:n-1]
+    return _build_symmetry_orbit_map(T, N, perms, scales)
 end
 
 """

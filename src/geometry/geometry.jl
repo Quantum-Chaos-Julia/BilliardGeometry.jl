@@ -7,7 +7,7 @@ export SpecularReflection, QuantumSolverIgnore, Transparent, PeriodicX, Reflecti
 include("segments/linesegment.jl")
 export LineSegment
 include("segments/polarcurves.jl")
-export PolarSegment, polar_radius
+export PolarSegment, FourierCoeffPolarSegment, polar_radius
 include("segments/circlesegment.jl")
 export CircleSegment
 include("segments/compositecurves.jl")
@@ -35,7 +35,7 @@ export invert_curve
 include("arclength.jl")
 export arc_length, construct_arc_length_interpolation
 include("curvederivatives.jl")
-export tangent, tangent_2
+export tangent, tangent_2, tangent_vec, normal_vec, curvature
 include("boundarycomponents.jl")
 export component_lengths, print_component_junctions
 include("poincarebirkhoff.jl")

@@ -44,10 +44,10 @@ end
     return SVector(-Ra2*cos(phi), -Ra2*sin(phi))
 end
 
-# PolarSegment: r(phi) = R + Σ aₙcos(nφ) + Σ bₙsin(nφ), coef = [b₁,a₁,b₂,a₂,...]
+# FourierCoeffPolarSegment: r(phi) = R + Σ aₙcos(nφ) + Σ bₙsin(nφ), coef = [b₁,a₁,b₂,a₂,...]
 # (same coefficient convention as `polar_radius`). Both angular derivatives are
 # evaluated analytically from the Fourier coefficients.
-@inline function _polar_radius_derivative(polar::L, phi::T) where {L<:PolarSegment,T<:Real}
+@inline function _polar_radius_derivative(polar::L, phi::T) where {L<:FourierCoeffPolarSegment,T<:Real}
     dr = zero(T)
     sin_coef = polar.coef[1:2:end]
     cos_coef = polar.coef[2:2:end]
@@ -60,7 +60,7 @@ end
     return dr
 end
 
-@inline function _polar_radius_derivative_2(polar::L, phi::T) where {L<:PolarSegment,T<:Real}
+@inline function _polar_radius_derivative_2(polar::L, phi::T) where {L<:FourierCoeffPolarSegment,T<:Real}
     ddr = zero(T)
     sin_coef = polar.coef[1:2:end]
     cos_coef = polar.coef[2:2:end]
@@ -73,7 +73,7 @@ end
     return ddr
 end
 
-@inline function tangent(polar::L, t::T) where {L<:PolarSegment,T<:Real}
+@inline function tangent(polar::L, t::T) where {L<:FourierCoeffPolarSegment,T<:Real}
     phi = polar.shift_angle + t*polar.arc_angle
     r = polar_radius(polar, phi)
     dr = _polar_radius_derivative(polar, phi)
@@ -81,11 +81,75 @@ end
     return dphi*SVector(dr*cos(phi)-r*sin(phi), dr*sin(phi)+r*cos(phi))
 end
 
-@inline function tangent_2(polar::L, t::T) where {L<:PolarSegment,T<:Real}
+@inline function tangent_2(polar::L, t::T) where {L<:FourierCoeffPolarSegment,T<:Real}
     phi = polar.shift_angle + t*polar.arc_angle
     r = polar_radius(polar, phi)
     dr = _polar_radius_derivative(polar, phi)
     ddr = _polar_radius_derivative_2(polar, phi)
     dphi2 = polar.arc_angle^2
     return dphi2*SVector(ddr*cos(phi)-2*dr*sin(phi)-r*cos(phi), ddr*sin(phi)+2*dr*cos(phi)-r*sin(phi))
+end
+
+# PolarSegment (arbitrary r_func(φ)): no analytic derivative is available, so
+# `curve(polar_curve, t)` is differentiated via nested `ForwardDiff` calls.
+function tangent(polar_curve::L, t::T) where {L<:PolarSegment,T<:Real}
+    dx = ForwardDiff.derivative(u->curve(polar_curve,u)[1], t)
+    dy = ForwardDiff.derivative(u->curve(polar_curve,u)[2], t)
+    return SVector(dx,dy)
+end
+
+function tangent_2(polar_curve::L, t::T) where {L<:PolarSegment,T<:Real}
+    ddx = ForwardDiff.derivative(u->ForwardDiff.derivative(v->curve(polar_curve,v)[1], u), t)
+    ddy = ForwardDiff.derivative(u->ForwardDiff.derivative(v->curve(polar_curve,v)[2], u), t)
+    return SVector(ddx,ddy)
+end
+
+"""
+    tangent_vec(crv::AbsCurve, ts::AbstractArray) → t̂::Vector
+
+Unit tangent vectors, `t̂(t) = v(t)/norm(v(t))` where `v(t) = tangent(crv,t)`.
+"""
+function tangent_vec(crv::AbsCurve, ts::AbstractArray{<:Real})
+    ta = tangent(crv, ts)
+    return [ti/norm(ti) for ti in ta]
+end
+
+"""
+    normal_vec(crv::AbsCurve, ts::AbstractArray) → n̂::Vector
+
+Unit outward normal vectors, obtained from the unit tangent by a clockwise
+90° rotation, `(tx,ty) -> (ty,-tx)`. Valid for a CCW-oriented outer boundary;
+hole boundaries need the opposite curve orientation for the same rule to give
+the outward normal of the billiard domain.
+"""
+function normal_vec(crv::AbsCurve, ts::AbstractArray{<:Real})
+    ta = tangent_vec(crv, ts)
+    return [SVector(ti[2], -ti[1]) for ti in ta]
+end
+
+"""
+    curvature(crv::AbsCurve, ts::AbstractArray) → κ::Vector
+    curvature(crv::AbsCurve, t::Real) → κ::Real
+
+Signed curvature `κ(t) = (x'y''-y'x'')/(x'^2+y'^2)^{3/2}`, reusing
+`tangent`/`tangent_2` generically for any `<:AbsCurve`.
+"""
+function curvature(crv::AbsCurve, ts::AbstractArray{<:Real})
+    dr = tangent(crv, ts)
+    ddr = tangent_2(crv, ts)
+    kappa = similar(ts)
+    @inbounds for i in eachindex(ts)
+        v = dr[i]
+        a = ddr[i]
+        den = hypot(v[1], v[2])^3
+        kappa[i] = (v[1]*a[2]-v[2]*a[1])/den
+    end
+    return kappa
+end
+
+function curvature(crv::AbsCurve, t::Real)
+    dr = tangent(crv, t)
+    ddr = tangent_2(crv, t)
+    den = hypot(dr[1], dr[2])^3
+    return (dr[1]*ddr[2]-dr[2]*ddr[1])/den
 end

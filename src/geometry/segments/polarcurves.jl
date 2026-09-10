@@ -1,4 +1,10 @@
-struct PolarSegment{T,BC,N}  <: AbsPolarCurve{BC} where {N<:Int,T<:Real}
+"""
+    FourierCoeffPolarSegment{T,BC,N} <: AbsPolarCurve{BC}
+
+Polar boundary segment with Fourier radial function
+`r(φ) = R + Σₙ[aₙ*cos(nφ)+bₙ*sin(nφ)]`, where `coef = [b₁,a₁,b₂,a₂,...]`.
+"""
+struct FourierCoeffPolarSegment{T,BC,N}  <: AbsPolarCurve{BC} where {N<:Int,T<:Real}
     R::T
     coef::SVector{N,T}
     arc_angle::T
@@ -11,15 +17,16 @@ struct PolarSegment{T,BC,N}  <: AbsPolarCurve{BC} where {N<:Int,T<:Real}
     segment_id::Int64
 end
 
-function PolarSegment(coef; R=1.0, arc_angle =2.0*pi, shift_angle=0.0, center = [0.0,0.0], orientation = 1, bc = SpecularReflection(), domain_id=1, segment_id=1)
+function FourierCoeffPolarSegment(coef; R=1.0, arc_angle=2.0*pi, shift_angle=0.0, center=[0.0,0.0], orientation=1, bc=SpecularReflection(), domain_id=1, segment_id=1)
     N = length(coef)
-    type = eltype(coef)
-    polar_curve = PolarSegment{type,typeof(bc),N}(R,coef,arc_angle,shift_angle,center,orientation,0.0,bc,domain_id,segment_id)
-    L = arc_length(polar_curve, 1.0)
+    T = promote_type(eltype(coef), typeof(R), typeof(arc_angle), typeof(shift_angle), eltype(center))
+    coefs = SVector{N,T}(coef)
+    polar_curve = FourierCoeffPolarSegment{T,typeof(bc),N}(T(R), coefs, T(arc_angle), T(shift_angle), SVector{2,T}(center), Int64(orientation), zero(T), bc, Int64(domain_id), Int64(segment_id))
+    L = arc_length(polar_curve, one(T))
     return @set polar_curve.length = L
 end
 
-function polar_radius(polar_segment::L, phi::T) where {L<:PolarSegment, T<:Real}
+function polar_radius(polar_segment::L, phi::T) where {L<:FourierCoeffPolarSegment, T<:Real}
     let radius = polar_segment.R, sin_coef = polar_segment.coef[1:2:end], cos_coef = polar_segment.coef[2:2:end]
         for (n,a) in enumerate(cos_coef)
             radius = radius + a*cos(phi*n)
@@ -29,6 +36,38 @@ function polar_radius(polar_segment::L, phi::T) where {L<:PolarSegment, T<:Real}
         end
         return radius
     end
+end
+
+"""
+    PolarSegment{T,BC,F} <: AbsPolarCurve{BC}
+
+Polar boundary segment defined by an arbitrary radial function `r_func(φ)`
+(e.g. an interpolation/spline or any closure), not restricted to a Fourier
+series. Derivatives (`tangent`/`tangent_2`) are obtained via `ForwardDiff`
+rather than an analytic formula (see `curvederivatives.jl`).
+"""
+struct PolarSegment{T,BC,F}  <: AbsPolarCurve{BC} where {T<:Real}
+    R::T
+    r_func::F
+    arc_angle::T
+    shift_angle::T
+    center::SVector{2,T}
+    orientation::Int64
+    length::T
+    bc::BC
+    domain_id::Int64
+    segment_id::Int64
+end
+
+function PolarSegment(r_func::F; R=1.0, arc_angle=2.0*pi, shift_angle=0.0, center=[0.0,0.0], orientation=1, bc=SpecularReflection(), domain_id=1, segment_id=1) where {F}
+    T = promote_type(typeof(R), typeof(arc_angle), typeof(shift_angle), eltype(center))
+    polar_curve = PolarSegment{T,typeof(bc),F}(T(R), r_func, T(arc_angle), T(shift_angle), SVector{2,T}(center), Int64(orientation), zero(T), bc, Int64(domain_id), Int64(segment_id))
+    L = arc_length(polar_curve, one(T))
+    return @set polar_curve.length = L
+end
+
+function polar_radius(polar_segment::L, phi::T) where {L<:PolarSegment, T<:Real}
+    return polar_segment.r_func(phi)
 end
 
 function curve(polar_curve::L, t::T) where {L<:AbsPolarCurve, T<:Real}

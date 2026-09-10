@@ -47,7 +47,26 @@ end
 end
 
 @testset "polarsegment.jl" begin
+    # Step 10.9 item C: `PolarSegment`->`FourierCoeffPolarSegment` rename, with
+    # a `promote_type` fix so mismatched literal types (Int `R`, Float32
+    # `coef`, Float64 `center`) still produce a single consistent `T`.
+    seg = FourierCoeffPolarSegment(Float32[0.0,0.0,0.0,0.3]; R=1, center=[0.0,0.0])
+    @test typeof(seg).parameters[1] == Float64
 
+    # New function-based `PolarSegment{T,BC,F}`: derivatives via ForwardDiff,
+    # checked against central finite differences of `curve(t)`.
+    rfunc(phi) = 1.0 + 0.3*cos(2*phi)
+    pseg = PolarSegment(rfunc)
+    h = 1e-6
+    for t0 in (0.1, 0.4, 0.7)
+        xp = curve(pseg, t0+h)
+        xm = curve(pseg, t0-h)
+        x0 = curve(pseg, t0)
+        fd1 = (xp .- xm) ./ (2h)
+        fd2 = (xp .- 2 .* x0 .+ xm) ./ (h^2)
+        @test all(isapprox.(fd1, tangent(pseg, t0); atol=1e-5))
+        @test all(isapprox.(fd2, tangent_2(pseg, t0); atol=1e-3))
+    end
 end
 
 @testset "curvederivatives.jl" begin
@@ -72,6 +91,20 @@ end
     ts = [0.1,0.4,0.9]
     @test tangent(circ, ts) == [tangent(circ,t) for t in ts]
     @test tangent_2(circ, ts) == [tangent_2(circ,t) for t in ts]
+
+    # Step 10.9 item D: `tangent_vec`/`normal_vec`/`curvature`. A circle of
+    # radius R has constant curvature 1/R, and its unit outward normal at
+    # parameter t is the radial direction (cos(phi),sin(phi)).
+    R = 2.0
+    circ0 = CircleSegment(R, 2*pi, 0.0, [0.0,0.0])
+    ts0 = collect(range(0,1,length=5))
+    @test all(isapprox.(curvature(circ0, ts0), 1/R; atol=1e-12))
+    @test isapprox(curvature(circ0, ts0[2]), 1/R; atol=1e-12)
+    tv = tangent_vec(circ0, ts0)
+    @test all(isapprox.(norm.(tv), 1.0; atol=1e-12))
+    nv = normal_vec(circ0, ts0)
+    phis = 2*pi .* ts0
+    @test all(isapprox.(nv, [SVector(cos(phi),sin(phi)) for phi in phis]; atol=1e-10))
 end
 
 @testset "boundarycomponents.jl" begin
@@ -168,7 +201,15 @@ end
             q1,q2 = members
             @test isapprox(reflect(xy[q1]), xy[q2]; atol=1e-10)
         end
-        @test all(==(one(ComplexF64)), orbits.phase)
+        # Step 10.9 item A: `symmetry_index_orbits` now wires in
+        # `symmetry_irrep_character` for XAxisReflection/YAxisReflection, so
+        # `phase` is no longer trivially `1` everywhere. Each fundamental
+        # representative's own node keeps phase `1`; its reflected partner
+        # carries the reflection's irrep character (`-1` by default).
+        χ = symmetry_irrep_character(Float64, sym)
+        @test all(==(one(ComplexF64)), orbits.phase[orbits.fundamental_indices])
+        partners = setdiff(1:N, orbits.fundamental_indices)
+        @test all(==(χ), orbits.phase[partners])
     end
 
     orbits_xy = symmetry_index_orbits(Float64, xy, XYAxisReflection())
@@ -273,5 +314,32 @@ end
         @test isapprox(apply_symmetry(XAxisReflection(), xy[q]), xy[_idx_reflect_x(q,N)]; atol=1e-8)
         @test isapprox(apply_symmetry(YAxisReflection(), xy[q]), xy[_idx_reflect_y(q,N)]; atol=1e-8)
     end
+
+    # Step 10.9 item B: `full_boundary` support for `FourierCoeffPolarSegment`
+    # under a D2-symmetric polar billiard. The core correctness identity is
+    # `curve(_apply_symmetry_to_curve(sym,c), t) == apply_symmetry(sym, curve(c,t))`
+    # (checked directly, white-box, since `PolarBilliard`'s default full-circle
+    # fundamental curve is not itself a proper fundamental sector, so a
+    # closed-loop reconstruction check like the Stadium one above does not
+    # apply here -- that requires an actual quarter-sector polar billiard,
+    # deferred to Step 11).
+    polar_bil = PolarBilliard([0.0,0.0,0.0,0.3])
+    orig_polar_curve = polar_bil.fundamental_domain.boundary[1]
+    for sym in (XAxisReflection(), YAxisReflection(), XYAxisReflection())
+        g = BilliardGeometry._apply_symmetry_to_curve(sym, orig_polar_curve)
+        @test g isa FourierCoeffPolarSegment
+        for t in (0.0, 0.2, 0.5, 0.8, 1.0)
+            @test isapprox(curve(g, t), apply_symmetry(sym, curve(orig_polar_curve, t)); atol=1e-8)
+        end
+    end
+
+    # `full_boundary` itself runs without error on a symmetric polar billiard
+    # and returns the expected number/type of curves (fundamental curve plus
+    # one image per non-identity symmetry).
+    D2sym = [YAxisReflection(), XYAxisReflection(), XAxisReflection()]
+    polar_bil_d2 = PolarBilliard{Float64}(polar_bil.fundamental_domain, D2sym)
+    fb_polar = full_boundary(polar_bil_d2)
+    @test length(fb_polar) == 4
+    @test all(c isa FourierCoeffPolarSegment for c in fb_polar)
 end
 

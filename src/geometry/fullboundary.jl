@@ -79,6 +79,41 @@ function _apply_symmetry_to_curve(sym::AbsSymmetry, c::CircleSegment{T}) where {
     return CircleSegment(c.radius, new_arc, new_shift, center2; bc=c.bc, orientation=c.orientation, domain_id=c.domain_id, segment_id=c.segment_id)
 end
 
+# Center/shift-angle/arc-angle image of a polar curve under `sym`, shared by
+# both `FourierCoeffPolarSegment` and `PolarSegment`. Same rotation/reflection
+# formula as `CircleSegment` above, since it only depends on the angular
+# parametrization convention (rotating a polar curve about a possibly
+# off-origin center rotates its local origin too, not just its angular
+# phase); the radial function (`coef`/`r_func`) is invariant under rotation
+# of the ambient frame and is carried through unchanged by the caller.
+function _polar_symmetry_image(sym::AbsSymmetry, c::L) where {L<:AbsPolarCurve}
+    M = _sym_matrix(sym)
+    T = eltype(c.center)
+    center2 = SVector{2,T}(M*c.center)
+    if det(M) > 0
+        φ = atan(M[2,1], M[1,1])
+        new_shift = c.shift_angle + φ
+        new_arc = c.arc_angle
+    else
+        two_ψ = atan(M[2,1], M[1,1])
+        new_shift = two_ψ - c.shift_angle
+        new_arc = -c.arc_angle
+    end
+    return center2, new_shift, new_arc
+end
+
+# Pointwise image of a `FourierCoeffPolarSegment`/`PolarSegment` under `sym`.
+# A negative `new_arc` (reflection case) is resolved by `_reverse_curve`,
+# which reverses the parametrization direction back to a positive arc angle.
+function _apply_symmetry_to_curve(sym::AbsSymmetry, c::L) where {L<:FourierCoeffPolarSegment}
+    center2, new_shift, new_arc = _polar_symmetry_image(sym, c)
+    return FourierCoeffPolarSegment(c.coef; R=c.R, arc_angle=new_arc, shift_angle=new_shift, center=center2, orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+function _apply_symmetry_to_curve(sym::AbsSymmetry, c::L) where {L<:PolarSegment}
+    center2, new_shift, new_arc = _polar_symmetry_image(sym, c)
+    return PolarSegment(c.r_func; R=c.R, arc_angle=new_arc, shift_angle=new_shift, center=center2, orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+
 # Reverses a curve's parametrization direction (`t -> 1-t`), leaving its
 # physical trace unchanged.
 _reverse_curve(c::LineSegment) = LineSegment(c.pt1, c.pt0; bc=c.bc, orientation=-c.orientation, domain_id=c.domain_id, segment_id=c.segment_id)
@@ -86,6 +121,16 @@ function _reverse_curve(c::CircleSegment{T}) where {T<:Real}
     new_shift = c.shift_angle + c.arc_angle
     new_arc = -c.arc_angle
     return CircleSegment(c.radius, new_arc, new_shift, c.center; bc=c.bc, orientation=c.orientation, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+function _reverse_curve(c::L) where {L<:FourierCoeffPolarSegment}
+    new_shift = c.shift_angle + c.arc_angle
+    new_arc = -c.arc_angle
+    return FourierCoeffPolarSegment(c.coef; R=c.R, arc_angle=new_arc, shift_angle=new_shift, center=c.center, orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+function _reverse_curve(c::L) where {L<:PolarSegment}
+    new_shift = c.shift_angle + c.arc_angle
+    new_arc = -c.arc_angle
+    return PolarSegment(c.r_func; R=c.R, arc_angle=new_arc, shift_angle=new_shift, center=c.center, orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
 end
 
 """
@@ -104,8 +149,9 @@ subdomain seams (e.g. `Transparent`) are never included, matching
 [`get_boundary_curves`](@ref)'s existing filtering. For a billiard with no
 symmetries, `full_boundary(billiard) == get_boundary_curves(billiard)`.
 
-Currently supports [`LineSegment`](@ref) and [`CircleSegment`](@ref) physical
-curves under [`XAxisReflection`](@ref), [`YAxisReflection`](@ref),
+Currently supports [`LineSegment`](@ref), [`CircleSegment`](@ref),
+[`FourierCoeffPolarSegment`](@ref) and [`PolarSegment`](@ref) physical curves
+under [`XAxisReflection`](@ref), [`YAxisReflection`](@ref),
 [`XYAxisReflection`](@ref), [`DiagonalReflection`](@ref),
 [`AntiDiagonalReflection`](@ref) and [`NFoldRotation`](@ref) symmetries;
 generalizing to every curve/segment type is deferred until more billiards are
