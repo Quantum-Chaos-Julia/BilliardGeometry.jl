@@ -24,8 +24,7 @@ function MushroomBilliard(R::T,w::T,h::T) where {T<:Real}
 
     bc=SpecularReflection();ign=QuantumSolverIgnore()
     z=zero(T);cfull=SVector{2,T}(z,z)
-    x0=((T(pi)+2)*R-2h)/4
-    w<x0<R||throw(ArgumentError("Canonical Y-symmetry origin x0=$x0 must satisfy w<x0<R"))
+    x0=(w+R)/2
 
     p0=cfull+SVector{2,T}(x0,z);pm=cfull+SVector{2,T}(-x0,z)
     pR=cfull+SVector{2,T}(R,z);pL=cfull+SVector{2,T}(-R,z)
