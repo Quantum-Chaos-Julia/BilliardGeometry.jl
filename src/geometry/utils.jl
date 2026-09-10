@@ -11,29 +11,30 @@ function connect_curves(curves)
     if is_closed(curves)
         return curves
     end
-    connected_curves = Vector{AbsCurve}()
+    # Greedily grow one connected chain at a time from whatever curves remain,
+    # instead of assuming every input curve belongs to a single ring. This
+    # correctly preserves multiply connected geometries (e.g. an outer wall
+    # plus a disjoint circular obstacle) as separate closed components,
+    # rather than silently dropping every component after the first.
     remaining_curves = copy(curves)
-    push!(connected_curves, popfirst!(remaining_curves))
-    for i in 2:length(curves)
-        end_pt = curve(connected_curves[end],1.0)
-        N_remaining = length(remaining_curves)
-        for j in 1:N_remaining
-            start_pt = curve(remaining_curves[j],0.0)
-            if is_overlaping(end_pt, start_pt)
-                push!(connected_curves,splice!(remaining_curves,j))
-                break
+    connected_curves = Vector{AbsCurve}()
+    while !isempty(remaining_curves)
+        chain = Vector{AbsCurve}()
+        push!(chain, popfirst!(remaining_curves))
+        extended = true
+        while extended
+            extended = false
+            end_pt = curve(chain[end],1.0)
+            for j in eachindex(remaining_curves)
+                start_pt = curve(remaining_curves[j],0.0)
+                if is_overlaping(end_pt, start_pt)
+                    push!(chain, splice!(remaining_curves,j))
+                    extended = true
+                    break
+                end
             end
         end
-    end
-    if length(remaining_curves) > 0
-        second_section = connect_curves(remaining_curves)
-        start_first, end_first = curve(connected_curves[1],0.0), curve(connected_curves[end],1.0)
-        start_second, end_second = curve(second_section[1],0.0), curve(second_section[end],1.0)
-        if is_overlaping(end_first, start_second)
-            append!(connected_curves,second_section)
-        elseif is_overlaping(end_second, start_first)
-            prepend!(connected_curves,second_section)
-        end
+        append!(connected_curves, chain)
     end
     return connected_curves
 end

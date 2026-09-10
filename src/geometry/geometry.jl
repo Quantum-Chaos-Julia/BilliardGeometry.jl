@@ -28,6 +28,22 @@ include("billiards/polar.jl")
 export PolarBilliard, PolarDomain
 include("billiards/limacon.jl")
 export LimaconBilliard, LimaconSegment
+include("billiards/circle.jl")
+export CircleBilliard
+include("billiards/ellipse.jl")
+export EllipseBilliard
+include("billiards/rectangle.jl")
+export RectangleBilliard
+include("billiards/polygon.jl")
+export PolygonBilliard
+include("billiards/star.jl")
+export StarBilliard
+include("billiards/c3.jl")
+export C3Billiard
+include("billiards/prosen.jl")
+export ProsenBilliard
+include("billiards/circle_with_hole.jl")
+export AnnularBilliard
 include("fullboundary.jl")
 export full_boundary
 include("inversions.jl")
