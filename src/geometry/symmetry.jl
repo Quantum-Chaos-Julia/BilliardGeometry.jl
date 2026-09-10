@@ -64,6 +64,32 @@ struct AntiDiagonalReflection<:BilliardGeometry.AbsReflection
     parity::Int
 end
 
+"""
+    CompositeReflection(reflections)
+    CompositeReflection(reflections...)
+
+Represent simultaneous reflection constraints whose generated symmetry group is
+used for symmetry reduction.
+
+Each constituent reflection carries its own one-dimensional irrep parity.
+The complete symmetry group is obtained from the constituent actions by group
+closure rather than by treating the collection as a single geometric
+transformation.
+
+This permits combinations such as an `XYAxisReflection` together with a
+`DiagonalReflection`, which generate the full square `D₄` symmetry group when
+supported by the geometry.
+
+## Attributes
+* `reflections`: Reflection constraints used as generators of the composite symmetry group.
+"""
+struct CompositeReflection<:AbsReflection
+    reflections::Vector{AbsReflection}
+end
+
+CompositeReflection(reflections::AbstractVector{<:AbsReflection})=CompositeReflection(AbsReflection[reflections...])
+CompositeReflection(reflections::AbsReflection...)=CompositeReflection(AbsReflection[reflections...])
+
 # defaults 
 XAxisReflection()=XAxisReflection(-1)
 YAxisReflection()=YAxisReflection(-1)
