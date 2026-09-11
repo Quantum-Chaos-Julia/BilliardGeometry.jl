@@ -3,7 +3,7 @@ export XAxisReflection, YAxisReflection, XYAxisReflection, DiagonalReflection, A
 include("symmetryorbits.jl")
 export SymmetryOrbitMap, fundamental_size, full_size, orbit_size, symmetry_orbit, symmetry_node_multiple, symmetry_index_orbits
 include("boundarytypes.jl")
-export SpecularReflection, QuantumSolverIgnore, Transparent, PeriodicX, ReflectionSymmetry, get_boundary_curves, get_all_curves, get_curve, get_all_domains, get_domain, update_boundary_condition
+export SpecularReflection, QuantumSolverIgnore, Transparent, PeriodicX, ReflectionSymmetry, get_boundary_curves, get_all_curves, get_curve, get_all_domains, get_domain, update_boundary_condition, genus, boundary_components
 include("segments/linesegment.jl")
 export LineSegment
 include("segments/polarcurves.jl")
@@ -18,6 +18,8 @@ include("domains/circular.jl")
 export CircleWedge
 include("domains/compositedomains.jl")
 export SimpleDomain, CompositeDomain, reset_ids!
+include("domains/multiplyconnecteddomains.jl")
+export MultiplyConnectedDomain
 include("billiards/triangle.jl")
 export TriangleBilliard
 include("billiards/stadium.jl")
@@ -42,7 +44,7 @@ include("billiards/c3.jl")
 export C3Billiard
 include("billiards/prosen.jl")
 export ProsenBilliard
-include("billiards/circle_with_hole.jl")
+include("billiards/annular.jl")
 export AnnularBilliard
 include("fullboundary.jl")
 export full_boundary

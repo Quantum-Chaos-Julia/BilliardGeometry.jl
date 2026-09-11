@@ -22,12 +22,13 @@ abstract type AbsDomain end
 abstract type AbsSimpleDomain <: AbsDomain end
 abstract type AbsPolarDomain <: AbsSimpleDomain end
 abstract type AbsCompositeDomain <: AbsDomain end
+abstract type AbsMultiplyConnectedDomain <: AbsDomain end
 abstract type AbsBilliard end
 
 abstract type AbsSampler end
 abstract type AbsReflection <: AbsSymmetry end
 
-export AbsCurve, AbsPolarCurve, AbsCompositeCurve, AbsCoords, AbsDomain, AbsPolarDomain, AbsCompositeDomain, AbsSimpleDomain, AbsBilliard, AbsBoundaryCondition, AbsSampler, AbsSymmetry
+export AbsCurve, AbsPolarCurve, AbsCompositeCurve, AbsCoords, AbsDomain, AbsPolarDomain, AbsCompositeDomain, AbsSimpleDomain, AbsMultiplyConnectedDomain, AbsBilliard, AbsBoundaryCondition, AbsSampler, AbsSymmetry
 
 include("geometry/utils.jl")
 include("geometry/geometry.jl")

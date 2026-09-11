@@ -15,10 +15,21 @@ end
 
 struct QuantumSolverIgnore <:AbsBoundaryCondition end
 
-function get_boundary_curves(domain::D) where D<:AbsSimpleDomain
+# Shared body of get_boundary_curves(::AbsSimpleDomain)/(::AbsMultiplyConnectedDomain):
+# both store their curves flat in domain.boundary, filter to physical
+# (SpecularReflection) curves, and connect them into contiguous runs.
+function _connected_physical_curves(boundary::Vector{AbsCurve})
     is_outer(crv) = typeof(crv.bc) <: SpecularReflection
-    boundary = filter(is_outer, domain.boundary)
-    return connect_curves(boundary)
+    physical = filter(is_outer, boundary)
+    return connect_curves(physical)
+end
+
+function get_boundary_curves(domain::D) where D<:AbsSimpleDomain
+    return _connected_physical_curves(domain.boundary)
+end
+
+function get_boundary_curves(domain::D) where D<:AbsMultiplyConnectedDomain
+    return _connected_physical_curves(domain.boundary)
 end
 
 function get_boundary_curves(composite_domain::D) where D<:AbsCompositeDomain
@@ -33,6 +44,7 @@ end
 function get_boundary_curves(billiard::B) where B<:AbsBilliard
     return get_boundary_curves(billiard.fundamental_domain)
 end
+
 
 function get_all_domains(billiard::B) where B<:AbsBilliard
     domain = billiard.fundamental_domain
@@ -109,3 +121,53 @@ function update_boundary_condition(billiard::B, domain_id, segment_id, bc::BC) w
         return @set billiard.fundamental_domain.boundary[seg_idx].bc = bc
     end
 end
+
+"""
+    genus(domain::AbsDomain) → g::Int64
+    genus(billiard::AbsBilliard) → g::Int64
+
+Returns the genus (number of holes) of a domain/billiard: `0` for
+[`AbsSimpleDomain`](@ref)/[`AbsCompositeDomain`](@ref), and the stored
+`genus` field for [`AbsMultiplyConnectedDomain`](@ref) (e.g. [`AnnularBilliard`](@ref)).
+"""
+genus(domain::AbsDomain) = 0
+genus(domain::AbsMultiplyConnectedDomain) = domain.genus
+genus(billiard::B) where B<:AbsBilliard = genus(billiard.fundamental_domain)
+
+# Groups a flat physical-boundary curve list into connected components by
+# curve domain_id, preserving first-seen domain_id order and within-group
+# curve order.
+function _group_curves_by_domain_id(boundary::Vector{AbsCurve})
+    ids = Int[]
+    groups = Vector{Vector{AbsCurve}}()
+    @inbounds for c in boundary
+        idx = findfirst(==(c.domain_id), ids)
+        if idx === nothing
+            push!(ids, c.domain_id)
+            push!(groups, AbsCurve[c])
+        else
+            push!(groups[idx], c)
+        end
+    end
+    return groups
+end
+
+"""
+    boundary_components(domain::AbsDomain) → components::Vector{Vector{AbsCurve}}
+    boundary_components(billiard::AbsBilliard) → components::Vector{Vector{AbsCurve}}
+
+Returns the connected physical boundary curves of `domain`/`billiard`, grouped
+one vector per connected component (outer boundary first, then each hole for
+[`AbsMultiplyConnectedDomain`](@ref)).
+
+## Description
+For [`AbsSimpleDomain`](@ref)/[`AbsCompositeDomain`](@ref) (genus `0`), this is
+a single-element vector containing [`get_boundary_curves`](@ref)'s result. For
+[`AbsMultiplyConnectedDomain`](@ref), the connected physical curves are
+grouped by each curve's `domain_id`, preserving first-seen order (outer
+boundary's `domain_id` listed first in `domain.boundary` by construction, see
+[`MultiplyConnectedDomain`](@ref)).
+"""
+boundary_components(domain::AbsDomain) = [get_boundary_curves(domain)]
+boundary_components(domain::AbsMultiplyConnectedDomain) = _group_curves_by_domain_id(get_boundary_curves(domain))
+boundary_components(billiard::B) where B<:AbsBilliard = boundary_components(billiard.fundamental_domain)
