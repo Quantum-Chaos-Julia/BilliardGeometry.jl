@@ -32,7 +32,8 @@ export AbsCurve, AbsPolarCurve, AbsCompositeCurve, AbsCoords, AbsDomain, AbsPola
 
 include("geometry/utils.jl")
 include("geometry/geometry.jl")
-
+include("geometry/area.jl")
+export area, fundamental_area, corner_angles
 
 include("quadrature/samplers.jl")
 export LinearNodes, GaussLegendreNodes, FourierNodes, sample_points

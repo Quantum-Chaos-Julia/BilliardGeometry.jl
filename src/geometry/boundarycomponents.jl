@@ -81,6 +81,27 @@ function _component_corner_locations(::Type{T}, comp::Vector; angle_tol=T(1e-8))
 end
 
 """
+    _component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real} → angles::Vector{T}
+
+Interior angles (`π` minus the tangent turning angle, i.e. the same
+convention as [`Polygon`](@ref)'s `angles` field) at every true corner of a
+composite boundary component `comp`, in the same traversal order as
+[`_component_corner_locations`](@ref) (periodic seam between the final and
+first segment checked first, if a true corner).
+"""
+function _component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real}
+    angles = T[]
+    m = length(comp)
+    τ0 = _junction_angle(comp[end], comp[1], T)
+    τ0 > angle_tol && push!(angles, T(pi) - τ0)
+    @inbounds for j in 1:m-1
+        τ = _junction_angle(comp[j], comp[j+1], T)
+        τ > angle_tol && push!(angles, T(pi) - τ)
+    end
+    return angles
+end
+
+"""
     print_component_junctions(comp::Vector; T=Float64, angle_tol=1e-8)
 
 Prints diagnostic information (global periodic parameter, tangent
