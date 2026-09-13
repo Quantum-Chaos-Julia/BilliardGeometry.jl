@@ -11,7 +11,7 @@
 #discretized boundary into its two connected components.
 struct AnnularBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::MultiplyConnectedDomain{T}
-    symmetries::Vector{AbsSymmetry}
+    symmetries::SymmetryRegistry
 end
 
 function AnnularBilliard(R_outer::T, R_inner::T; center=SVector{2,T}(zero(T),zero(T))) where T<:Real
@@ -24,7 +24,7 @@ function AnnularBilliard(R_outer::T, R_inner::T; center=SVector{2,T}(zero(T),zer
     inner = CircleSegment(R_inner, T(2*pi), zero(T), c; bc=bc, orientation=-1, domain_id=2, segment_id=1)
     vertices = SVector{2,T}[c+SVector{2,T}(R_outer,zero(T)), c+SVector{2,T}(R_inner,zero(T))]
     fundamental_domain = MultiplyConnectedDomain(AbsCurve[outer], Vector{AbsCurve}[[inner]], vertices, 1)
-    symmetries = Vector{AbsSymmetry}(undef,0)
+    symmetries = register_symmetries()
     return AnnularBilliard{T}(fundamental_domain, symmetries)
 end
 

@@ -8,9 +8,24 @@ struct PeriodicX <:AbsBoundaryCondition
     next_id::Int64
 end
 
-struct ReflectionSymmetry{S} <:AbsBoundaryCondition where S<:AbsReflection
-    symmetry::S
-    N_sectors::Int64
+"""
+SymmetryWall <: AbsBoundaryCondition
+
+Boundary condition marking a curve as a symmetry wall: crossing it
+corresponds to applying the billiard's registered symmetry generator
+identified by `sym_id` (see [`SymmetryRegistry`](@ref)/
+[`register_symmetries`](@ref)), landing in the neighboring fundamental-domain
+copy `sector_id`. Covers both reflection walls and rotation wedge cuts
+(`AbsRotation` generators), which previously had no dedicated boundary
+condition at all.
+
+## Attributes
+* `sym_id::Int64`: `sym_id` of the billiard's registered symmetry generator this wall corresponds to.
+* `sector_id::Int64`: Index of the neighboring fundamental-domain copy this wall borders.
+"""
+struct SymmetryWall <:AbsBoundaryCondition
+    sym_id::Int64
+    sector_id::Int64
 end
 
 struct QuantumSolverIgnore <:AbsBoundaryCondition end

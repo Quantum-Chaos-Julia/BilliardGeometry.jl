@@ -1,11 +1,12 @@
 struct MushroomBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::CompositeDomain
-    symmetries::Vector{AbsSymmetry}
+    symmetries::SymmetryRegistry
 end
 
 function MushroomBilliard(half_width,stem_heigth=1.0;R=1.0,origin=[0.0,0.0])
     type = typeof(half_width)     
     cx,cy = origin #center of circle segment
+    symmetries = register_symmetries(YAxisReflection())
     #mushroom cap consists of two domains
     x_seg = LineSegment([half_width,cy], [R,cy]; bc = SpecularReflection(), domain_id=1, segment_id=1)
     circle = CircleSegment(R, pi/2, 0.0, cx, cy; bc = SpecularReflection(), domain_id=1, segment_id=2)
@@ -15,13 +16,12 @@ function MushroomBilliard(half_width,stem_heigth=1.0;R=1.0,origin=[0.0,0.0])
     circle_dom =  SimpleDomain{Float64}([x_seg,circle,chord1],corners,1)
 
     triangle_dom = Polygon([[cx,R],origin,[half_width,cy]],2; 
-    bcs=[ReflectionSymmetry(YAxisReflection(),2),Transparent(3),Transparent(1)])
+    bcs=[SymmetryWall(1,2),Transparent(3),Transparent(1)])
 
     #mushroom stem consists of one domain   
     stem_dom = Polygon([origin,[cx,-stem_heigth],[half_width,-stem_heigth],[half_width,cy]],3; 
-    bcs=[ReflectionSymmetry(YAxisReflection(),2),SpecularReflection(),SpecularReflection(),Transparent(2)])
+    bcs=[SymmetryWall(1,2),SpecularReflection(),SpecularReflection(),Transparent(2)])
 
-    symmetries = [YAxisReflection()] #order coresponds to symmetry sectors
     return MushroomBilliard{typeof(half_width)}(CompositeDomain([circle_dom, triangle_dom, stem_dom]), symmetries)
 end
 

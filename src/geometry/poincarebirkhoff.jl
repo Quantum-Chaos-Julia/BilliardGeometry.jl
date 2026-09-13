@@ -29,7 +29,8 @@ function pb_coords(billiard::B, subsegment::Int64, subdomain::Int64, sym_sector:
     l, crv = get_pb_curve(fundamental_boundary, subsegment, subdomain)
     s, p = fundamental_pb_coords(l, crv, pt, velocity) #l is length of prevoius curves
     if sym_sector > 1 
-        s, p = apply_symmetry_pb(symmetries[sym_sector-1], sym_sector, s, p, L)
+        sym = symmetry_of(symmetries, sym_sector-1)
+        s, p = apply_symmetry_pb(sym, sym_sector, s, p, L)
     end
     return PoincareBirkhoff(s,p)
 end
@@ -41,7 +42,8 @@ function pb_sectors(billiard)
     all_sectors = copy(boundary.end_lengths)
     for sym_sector in 2:(length(billiard.symmetries)+1)
         println(sym_sector)
-        sym_ends = [apply_symmetry_pb(billiard.symmetries[sym_sector-1], sym_sector, s, 0.0, L)[1] for s in ends]
+        sym = symmetry_of(billiard.symmetries, sym_sector-1)
+        sym_ends = [apply_symmetry_pb(sym, sym_sector, s, 0.0, L)[1] for s in ends]
         append!(all_sectors, sym_ends)
     end
     return find_unique_elements(sort(all_sectors))

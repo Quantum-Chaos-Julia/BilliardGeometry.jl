@@ -144,7 +144,7 @@ Starts from `get_boundary_curves(billiard)` — the connected `SpecularReflectio
 curves of the fundamental domain, i.e. the physical part of the discretization
 basis solvers already use — and appends, for every `sym in billiard.symmetries`,
 the image of those same fundamental-domain curves under `sym`. Symmetry walls
-(curves whose boundary condition is [`ReflectionSymmetry`](@ref)) and internal
+(curves whose boundary condition is [`SymmetryWall`](@ref)) and internal
 subdomain seams (e.g. `Transparent`) are never included, matching
 [`get_boundary_curves`](@ref)'s existing filtering. For a billiard with no
 symmetries, `full_boundary(billiard) == get_boundary_curves(billiard)`.

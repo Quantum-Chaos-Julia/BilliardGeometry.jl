@@ -162,7 +162,7 @@ function _build_symmetry_orbit_map(::Type{T}, N::Int, perms::Vector{Vector{Int}}
 end
 
 """
-    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::AbsSymmetry) where {T<:Real} → orbits::SymmetryOrbitMap{T}
+    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::AbsSymmetry, character...) where {T<:Real} → orbits::SymmetryOrbitMap{T}
 
 Constructs the [`SymmetryOrbitMap`](@ref) folding the fully discretized
 boundary points `xy` onto a fundamental domain under `symmetry`.
@@ -172,128 +172,128 @@ The reduction uses the exact integer index permutation the symmetry induces
 on a canonically ordered periodic boundary sampling (the same convention used
 by the BIM solvers' `evaluate_points` methods), not floating-point nearest-
 neighbor matching on `xy`: `length(xy)` must already be a multiple of
-[`symmetry_node_multiple`](@ref)`(symmetry)`. The per-node `phase` factors are
-the irreducible-representation characters returned by
-[`symmetry_irrep_character`](@ref), so odd/anti-symmetric BIM sectors are
-supported for every `symmetry` with a `symmetry_irrep_character` method.
+[`symmetry_node_multiple`](@ref)`(symmetry)`. The per-node `phase` factors
+are the irreducible-representation character(s) requested via the trailing
+`character` argument(s) — a Layer-2 (per-solve representation) choice, kept
+separate from `symmetry`'s purely geometric data (see `SymmetrySector` in
+`QuantumBilliards.jl`) — defaulting to the trivial (fully symmetric)
+representation when omitted.
 
 ## Arguments
 * `T`: Real scalar type used by the boundary discretization.
 * `xy`: Complete (unfolded) boundary points in Cartesian coordinates, canonically ordered.
 * `symmetry`: The discrete symmetry the boundary points are invariant under.
+* `character`: The requested one-dimensional irrep character(s) (`±1` for a single-axis reflection; `character_x,character_y` for `XYAxisReflection`; `sector::Int` for `NFoldRotation`), defaulting to the trivial representation.
 
 ## Returns
 * `orbits`: A [`SymmetryOrbitMap{T}`](@ref) instance.
 """
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::XAxisReflection) where {T<:Real}
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::XAxisReflection, character::Complex{T}=one(Complex{T})) where {T<:Real}
     N = length(xy)
     N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("XAxisReflection requires N divisible by 4; received N=$N"))
     id = collect(1:N)
     refl = [_idx_reflect_x(q,N) for q in 1:N]
-    χ = symmetry_irrep_character(T, symmetry)
-    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), χ])
+    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), character])
 end
 
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::YAxisReflection) where {T<:Real}
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::YAxisReflection, character::Complex{T}=one(Complex{T})) where {T<:Real}
     N = length(xy)
     N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("YAxisReflection requires N divisible by 4; received N=$N"))
     id = collect(1:N)
     refl = [_idx_reflect_y(q,N) for q in 1:N]
-    χ = symmetry_irrep_character(T, symmetry)
-    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), χ])
+    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), character])
 end
 
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::XYAxisReflection) where {T<:Real}
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::XYAxisReflection, character_x::Complex{T}=one(Complex{T}), character_y::Complex{T}=one(Complex{T})) where {T<:Real}
     N = length(xy)
     N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("XYAxisReflection requires N divisible by 4; received N=$N"))
     id = collect(1:N)
     rx = [_idx_reflect_x(q,N) for q in 1:N]
     ry = [_idx_reflect_y(q,N) for q in 1:N]
     rxy = [_idx_rotate_pi(q,N) for q in 1:N]
-    # χ_x/χ_y are the characters of the individual axis-reflection generators
-    # (same convention as the `CompositeReflection` expansion below); χ_xy, the
-    # character of the combined π-rotation, is `symmetry_irrep_character`.
-    χ_x = Complex{T}(symmetry.parity_y)
-    χ_y = Complex{T}(symmetry.parity_x)
-    χ_xy = symmetry_irrep_character(T, symmetry)
-    return _build_symmetry_orbit_map(T, N, [id,rx,ry,rxy], Complex{T}[one(Complex{T}), χ_x, χ_y, χ_xy])
+    # χ_xy, the character of the combined π-rotation, is the product of the
+    # two individual axis-reflection characters.
+    χ_xy = character_x*character_y
+    return _build_symmetry_orbit_map(T, N, [id,rx,ry,rxy], Complex{T}[one(Complex{T}), character_x, character_y, χ_xy])
 end
 
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::NFoldRotation) where {T<:Real}
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::NFoldRotation, sector::Int=0) where {T<:Real}
     N = length(xy)
     n = symmetry_node_multiple(symmetry)
     N%n==0 || throw(ArgumentError("NFoldRotation of order $n requires N divisible by $n; received N=$N"))
     perms = [[_idx_rotate(q,N,n,l) for q in 1:N] for l in 0:n-1]
-    scales = Complex{T}[cis(T(2*pi)*T(symmetry.sector*l)/T(n)) for l in 0:n-1]
+    scales = Complex{T}[cis(T(2*pi)*T(sector*l)/T(n)) for l in 0:n-1]
     return _build_symmetry_orbit_map(T, N, perms, scales)
 end
 
 """
-    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::DiagonalReflection) where {T<:Real} → orbits::SymmetryOrbitMap{T}
+    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::DiagonalReflection, character::Complex{T}=one(Complex{T})) where {T<:Real} → orbits::SymmetryOrbitMap{T}
 
 Builds the exact two-element boundary orbits generated by reflection across
-the `y=x` diagonal, using the irrep factor `symmetry_irrep_character(T,symmetry)`.
+the `y=x` diagonal, using the requested irrep `character` (trivial by default).
 """
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::DiagonalReflection) where {T<:Real}
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::DiagonalReflection, character::Complex{T}=one(Complex{T})) where {T<:Real}
     N = length(xy)
     N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("DiagonalReflection requires N divisible by 8; received N=$N"))
     id = collect(1:N)
     refl = [_idx_reflect_diag_plus(q,N) for q in 1:N]
-    χ = symmetry_irrep_character(T, symmetry)
-    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), χ])
+    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), character])
 end
 
 """
-    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::AntiDiagonalReflection) where {T<:Real} → orbits::SymmetryOrbitMap{T}
+    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::AntiDiagonalReflection, character::Complex{T}=one(Complex{T})) where {T<:Real} → orbits::SymmetryOrbitMap{T}
 
 Builds the exact two-element boundary orbits generated by reflection across
-the `y=-x` anti-diagonal, using the irrep factor `symmetry_irrep_character(T,symmetry)`.
+the `y=-x` anti-diagonal, using the requested irrep `character` (trivial by default).
 """
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::AntiDiagonalReflection) where {T<:Real}
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::AntiDiagonalReflection, character::Complex{T}=one(Complex{T})) where {T<:Real}
     N = length(xy)
     N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("AntiDiagonalReflection requires N divisible by 8; received N=$N"))
     id = collect(1:N)
     refl = [_idx_reflect_diag_minus(q,N) for q in 1:N]
-    χ = symmetry_irrep_character(T, symmetry)
-    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), χ])
+    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), character])
 end
 
 """
-    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::CompositeReflection) where {T<:Real} → orbits::SymmetryOrbitMap{T}
+    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::CompositeReflection, characters::Vector{Complex{T}}=ones(Complex{T},length(symmetry.reflections))) where {T<:Real} → orbits::SymmetryOrbitMap{T}
 
 Builds the complete boundary-orbit map generated by a [`CompositeReflection`](@ref).
 
 The constituent reflections are first expanded into primitive exact index
-generators (`XYAxisReflection` contributes both coordinate-axis reflections).
-Starting from the identity, the complete finite symmetry group is generated
-by closure under composition; the irrep factor of a generated action is the
-product of the factors of its generators. If the same geometric action is
-generated with two different factors, the requested reflection parities are
-inconsistent and an `ArgumentError` is thrown.
+generators (`XYAxisReflection` contributes both coordinate-axis reflections,
+sharing its entry of `characters`). Starting from the identity, the complete
+finite symmetry group is generated by closure under composition; the irrep
+factor of a generated action is the product of the factors of its
+generators, taken from the requested `characters` (trivial by default, one
+entry per `symmetry.reflections`). If the same geometric action is generated
+with two different factors, the requested characters are inconsistent and an
+`ArgumentError` is thrown.
 """
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::CompositeReflection) where {T<:Real}
+function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::CompositeReflection, characters::Vector{Complex{T}}=ones(Complex{T}, length(symmetry.reflections))) where {T<:Real}
     N = length(xy)
     isempty(symmetry.reflections) && throw(ArgumentError("CompositeReflection requires at least one reflection"))
+    length(characters)==length(symmetry.reflections) || throw(DimensionMismatch("Received $(length(symmetry.reflections)) reflections but $(length(characters)) characters"))
     genperms = Vector{Vector{Int}}()
     genscales = Complex{T}[]
-    for ref in symmetry.reflections
+    for (k, ref) in enumerate(symmetry.reflections)
+        χ = characters[k]
         if ref isa XAxisReflection
             push!(genperms, [_idx_reflect_x(q,N) for q in 1:N])
-            push!(genscales, symmetry_irrep_character(T, ref))
+            push!(genscales, χ)
         elseif ref isa YAxisReflection
             push!(genperms, [_idx_reflect_y(q,N) for q in 1:N])
-            push!(genscales, symmetry_irrep_character(T, ref))
+            push!(genscales, χ)
         elseif ref isa XYAxisReflection
             push!(genperms, [_idx_reflect_x(q,N) for q in 1:N])
-            push!(genscales, Complex{T}(ref.parity_y))
+            push!(genscales, χ)
             push!(genperms, [_idx_reflect_y(q,N) for q in 1:N])
-            push!(genscales, Complex{T}(ref.parity_x))
+            push!(genscales, χ)
         elseif ref isa DiagonalReflection
             push!(genperms, [_idx_reflect_diag_plus(q,N) for q in 1:N])
-            push!(genscales, symmetry_irrep_character(T, ref))
+            push!(genscales, χ)
         elseif ref isa AntiDiagonalReflection
             push!(genperms, [_idx_reflect_diag_minus(q,N) for q in 1:N])
-            push!(genscales, symmetry_irrep_character(T, ref))
+            push!(genscales, χ)
         else
             throw(ArgumentError("Unsupported reflection type $(typeof(ref)) in CompositeReflection"))
         end

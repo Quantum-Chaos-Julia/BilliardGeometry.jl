@@ -65,7 +65,7 @@ end
 
 struct LimaconBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::PolarDomain{T}
-    symmetries::Vector{AbsSymmetry}
+    symmetries::SymmetryRegistry
 end
 
 
@@ -74,8 +74,8 @@ function LimaconBilliard(a)
     r0 = limacon.cusp
     r1 = limacon.start
     type = typeof(a)
-    x_segment = LineSegment(r0, r1; bc=ReflectionSymmetry(XAxisReflection(),2),segment_id=2)
+    symmetries = register_symmetries(XAxisReflection())
+    x_segment = LineSegment(r0, r1; bc=SymmetryWall(1,2),segment_id=2)
     limacon_dom =  PolarDomain{type}([limacon,x_segment],[r1,r0],1)
-    symmetries = [XAxisReflection()]
     return LimaconBilliard{type}(limacon_dom, symmetries)
 end

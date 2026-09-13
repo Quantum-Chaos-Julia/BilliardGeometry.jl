@@ -8,7 +8,7 @@ end
 
 struct TriangleBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::Polygon{T}
-    symmetries::Vector{AbsSymmetry}
+    symmetries::SymmetryRegistry
 end
 
 function TriangleBilliard(gamma, chi; bcs = [SpecularReflection(),SpecularReflection(),SpecularReflection()], x0=zero(gamma), y0=zero(gamma), h = one(gamma))
@@ -18,6 +18,6 @@ function TriangleBilliard(gamma, chi; bcs = [SpecularReflection(),SpecularReflec
     #println("α=$alpha, β=$beta, γ=$gamma")
     corners = triangle_corners(angles, x0, y0, h)
     domain = Polygon(corners, 1; bcs)
-    symmetries = Vector{AbsSymmetry}(undef,0)
+    symmetries = register_symmetries()
     return TriangleBilliard{typeof(gamma)}(domain, symmetries)
 end

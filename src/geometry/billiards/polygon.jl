@@ -1,10 +1,10 @@
 #simply connected polygonal billiard from ordered (counterclockwise) vertices
 struct PolygonBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::SimpleDomain{T}
-    symmetries::Vector{AbsSymmetry}
+    symmetries::SymmetryRegistry
 end
 
-function PolygonBilliard(vertices::AbstractVector{<:SVector{2,T}}; symmetries=AbsSymmetry[]) where T<:Real
+function PolygonBilliard(vertices::AbstractVector{<:SVector{2,T}}; symmetries::SymmetryRegistry=register_symmetries()) where T<:Real
     n = length(vertices)
     n >= 3 || throw(ArgumentError("a polygon requires at least three vertices"))
     verts = SVector{2,T}.(vertices)
@@ -21,6 +21,5 @@ function PolygonBilliard(vertices::AbstractVector{<:SVector{2,T}}; symmetries=Ab
         boundary[i] = LineSegment(verts[i], verts[mod1(i+1,n)]; bc=bc, domain_id=1, segment_id=i)
     end
     fundamental_domain = SimpleDomain{T}(boundary, verts, 1)
-    syms = AbsSymmetry[symmetries...]
-    return PolygonBilliard{T}(fundamental_domain, syms)
+    return PolygonBilliard{T}(fundamental_domain, symmetries)
 end

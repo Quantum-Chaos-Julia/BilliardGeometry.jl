@@ -7,65 +7,77 @@ reflect_antidiag = LinearMap(SMatrix{2,2}([0.0 -1.0;-1.0 0.0]))
 reflect_xy = reflect_x ∘ reflect_y
 
 """
-    XAxisReflection(parity_y=-1)
+    XAxisReflection(sym_id=0)
 
 Reflection across the x-axis, `(x,y) -> (x,-y)`.
 
 ## Arguments
-* `parity_y`: Irreducible-representation parity associated with the reflected `y` coordinate.
+* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref) (purely geometric; carries no representation/parity data — see [`SymmetrySector`](@ref) in `QuantumBilliards.jl` for the per-solve representation choice).
 """
 struct XAxisReflection <: AbsReflection
-    parity_y::Int
+    sym_id::Int
 end
-XAxisReflection() = XAxisReflection(-1)
+XAxisReflection() = XAxisReflection(0)
 
 """
-    YAxisReflection(parity_x=-1)
+    YAxisReflection(sym_id=0)
 
 Reflection across the y-axis, `(x,y) -> (-x,y)`.
 
 ## Arguments
-* `parity_x`: Irreducible-representation parity associated with the reflected `x` coordinate.
+* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref).
 """
 struct YAxisReflection <: AbsReflection
-    parity_x::Int
+    sym_id::Int
 end
-YAxisReflection() = YAxisReflection(-1)
+YAxisReflection() = YAxisReflection(0)
 
 """
-    XYAxisReflection(parity_x=-1,parity_y=-1)
+    XYAxisReflection(sym_id=0)
 
 Reflection across both coordinate axes, `(x,y) -> (-x,-y)`.
 
 ## Arguments
-* `parity_x`: Irreducible-representation parity associated with the reflected `x` coordinate.
-* `parity_y`: Irreducible-representation parity associated with the reflected `y` coordinate.
+* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref).
 """
 struct XYAxisReflection <: AbsReflection 
-    parity_x::Int
-    parity_y::Int
+    sym_id::Int
 end
-XYAxisReflection() = XYAxisReflection(-1,-1)
+XYAxisReflection() = XYAxisReflection(0)
 
 """
-    DiagonalReflection(parity=-1)
+    DiagonalReflection(sym_id=0)
 
 Reflection across the `y=x` diagonal, `(x,y) -> (y,x)`.
+
+## Arguments
+* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref).
 """
 struct DiagonalReflection <: AbsReflection
-    parity::Int
+    sym_id::Int
 end
-DiagonalReflection() = DiagonalReflection(-1)
+DiagonalReflection() = DiagonalReflection(0)
 
 """
-    AntiDiagonalReflection(parity=-1)
+    AntiDiagonalReflection(sym_id=0)
 
 Reflection across the `y=-x` anti-diagonal, `(x,y) -> (-y,-x)`.
+
+## Arguments
+* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref).
 """
 struct AntiDiagonalReflection <: AbsReflection
-    parity::Int
+    sym_id::Int
 end
-AntiDiagonalReflection() = AntiDiagonalReflection(-1)
+AntiDiagonalReflection() = AntiDiagonalReflection(0)
+
+# Layer-1 (geometric) reconstruction helpers used only by `register_symmetries`
+# to tag a fresh copy of a generator with its assigned `sym_id`.
+_with_sym_id(::XAxisReflection, id::Int) = XAxisReflection(id)
+_with_sym_id(::YAxisReflection, id::Int) = YAxisReflection(id)
+_with_sym_id(::XYAxisReflection, id::Int) = XYAxisReflection(id)
+_with_sym_id(::DiagonalReflection, id::Int) = DiagonalReflection(id)
+_with_sym_id(::AntiDiagonalReflection, id::Int) = AntiDiagonalReflection(id)
 
 """
     CompositeReflection(reflections)
@@ -134,7 +146,14 @@ function apply_symmetry_pb(sym::AbsReflection, sym_sector::Int64, s::T, p::T, L:
     end
 end
 
-D2_symmetry = [YAxisReflection(), XYAxisReflection(), XAxisReflection()]
+"""
+    D2_symmetry() → reg::SymmetryRegistry
+
+Registers the three non-identity elements of the `D₂` reflection group
+(`YAxisReflection`, `XYAxisReflection`, `XAxisReflection`, in that order) via
+[`register_symmetries`](@ref), giving them fresh `sym_id`s `1,2,3`.
+"""
+D2_symmetry() = register_symmetries(YAxisReflection(), XYAxisReflection(), XAxisReflection())
 
 abstract type AbsRotation <: AbsSymmetry end
 
@@ -147,7 +166,7 @@ abstract type AbsRotation <: AbsSymmetry end
 end
 
 """
-    NFoldRotation(N,m,sector=0)
+    NFoldRotation(N,m,sym_id=0)
 
 One nontrivial image of an `N`-fold rotational symmetry: counter-clockwise
 rotation by `2π*m/N`.
@@ -155,22 +174,24 @@ rotation by `2π*m/N`.
 ## Arguments
 * `N`: Order of the rotational symmetry.
 * `m`: Power of the fundamental rotation.
-* `sector`: Irreducible-representation sector.
+* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref) (purely geometric; carries no representation data \u2014 see `SymmetrySector` in `QuantumBilliards.jl` for the per-solve irrep-sector choice).
 """
 struct NFoldRotation <: AbsRotation
     order::Int64
     m::Int64
-    sector::Int64
+    sym_id::Int64
     angle::Float64
     sym_map::LinearMap{SMatrix{2, 2, Float64, 4}}
 end
 
-function NFoldRotation(N, m, sector::Int=0)
+function NFoldRotation(N, m, sym_id::Int=0)
     angle = 2*pi/N
     mm = mod(m, N)
     sym_map = LinearMap(rotation_matrix_z(angle*mm))
-    return NFoldRotation(N, mm, mod(sector,N), angle, sym_map)
+    return NFoldRotation(N, mm, sym_id, angle, sym_map)
 end
+
+_with_sym_id(sym::NFoldRotation, id::Int) = NFoldRotation(sym.order, sym.m, id)
 
 function apply_symmetry(sym::NFoldRotation, pt::SVector{2,T}) where T<:Real
     return sym.sym_map(pt)
@@ -179,18 +200,11 @@ function apply_symmetry(sym::NFoldRotation, pts)
     return [sym.sym_map(pt) for pt in pts]
 end
 
-Cn_symmetry(n, sector::Int=0) = [NFoldRotation(n,i,sector) for i in 1:(n-1)]
-
 """
-    symmetry_irrep_character(::Type{T}, sym) where T<:Real → χ::Complex{T}
+    Cn_symmetry(n) → reg::SymmetryRegistry
 
-Returns the one-dimensional irreducible-representation factor associated with
-a symmetry image: the parity `±1` for a `<:AbsReflection`, or the character
-factor `exp(2πi*sector*m/N)` for a `<:AbsRotation` image.
+Registers the `n-1` non-identity images of an `n`-fold rotational symmetry
+(`NFoldRotation(n,1), ..., NFoldRotation(n,n-1)`) via
+[`register_symmetries`](@ref), giving them fresh `sym_id`s `1,...,n-1`.
 """
-symmetry_irrep_character(::Type{T}, sym::XAxisReflection) where T<:Real = Complex{T}(sym.parity_y)
-symmetry_irrep_character(::Type{T}, sym::YAxisReflection) where T<:Real = Complex{T}(sym.parity_x)
-symmetry_irrep_character(::Type{T}, sym::XYAxisReflection) where T<:Real = Complex{T}(sym.parity_x*sym.parity_y)
-symmetry_irrep_character(::Type{T}, sym::DiagonalReflection) where T<:Real = Complex{T}(sym.parity)
-symmetry_irrep_character(::Type{T}, sym::AntiDiagonalReflection) where T<:Real = Complex{T}(sym.parity)
-symmetry_irrep_character(::Type{T}, sym::NFoldRotation) where T<:Real = cis(T(2*pi)*T(sym.sector*sym.m)/T(sym.order))
+Cn_symmetry(n) = register_symmetries((NFoldRotation(n,i) for i in 1:(n-1))...)
