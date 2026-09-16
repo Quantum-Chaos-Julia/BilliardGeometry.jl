@@ -39,4 +39,8 @@ include("quadrature/samplers.jl")
 export LinearNodes, GaussLegendreNodes, FourierNodes, sample_points
 include("quadrature/kressgrading.jl")
 export kress_R!, kress_R_even!, kress_R_odd!, s_mid, kress_graded_nodes_data, multi_kress_graded_nodes_data
+
+include("geometry/billiards/sinai.jl")
+export SinaiBilliard
+
 end
