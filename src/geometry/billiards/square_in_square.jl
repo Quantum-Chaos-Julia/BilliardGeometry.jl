@@ -35,6 +35,6 @@ function SquareWithinSquareBilliard(a::T=one(T); positions::AbstractVector{<:Rea
     push!(boundary,LineSegment(current,p0; bc=SymmetryWall(1,2), domain_id=1, segment_id=wall_id))
     vertices = SVector{2,T}[curve(c,z) for c in boundary]
     fundamental_domain = SimpleDomain{T}(boundary,vertices,1)
-    symmetries = register_symmetries()
+    symmetries = register_symmetries(DiagonalReflection())
     return SquareWithinSquareBilliard{T}(fundamental_domain,symmetries)
 end
