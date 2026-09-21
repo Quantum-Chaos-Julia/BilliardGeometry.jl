@@ -43,8 +43,6 @@ export kress_R!, kress_R_even!, kress_R_odd!, s_mid, kress_graded_nodes_data, mu
 include("geometry/billiards/sinai.jl")
 export SinaiBilliard
 
-include("geometry/billiards/rectangle_in_rectangle.jl")
-export RectangleWithinRectangleBilliard
 
 
 end
