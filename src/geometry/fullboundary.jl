@@ -132,7 +132,6 @@ function _reverse_curve(c::L) where {L<:PolarSegment}
     new_arc = -c.arc_angle
     return PolarSegment(c.r_func; R=c.R, arc_angle=new_arc, shift_angle=new_shift, center=c.center, orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
 end
-
 """
     full_boundary(billiard::Bi) where {Bi<:AbsBilliard} → curves::Vector{AbsCurve}
 
@@ -148,14 +147,6 @@ the image of those same fundamental-domain curves under `sym`. Symmetry walls
 subdomain seams (e.g. `Transparent`) are never included, matching
 [`get_boundary_curves`](@ref)'s existing filtering. For a billiard with no
 symmetries, `full_boundary(billiard) == get_boundary_curves(billiard)`.
-
-Currently supports [`LineSegment`](@ref), [`CircleSegment`](@ref),
-[`FourierCoeffPolarSegment`](@ref) and [`PolarSegment`](@ref) physical curves
-under [`XAxisReflection`](@ref), [`YAxisReflection`](@ref),
-[`XYAxisReflection`](@ref), [`DiagonalReflection`](@ref),
-[`AntiDiagonalReflection`](@ref) and [`NFoldRotation`](@ref) symmetries;
-generalizing to every curve/segment type is deferred until more billiards are
-ported.
 
 ## Arguments
 * `billiard`: The billiard whose complete physical boundary is reconstructed.

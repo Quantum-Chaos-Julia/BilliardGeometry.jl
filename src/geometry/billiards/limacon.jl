@@ -6,6 +6,7 @@ struct LimaconBilliard{T} <: AbsBilliard where T<:Real
 end
 
 function LimaconBilliard(a::T; R::T = one(T)) where T<:Real
+    abs(a) <= one(T) || throw(ArgumentError("Limaçon requires |a|<=1 to remain a simple (non-self-intersecting) curve; received a=$a"))
     center = SVector{2,T}(zero(T), zero(T)); coef = SVector{2,T}(zero(T), a)
     bc = SpecularReflection(); symmetries = register_symmetries(XAxisReflection())
 

@@ -1,17 +1,4 @@
 """
-    _boundary_components(boundary) → comps::Vector
-
-Normalizes a boundary representation into a vector of connected components.
-If `boundary` is already a vector of component vectors (each component being
-a vector of curve segments), it is returned unchanged. Otherwise every
-supplied curve is treated as its own single-segment component.
-"""
-function _boundary_components(boundary)
-    isempty(boundary) && throw(ArgumentError("Boundary cannot be empty"))
-    return boundary[1] isa AbstractVector ? boundary : [[crv] for crv in boundary]
-end
-
-"""
     component_lengths(comp::Vector) → (lens, cum, Ltot)
 
 Computes the length of each curve segment in `comp`, the cumulative lengths

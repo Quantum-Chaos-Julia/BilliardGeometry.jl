@@ -1,6 +1,5 @@
 function _arc_length_integrand(crv::C, t::T) where {C<:AbsCurve, T<:Real}
-    f(t) = curve(crv,t)
-    return norm(ForwardDiff.derivative(f, t))
+    return norm(tangent(crv, t))
 end
 
 function arc_length(crv::C, t1::T; rtol=sqrt(eps(T)), atol=zero(T)) where {C<:AbsCurve, T<:Real}

@@ -18,15 +18,17 @@ struct CircleSegment{T,BC}  <: AbsCurve{BC} where {T<:Real}
 end
 
 function CircleSegment(R, arc_angle, shift_angle, center; bc = SpecularReflection(), orientation = 1, domain_id=1, segment_id=1)
-    center = SVector{2,eltype(center)}(center)
-    L = R*abs(arc_angle)
-    return CircleSegment(R,arc_angle,shift_angle,center,orientation,L,bc,domain_id,segment_id)
+    T = promote_type(typeof(R), typeof(arc_angle), typeof(shift_angle), eltype(center))
+    center = SVector{2,T}(center)
+    L = T(R)*abs(T(arc_angle))
+    return CircleSegment(T(R),T(arc_angle),T(shift_angle),center,orientation,L,bc,domain_id,segment_id)
 end
 
 function CircleSegment(R, arc_angle, shift_angle, x0, y0; bc = SpecularReflection(), orientation = 1, domain_id=1, segment_id=1)
-    center = SVector(x0,y0)
-    L = R*abs(arc_angle)
-    return CircleSegment(R,arc_angle,shift_angle,center,orientation,L,bc,domain_id,segment_id)
+    T = promote_type(typeof(R), typeof(arc_angle), typeof(shift_angle), typeof(x0), typeof(y0))
+    center = SVector{2,T}(x0,y0)
+    L = T(R)*abs(T(arc_angle))
+    return CircleSegment(T(R),T(arc_angle),T(shift_angle),center,orientation,L,bc,domain_id,segment_id)
 end
 
 # returns SVector(x,y)

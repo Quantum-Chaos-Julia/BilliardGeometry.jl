@@ -1,21 +1,26 @@
 
 
-struct LinearNodes <: AbsSampler 
+struct LinearNodes{T<:Real} <: AbsSampler 
 end 
+LinearNodes(::Type{T}=Float64) where {T<:Real} = LinearNodes{T}()
 
-function sample_points(sampler::LinearNodes, N::Int)
-    t = midpoints(range(0,1.0,length = (N+1)))
-    dt = diff(range(0,1.0,length =(N+1)))
+function sample_points(sampler::LinearNodes{T}, N::Int) where {T<:Real}
+    t = midpoints(range(zero(T),one(T),length = (N+1)))
+    dt = diff(range(zero(T),one(T),length =(N+1)))
     return t, dt
 end
 
-struct GaussLegendreNodes <: AbsSampler 
+struct GaussLegendreNodes{T<:Real} <: AbsSampler 
 end 
+GaussLegendreNodes(::Type{T}=Float64) where {T<:Real} = GaussLegendreNodes{T}()
 
-function sample_points(sampler::GaussLegendreNodes, N::Int)
+function sample_points(sampler::GaussLegendreNodes{T}, N::Int) where {T<:Real}
+    # `gausslegendre` (FastGaussQuadrature) always returns `Float64` nodes/weights;
+    # convert to `T` afterwards so callers get a type-stable result for the
+    # sampler's declared precision.
     x, w = gausslegendre(N)
-    t = 0.5 .* x  .+ 0.5
-    dt = w .* 0.5 
+    t = T(0.5) .* T.(x)  .+ T(0.5)
+    dt = T.(w) .* T(0.5) 
     return t, dt
 end
 
@@ -73,24 +78,6 @@ function sample_points(sampler::FourierNodes, N::Int)
     return ts,dts
 end
 
-
-function random_interior_points(billiard::AbsBilliard, N::Int; grd::Int = 1000)
-    xlim,ylim = boundary_limits(billiard.fundamental_boundary; grd=grd)
-    dx =  xlim[2] - xlim[1]
-    dy =  ylim[2] - ylim[1]
-    pts = []
- 
-    #println(length(pts))
-    while length(pts)<N
-        x = (dx .* rand() .+ xlim[1]) 
-        y = (dy .* rand() .+ ylim[1])
-        pt = SVector(x,y)
-        if is_inside(billiard, [pt])[1] #rework this
-            push!(pts,pt)
-        end
-    end
-    return pts
-end
 
 #=
 #needs some work

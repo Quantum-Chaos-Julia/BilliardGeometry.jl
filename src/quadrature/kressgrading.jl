@@ -27,7 +27,7 @@ function kress_R_even!(R0::AbstractMatrix{T}) where {T<:Real}
     alt = (-1).^ks
     @. R0[:,1] = -twopi*rjn - (2*twopi/(N^2))*alt
     @inbounds for j in 2:N
-        @views R0[:,j] .= circshift(R0[:,j-1], 1)
+        @views circshift!(R0[:,j], R0[:,j-1], 1)
     end
     return nothing
 end
@@ -52,7 +52,7 @@ function kress_R_odd!(R0::AbstractMatrix{T}) where {T<:Real}
     rjn = real(FFTW.ifft(a))
     @. R0[:,1] = -twopi*rjn
     @inbounds for j in 2:N
-        @views R0[:,j] .= circshift(R0[:,j-1], 1)
+        @views circshift!(R0[:,j], R0[:,j-1], 1)
     end
     return nothing
 end

@@ -8,13 +8,14 @@ function StarBilliard(R::T, a::T, n::Int; center=SVector{2,T}(zero(T),zero(T))) 
     n >= 2 || throw(ArgumentError("n must satisfy n>=2; received n=$n"))
     R > abs(a) || throw(ArgumentError("Require R>|a| so r(phi)>0; received R=$R, a=$a"))
     c = SVector{2,T}(center)
+    (iszero(c[1]) && iszero(c[2])) || throw(ArgumentError("Cn symmetry requires center == (0,0) (NFoldRotation always rotates about the coordinate origin); received center=$c"))
     coef = SVector{2*n,T}(ntuple(i -> i==2*n ? a : zero(T), 2*n))
     bc = SpecularReflection()
     #only the n-1 nontrivial rotations are needed to tile the fundamental
     #2*pi/n sector back into the full 2*pi boundary; adding reflections on
     #top (even though r(phi) may also be reflection-symmetric for even n)
     #would duplicate already-covered curves in `full_boundary`.
-    symmetries = Cn_symmetry(n) # sym_id 1 = rotate by +2π/n (m=1), ..., sym_id n-1 = rotate by +2π(n-1)/n (m=n-1)
+    symmetries = Cn_symmetry(n; T=T) # sym_id 1 = rotate by +2π/n (m=1), ..., sym_id n-1 = rotate by +2π(n-1)/n (m=n-1)
     arc = FourierCoeffPolarSegment(coef; R=R, arc_angle=T(2*pi/n), shift_angle=zero(T), center=c, bc=bc, domain_id=1, segment_id=1)
     p0 = curve(arc, zero(T))
     p1 = curve(arc, one(T))

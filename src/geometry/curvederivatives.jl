@@ -22,6 +22,10 @@ function tangent_2(crv::AbsCurve, ts::AbstractArray{<:Real})
     return [tangent_2(crv, t) for t in ts]
 end
 
+@inline function tangent(crv::AbsCurve, t::Real)
+    return ForwardDiff.derivative(u -> curve(crv, u), t)
+end
+
 # Line segments: r(t) = pt0 + t*(pt1-pt0), affine in t.
 @inline function tangent(line::L, t::Real) where {L<:AbsLine}
     return line.pt1 - line.pt0
@@ -49,26 +53,22 @@ end
 # evaluated analytically from the Fourier coefficients.
 @inline function _polar_radius_derivative(polar::L, phi::T) where {L<:FourierCoeffPolarSegment,T<:Real}
     dr = zero(T)
-    sin_coef = polar.coef[1:2:end]
-    cos_coef = polar.coef[2:2:end]
-    @inbounds for (n,a) in enumerate(cos_coef)
-        dr -= n*a*sin(n*phi)
-    end
-    @inbounds for (n,b) in enumerate(sin_coef)
-        dr += n*b*cos(n*phi)
+    coef = polar.coef
+    n_terms = length(coef) ÷ 2
+    @inbounds for n in 1:n_terms
+        b, a = coef[2n-1], coef[2n]
+        dr += n*b*cos(n*phi) - n*a*sin(n*phi)
     end
     return dr
 end
 
 @inline function _polar_radius_derivative_2(polar::L, phi::T) where {L<:FourierCoeffPolarSegment,T<:Real}
     ddr = zero(T)
-    sin_coef = polar.coef[1:2:end]
-    cos_coef = polar.coef[2:2:end]
-    @inbounds for (n,a) in enumerate(cos_coef)
-        ddr -= n^2*a*cos(n*phi)
-    end
-    @inbounds for (n,b) in enumerate(sin_coef)
-        ddr -= n^2*b*sin(n*phi)
+    coef = polar.coef
+    n_terms = length(coef) ÷ 2
+    @inbounds for n in 1:n_terms
+        b, a = coef[2n-1], coef[2n]
+        ddr -= n^2*(a*cos(n*phi) + b*sin(n*phi))
     end
     return ddr
 end

@@ -11,7 +11,7 @@ function C3Billiard(a::T; scale::T=one(T)) where T<:Real
     amp = a*scale/T(2)
     coef = SVector{12,T}(ntuple(i -> i==6 ? amp : i==11 ? -amp : zero(T), 12))
     bc = SpecularReflection()
-    symmetries = Cn_symmetry(3) # sym_id 1 = rotate by +2π/3 (m=1), sym_id 2 = rotate by +4π/3 (m=2)
+    symmetries = Cn_symmetry(3; T=T) # sym_id 1 = rotate by +2π/3 (m=1), sym_id 2 = rotate by +4π/3 (m=2)
     arc = FourierCoeffPolarSegment(coef; R=R, arc_angle=T(2*pi/3), shift_angle=zero(T), center=c, bc=bc, domain_id=1, segment_id=1)
     p0 = curve(arc, zero(T))
     p1 = curve(arc, one(T))

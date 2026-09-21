@@ -7,17 +7,13 @@ function is_overlaping(pt1, pt2)
     return x && y
 end
 
+#TODO: Let's test this function.
 function connect_curves(curves)
     if is_closed(curves)
         return curves
     end
-    # Greedily grow one connected chain at a time from whatever curves remain,
-    # instead of assuming every input curve belongs to a single ring. This
-    # correctly preserves multiply connected geometries (e.g. an outer wall
-    # plus a disjoint circular obstacle) as separate closed components,
-    # rather than silently dropping every component after the first.
     remaining_curves = copy(curves)
-    connected_curves = Vector{AbsCurve}()
+    chains = Vector{Vector{AbsCurve}}()
     while !isempty(remaining_curves)
         chain = Vector{AbsCurve}()
         push!(chain, popfirst!(remaining_curves))
@@ -34,6 +30,28 @@ function connect_curves(curves)
                 end
             end
         end
+        push!(chains, chain)
+    end
+    merged = true
+    while merged && length(chains) > 1
+        merged = false
+        for i in eachindex(chains)
+            end_pt = curve(chains[i][end], 1.0)
+            for j in eachindex(chains)
+                i == j && continue
+                start_pt = curve(chains[j][1], 0.0)
+                if is_overlaping(end_pt, start_pt)
+                    chains[i] = vcat(chains[i], chains[j])
+                    deleteat!(chains, j)
+                    merged = true
+                    break
+                end
+            end
+            merged && break
+        end
+    end
+    connected_curves = Vector{AbsCurve}()
+    for chain in chains
         append!(connected_curves, chain)
     end
     return connected_curves
@@ -80,6 +98,12 @@ function find_unique_elements(vector)
 end
 
 
+# NOTE: `point_curve_parameter` has zero call sites anywhere in the
+# BilliardGeometry.jl/QuantumBilliards.jl ecosystem (dead code as of the
+# 2026-09-14 audit; also throws an unguarded `BoundsError` if `roots_y` is
+# empty and silently returns `nothing` if `roots_y`/`roots_x` never agree).
+# Not removed: potentially consumed by ClassicalBilliards.jl (an external
+# repo not present in this workspace), or reserved for future use.
 function point_curve_parameter(crv::C, pt) where {C<:AbsCurve}
     inv_x(theta) = curve(crv,theta)[1] - pt[1] 
     inv_y(theta) = curve(crv,theta)[2] - pt[2]

@@ -1,4 +1,3 @@
-
 ident = IdentityTransformation()
 reflect_x = LinearMap(SMatrix{2,2}([-1.0 0.0;0.0 1.0]))
 reflect_y = LinearMap(SMatrix{2,2}([1.0 0.0;0.0 -1.0]))
@@ -134,15 +133,37 @@ function apply_symmetry(sym::AntiDiagonalReflection, pts)
     return [reflect_antidiag(pt) for pt in pts]
 end
 
-function apply_symmetry_pb(sym::AbsReflection, sym_sector::Int64, s::T, p::T, L::T) where T<:Real
-    if sym_sector == 1
-        return s, p
-    elseif sym_sector == 2
-        return 2*L-s, -p
-    elseif sym_sector == 3
-        return 2*L+s, p
-    elseif sym_sector == 4    
-        return 4*L-s, -p
+"""
+    apply_symmetry_pb(sym::AbsSymmetry, sym_sector::Int64, s::T, p::T, L::T) where T<:Real
+
+Maps a Poincaré–Birkhoff (arc-length, sine-of-angle) coordinate `(s,p)`,
+measured within the fundamental domain (of length `L`), to its global
+coordinate on the `sym_sector`-th copy of the full physical boundary
+(`sym_sector==1` is the fundamental domain itself, `sym_sector==k+1`
+corresponds to the image under `billiard.symmetries[k]`).
+
+## Description
+Mirrors [`full_boundary`](@ref)'s reconstruction: the full physical boundary
+is the concatenation of the fundamental domain (`[0,L]`) followed by, for
+`k=1,...,length(billiard.symmetries)`, the image of the fundamental domain
+under `billiard.symmetries[k]`. Orientation-preserving images
+(`XYAxisReflection`, [`NFoldRotation`](@ref)) continue the same traversal
+direction, so `s` maps to `k*L+s` with `p` unchanged; orientation-reversing
+images (pure reflections) reverse it, so `s` maps to `(k+1)*L-s` with `p`
+negated — see [`_orientation_reversing`](@ref).
+
+## Arguments
+* `sym`: The symmetry generator whose image sector `(s,p)` is mapped into (only its orientation-reversal behavior is used; not called for `sym_sector==1`).
+* `sym_sector`: 1-based index of the boundary copy, `k+1` where `k` is `sym`'s 1-based position in `billiard.symmetries`.
+* `s`,`p`: Arc length / sine-of-angle coordinates within the fundamental domain.
+* `L`: Length of the fundamental domain's physical boundary.
+"""
+function apply_symmetry_pb(sym::AbsSymmetry, sym_sector::Int64, s::T, p::T, L::T) where T<:Real
+    k = sym_sector - 1
+    if _orientation_reversing(sym)
+        return (k+1)*L - s, -p
+    else
+        return k*L + s, p
     end
 end
 
@@ -166,7 +187,7 @@ abstract type AbsRotation <: AbsSymmetry end
 end
 
 """
-    NFoldRotation(N,m,sym_id=0)
+    NFoldRotation(N,m,sym_id=0; T::Type{<:Real}=Float64)
 
 One nontrivial image of an `N`-fold rotational symmetry: counter-clockwise
 rotation by `2π*m/N`.
@@ -174,24 +195,25 @@ rotation by `2π*m/N`.
 ## Arguments
 * `N`: Order of the rotational symmetry.
 * `m`: Power of the fundamental rotation.
-* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref) (purely geometric; carries no representation data \u2014 see `SymmetrySector` in `QuantumBilliards.jl` for the per-solve irrep-sector choice).
+* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref) (purely geometric; carries no representation data — see `SymmetrySector` in `QuantumBilliards.jl` for the per-solve irrep-sector choice).
+* `T`: Numeric type of the rotation angle/matrix, matching the billiard's own `T<:Real` (defaults to `Float64`; pass explicitly for `BigFloat`/`Float32` billiards so the rotation isn't silently narrowed/widened to `Float64`).
 """
-struct NFoldRotation <: AbsRotation
+struct NFoldRotation{T<:Real} <: AbsRotation
     order::Int64
     m::Int64
     sym_id::Int64
-    angle::Float64
-    sym_map::LinearMap{SMatrix{2, 2, Float64, 4}}
+    angle::T
+    sym_map::LinearMap{SMatrix{2, 2, T, 4}}
 end
 
-function NFoldRotation(N, m, sym_id::Int=0)
-    angle = 2*pi/N
+function NFoldRotation(N, m, sym_id::Int=0; T::Type{<:Real}=Float64)
+    angle = T(2*pi/N)
     mm = mod(m, N)
     sym_map = LinearMap(rotation_matrix_z(angle*mm))
     return NFoldRotation(N, mm, sym_id, angle, sym_map)
 end
 
-_with_sym_id(sym::NFoldRotation, id::Int) = NFoldRotation(sym.order, sym.m, id)
+_with_sym_id(sym::NFoldRotation, id::Int) = NFoldRotation(sym.order, sym.m, id; T=typeof(sym.angle))
 
 function apply_symmetry(sym::NFoldRotation, pt::SVector{2,T}) where T<:Real
     return sym.sym_map(pt)
@@ -201,10 +223,13 @@ function apply_symmetry(sym::NFoldRotation, pts)
 end
 
 """
-    Cn_symmetry(n) → reg::SymmetryRegistry
+    Cn_symmetry(n; T::Type{<:Real}=Float64) → reg::SymmetryRegistry
 
 Registers the `n-1` non-identity images of an `n`-fold rotational symmetry
 (`NFoldRotation(n,1), ..., NFoldRotation(n,n-1)`) via
 [`register_symmetries`](@ref), giving them fresh `sym_id`s `1,...,n-1`.
+
+`T` should match the billiard's own numeric type parameter (defaults to
+`Float64`); see [`NFoldRotation`](@ref).
 """
-Cn_symmetry(n) = register_symmetries((NFoldRotation(n,i) for i in 1:(n-1))...)
+Cn_symmetry(n; T::Type{<:Real}=Float64) = register_symmetries((NFoldRotation(n,i; T=T) for i in 1:(n-1))...)
