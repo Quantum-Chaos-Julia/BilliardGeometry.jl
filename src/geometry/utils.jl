@@ -57,10 +57,10 @@ function connect_curves(curves)
     return connected_curves
 end
 
-function is_connected(boundary; start_intial = true)
+function is_connected(boundary; start_initial = true)
     start_pts = CircularArray([curve(crv,0.0) for crv in boundary])
     end_pts = CircularArray([curve(crv,1.0) for crv in boundary])    
-    if start_intial
+    if start_initial
         test = [is_overlaping(end_pts[i-1], start_pts[i]) for i in 1:length(start_pts)]
     else
         test = [is_overlaping(end_pts[i], start_pts[i+1]) for i in 1:length(start_pts)]
@@ -68,15 +68,15 @@ function is_connected(boundary; start_intial = true)
     return test
 end
 
-function is_closed(boundary; check_periodic=false,  start_intial = true)
+function is_closed(boundary; check_periodic=false,  start_initial = true)
     if check_periodic
-        return all(is_connected(boundary; start_intial))
+        return all(is_connected(boundary; start_initial=start_initial))
     end
 
-    if start_intial
-        return all(is_connected(boundary; start_intial)[2:end])
+    if start_initial
+        return all(is_connected(boundary; start_initial=start_initial)[2:end])
     else
-        return all(is_connected(boundary; start_intial)[1:end-1])
+        return all(is_connected(boundary; start_initial=start_initial)[1:end-1])
     end
 end 
 
@@ -97,13 +97,6 @@ function find_unique_elements(vector)
     return unique(vector[u])
 end
 
-
-# NOTE: `point_curve_parameter` has zero call sites anywhere in the
-# BilliardGeometry.jl/QuantumBilliards.jl ecosystem (dead code as of the
-# 2026-09-14 audit; also throws an unguarded `BoundsError` if `roots_y` is
-# empty and silently returns `nothing` if `roots_y`/`roots_x` never agree).
-# Not removed: potentially consumed by ClassicalBilliards.jl (an external
-# repo not present in this workspace), or reserved for future use.
 function point_curve_parameter(crv::C, pt) where {C<:AbsCurve}
     inv_x(theta) = curve(crv,theta)[1] - pt[1] 
     inv_y(theta) = curve(crv,theta)[2] - pt[2]
