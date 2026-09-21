@@ -7,7 +7,7 @@ function SquareWithinSquareBilliard(a::T=one(T); positions::AbstractVector{<:Rea
     a > zero(T) || throw(ArgumentError("a must be positive; received $a"))
     length(positions) == length(sizes) || throw(ArgumentError("positions and sizes must have the same length"))
     pos = T.(positions); sz = T.(sizes); n = length(pos)
-    all(>(zero(T)),sz) || throw(ArgumentError("All square side lengths must be positive"))
+    all(>(zero(T)), sz) || throw(ArgumentError("All square side lengths must be positive"))
     p = sortperm(pos); pos = pos[p]; sz = sz[p]
     @inbounds for i in 1:n
         h = sz[i]/2
@@ -28,8 +28,8 @@ function SquareWithinSquareBilliard(a::T=one(T); positions::AbstractVector{<:Rea
         qx = SVector{2,T}(d+h,d-h)
         qlo = SVector{2,T}(d-h,d-h)
         push!(boundary,LineSegment(current,qhi; bc=SymmetryWall(1,2), domain_id=1, segment_id=wall_id)); wall_id += 1
-        push!(boundary,LineSegment(qhi,qx; bc=bc, orientation=-1, domain_id=i+1, segment_id=1))
-        push!(boundary,LineSegment(qx,qlo; bc=bc, orientation=-1, domain_id=i+1, segment_id=2))
+        push!(boundary,LineSegment(qlo,qx; bc=bc, orientation=-1, domain_id=i+1, segment_id=1))
+        push!(boundary,LineSegment(qx,qhi; bc=bc, orientation=-1, domain_id=i+1, segment_id=2))
         current = qlo
     end
     push!(boundary,LineSegment(current,p0; bc=SymmetryWall(1,2), domain_id=1, segment_id=wall_id))
