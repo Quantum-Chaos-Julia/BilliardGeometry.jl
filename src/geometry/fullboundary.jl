@@ -132,39 +132,80 @@ function _reverse_curve(c::L) where {L<:PolarSegment}
     new_arc = -c.arc_angle
     return PolarSegment(c.r_func; R=c.R, arc_angle=new_arc, shift_angle=new_shift, center=c.center, orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
 end
-"""
-    full_boundary(billiard::Bi) where {Bi<:AbsBilliard} → curves::Vector{AbsCurve}
 
-Reconstructs the complete, closed, canonically CCW-oriented physical boundary
-of `billiard` from its fundamental domain and its discrete `symmetries`.
+"""
+    _full_boundary_data(billiard::Bi) where {Bi<:AbsBilliard}
+
+Reconstruct the complete physical boundary together with its exact discrete
+construction provenance.
 
 ## Description
-Starts from `get_boundary_curves(billiard)` — the connected `SpecularReflection`
-curves of the fundamental domain, i.e. the physical part of the discretization
-basis solvers already use — and appends, for every `sym in billiard.symmetries`,
-the image of those same fundamental-domain curves under `sym`. Symmetry walls
-(curves whose boundary condition is [`SymmetryWall`](@ref)) and internal
-subdomain seams (e.g. `Transparent`) are never included, matching
-[`get_boundary_curves`](@ref)'s existing filtering. For a billiard with no
-symmetries, `full_boundary(billiard) == get_boundary_curves(billiard)`.
+The fundamental physical curves returned by `get_boundary_curves(billiard)`
+form reconstruction sector `1`. For every registered non-identity symmetry
+`billiard.symmetries[k]`, sector `k + 1` is constructed directly from the
+same fundamental curves.
+
+For every reconstructed curve, `source` stores the corresponding fundamental
+physical-curve index, `sector` stores the reconstruction-sector index, and
+`reversed` records whether the fundamental curve parametrization was reversed
+when constructing that image.
+
+The provenance is derived directly from the reconstruction procedure. No
+geometric matching or floating-point inference is performed.
 
 ## Arguments
-* `billiard`: The billiard whose complete physical boundary is reconstructed.
+* `billiard::Bi`: Billiard whose complete physical boundary is reconstructed.
 
 ## Returns
-* `curves`: The complete, closed physical boundary as a `Vector{AbsCurve}`.
+* `curves::Vector{AbsCurve}`: Complete physical boundary.
+* `source::Vector{Int}`: Fundamental physical-curve source index of each curve.
+* `sector::Vector{Int}`: Reconstruction-sector index of each curve.
+* `reversed::BitVector`: Whether each reconstructed curve reverses its source parametrization.
 """
-function full_boundary(billiard::Bi) where {Bi<:AbsBilliard}
+function _full_boundary_data(billiard::Bi) where {Bi<:AbsBilliard}
     P = get_boundary_curves(billiard)
+    np = length(P)
     curves = Vector{AbsCurve}(P)
-    for sym in billiard.symmetries
+    source = collect(1:np)
+    sector = ones(Int, np)
+    reversed = falses(np)
+    @inbounds for (k, sym) in enumerate(billiard.symmetries)
         if _orientation_reversing(sym)
             images = [_reverse_curve(_apply_symmetry_to_curve(sym, c)) for c in P]
             append!(curves, reverse(images))
+            append!(source, np:-1:1)
+            append!(sector, fill(k + 1, np))
+            append!(reversed, trues(np))
         else
             images = [_apply_symmetry_to_curve(sym, c) for c in P]
             append!(curves, images)
+            append!(source, 1:np)
+            append!(sector, fill(k + 1, np))
+            append!(reversed, falses(np))
         end
     end
+    return curves, source, sector, reversed
+end
+
+"""
+    full_boundary(billiard::Bi) where {Bi<:AbsBilliard}
+
+Reconstruct the complete physical boundary from the billiard's fundamental
+physical curves and registered discrete symmetries.
+
+## Description
+Sector `1` is the fundamental physical boundary returned by
+`get_boundary_curves(billiard)`. Each registered non-identity symmetry adds
+one additional physical reconstruction sector. Reflection images are reversed
+as required to preserve continuous boundary traversal orientation.
+
+## Arguments
+* `billiard::Bi`: Billiard whose complete physical boundary is requested.
+
+## Returns
+* `curves::Vector{AbsCurve}`: Complete reconstructed physical boundary.
+"""
+function full_boundary(billiard::Bi) where {Bi<:AbsBilliard}
+    curves, _, _, _ = _full_boundary_data(billiard)
     return curves
 end

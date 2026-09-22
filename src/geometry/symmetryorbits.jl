@@ -1,38 +1,42 @@
-"""
-SymmetryOrbitMap{T}
+################################################################################
+# DISCRETE BOUNDARY SYMMETRY ORBITS
+#
+# A BIM discretization samples each complete physical boundary component on a
+# periodic midpoint grid. The action of a discrete symmetry on those nodes is
+# determined exactly from the same registered symmetry group used by
+# `full_boundary`; it is never inferred from floating-point coordinates.
+#
+# Current restriction:
+#
+#   Every physical boundary component must be individually invariant under the
+#   active symmetry. Symmetries that exchange distinct `domain_id` components
+#   are not supported.
+#
+# Thus the same construction applies independently to the outer boundary and,
+# for multiply connected billiards, to every invariant hole boundary.
+################################################################################
 
-`SymmetryOrbitMap` is a concrete type representing the folding of a fully
-discretized (periodic) boundary onto a fundamental domain under a discrete
-[`AbsSymmetry`](@ref) group.
+"""
+    SymmetryOrbitMap{T}
+
+Exact folding of a periodic boundary discretization under a discrete symmetry
+group.
 
 ## Description
-Boundary-integral method (BIM) solvers discretize unknown boundary densities
-directly (rather than expanding them in an [`AbsBasis`](@ref)), so a discrete
-symmetry cannot be baked into basis functions the way
-[`CornerAdaptedFourierBessel`](@ref) does for basis solvers. Instead, the
-*complete* physical boundary is discretized, and a `SymmetryOrbitMap` records,
-for every full-boundary node, which fundamental-domain node it is the
-symmetry image of, together with the irreducible-representation phase factor
-relating the two. This lets a BIM solver assemble its Fredholm matrix only on
-the fundamental-domain indices while still summing source contributions over
-every symmetry image of the full boundary.
+`SymmetryOrbitMap` records the complete discrete symmetry orbit of every
+fundamental boundary node together with the irreducible-representation factor
+relating each image to its representative. The node permutations are derived
+algebraically from the billiard's registered physical-boundary reconstruction;
+no floating-point coordinate matching is used.
 
 ## Attributes
-* `fundamental_indices::Vector{Int}`: Indices into the full-boundary node array kept as the fundamental-domain representatives.
-* `orbit_of::Vector{Int}`: For each full-boundary node index, the fundamental-domain index (position in `fundamental_indices`) it is folded onto.
-* `phase::Vector{Complex{T}}`: Per full-boundary-node irreducible-representation phase factor relating the node to its fundamental-domain representative (`one(Complex{T})` for the trivial representation).
-* `full_size::Int`: Number of nodes on the complete (unfolded) boundary.
-* `fundamental_size::Int`: Number of nodes on the fundamental domain, `length(fundamental_indices)`.
-* `fund_to_full::Matrix{Int}`: `fund_to_full[g,b]` is the full-boundary node index of the `g`-th group image of fundamental node `b`.
-* `fund_to_scale::Matrix{Complex{T}}`: `fund_to_scale[g,b]` is the irrep factor associated with `fund_to_full[g,b]`.
-
-## API
-The following functions can be evaluated for any `SymmetryOrbitMap`:
-- [`fundamental_size`](@ref)
-- [`full_size`](@ref)
-- [`orbit_size`](@ref)
-- [`symmetry_orbit`](@ref)
-- `Base.length`
+* `fundamental_indices::Vector{Int}`: Full-boundary indices chosen as orbit representatives.
+* `orbit_of::Vector{Int}`: Fundamental-orbit index associated with each full-boundary node.
+* `phase::Vector{Complex{T}}`: Irreducible-representation factor associated with each full-boundary node.
+* `full_size::Int`: Number of nodes on the complete boundary component.
+* `fundamental_size::Int`: Number of symmetry-reduced boundary nodes.
+* `fund_to_full::Matrix{Int}`: Full node index of each group image of each representative.
+* `fund_to_scale::Matrix{Complex{T}}`: Irrep factor of each group image.
 """
 struct SymmetryOrbitMap{T<:Real}
     fundamental_indices::Vector{Int}
@@ -47,62 +51,82 @@ end
 """
     fundamental_size(orbits::SymmetryOrbitMap) → n::Int
 
-Returns the number of nodes on the fundamental domain, `n = orbits.fundamental_size`.
+Return the number of symmetry-reduced boundary nodes.
+
+## Arguments
+* `orbits::SymmetryOrbitMap`: Boundary symmetry-orbit map.
+
+## Returns
+* `n::Int`: Number of fundamental boundary nodes.
 """
 fundamental_size(orbits::SymmetryOrbitMap) = orbits.fundamental_size
 
 """
     length(orbits::SymmetryOrbitMap) → n::Int
 
-Returns the number of nodes on the complete (unfolded) boundary, `n = orbits.full_size`.
+Return the number of nodes on the complete boundary component.
+
+## Arguments
+* `orbits::SymmetryOrbitMap`: Boundary symmetry-orbit map.
+
+## Returns
+* `n::Int`: Number of complete-boundary nodes.
 """
 Base.length(orbits::SymmetryOrbitMap) = orbits.full_size
 
 """
     full_size(orbits::SymmetryOrbitMap) → n::Int
 
-Returns the number of nodes on the complete (unfolded) boundary, `n = orbits.full_size`.
+Return the number of nodes on the complete boundary component.
+
+## Arguments
+* `orbits::SymmetryOrbitMap`: Boundary symmetry-orbit map.
+
+## Returns
+* `n::Int`: Number of complete-boundary nodes.
 """
 full_size(orbits::SymmetryOrbitMap) = orbits.full_size
 
 """
     orbit_size(orbits::SymmetryOrbitMap) → ng::Int
 
-Returns the symmetry-group order (number of group images per fundamental node), `size(orbits.fund_to_full,1)`.
+Return the number of symmetry-group images in each boundary orbit.
+
+## Arguments
+* `orbits::SymmetryOrbitMap`: Boundary symmetry-orbit map.
+
+## Returns
+* `ng::Int`: Symmetry-group order.
 """
 orbit_size(orbits::SymmetryOrbitMap) = size(orbits.fund_to_full, 1)
 
 """
     symmetry_orbit(orbits::SymmetryOrbitMap, b::Int) → (qs, χs)
 
-Returns the full-boundary indices and irrep factors representing the complete
-symmetry orbit of fundamental node `b`: if `qs,χs = symmetry_orbit(orbits,b)`,
-then a reduced boundary value `u_b` generates the full orbit according to
-`u[qs[l]] = χs[l]*u_b`. The returned arrays are views into `orbits` and
-therefore allocate no copies.
+Return the complete node indices and irrep factors in fundamental orbit `b`.
+
+## Arguments
+* `orbits::SymmetryOrbitMap`: Boundary symmetry-orbit map.
+* `b::Int`: Fundamental-orbit index.
+
+## Returns
+* `qs`: View of complete-boundary node indices.
+* `χs`: View of corresponding irreducible-representation factors.
 """
 @inline function symmetry_orbit(orbits::SymmetryOrbitMap, b::Int)
-    return @view(orbits.fund_to_full[:,b]), @view(orbits.fund_to_scale[:,b])
+    return @view(orbits.fund_to_full[:, b]), @view(orbits.fund_to_scale[:, b])
 end
 
 """
     symmetry_node_multiple(symmetry::AbsSymmetry) → n::Int
 
-Returns the full-boundary node count multiple required for
-[`symmetry_index_orbits`](@ref) to fold the boundary onto a fundamental
-domain under `symmetry` using exact integer index permutations (no
-floating-point point matching).
+Return the node-count multiple required by a boundary symmetry reduction.
 
-## Description
-For [`XAxisReflection`](@ref), [`YAxisReflection`](@ref) and
-[`XYAxisReflection`](@ref) the node count must be divisible by `4` (matching
-the `-develop` reference solvers' node-count sizing, which requires this even
-though the reflection group itself has order `2`, so that the boundary can
-also accommodate the combined `D₂` action exactly). [`DiagonalReflection`](@ref)
-and [`AntiDiagonalReflection`](@ref) require divisibility by `8`. For
-[`NFoldRotation`](@ref), the multiple is the rotation order `sym.order`. For a
-[`CompositeReflection`](@ref), the multiple is the least common multiple of
-its constituent reflections' multiples.
+## Arguments
+* `symmetry::AbsSymmetry`: Active discrete symmetry.
+
+## Returns
+* `n::Int`: Required node-count multiple.
 """
 symmetry_node_multiple(::XAxisReflection) = 4
 symmetry_node_multiple(::YAxisReflection) = 4
@@ -110,33 +134,177 @@ symmetry_node_multiple(::XYAxisReflection) = 4
 symmetry_node_multiple(::DiagonalReflection) = 8
 symmetry_node_multiple(::AntiDiagonalReflection) = 8
 symmetry_node_multiple(sym::NFoldRotation) = sym.order
-symmetry_node_multiple(sym::CompositeReflection) = foldl(lcm, (symmetry_node_multiple(ref) for ref in sym.reflections); init=1)
+symmetry_node_multiple(sym::CompositeReflection) = foldl(lcm, (symmetry_node_multiple(ref) for ref in sym.reflections); init = 1)
 
-# Canonical periodic boundary index actions (boundary assumed sampled by
-# midpoint nodes `s_mid(k,N) = 2π(k-1/2)/N` in canonical orientation, exactly
-# as ported to `QuantumBilliards.jl`/`BilliardGeometry.jl`'s BIM `evaluate_points`
-# methods). All actions below are exact integer permutations of node indices,
-# so no floating-point tolerance/point-matching is required.
-@inline _idx_reflect_x(q::Int, N::Int) = mod1(N-q+1, N)
-@inline _idx_reflect_y(q::Int, N::Int) = mod1(N÷2-q+1, N)
-@inline _idx_reflect_diag_plus(q::Int, N::Int) = mod1(N÷4-q+1, N)
-@inline _idx_reflect_diag_minus(q::Int, N::Int) = mod1(3*N÷4-q+1, N)
-@inline _idx_rotate_pi(q::Int, N::Int) = mod1(q+N÷2, N)
-@inline _idx_rotate(q::Int, N::Int, n::Int, l::Int) = mod1(q+l*(N÷n), N)
+################################################################################
+# EXACT REGISTERED-GROUP ALGEBRA
+################################################################################
+
+# Exact integer matrix key for the identity transformation.
+const _SYMMETRY_IDENTITY_KEY = (1, 0, 0, 1)
+
+# Return the exact integer matrix key of each implemented reflection.
+@inline _symmetry_key(::XAxisReflection) = (1, 0, 0, -1)
+@inline _symmetry_key(::YAxisReflection) = (-1, 0, 0, 1)
+@inline _symmetry_key(::XYAxisReflection) = (-1, 0, 0, -1)
+@inline _symmetry_key(::DiagonalReflection) = (0, 1, 1, 0)
+@inline _symmetry_key(::AntiDiagonalReflection) = (0, -1, -1, 0)
+
+# Compose two exact 2×2 integer symmetry matrices, returning the key of A ∘ B.
+@inline function _compose_symmetry_keys(A::NTuple{4, Int}, B::NTuple{4, Int})
+    a, b, c, d = A
+    e, f, g, h = B
+    return (a * e + b * g, a * f + b * h, c * e + d * g, c * f + d * h)
+end
+
+# Represent an N-fold rotation exactly by its order and reduced rotation power.
+@inline _rotation_key(sym::NFoldRotation) = (sym.order, mod(sym.m, sym.order))
+
+# Return the exact identity key for an N-fold rotation group.
+@inline _rotation_identity_key(n::Int) = (n, 0)
+
+# Compose two powers of the same cyclic rotation group.
+@inline function _compose_rotation_keys(a::Tuple{Int, Int}, b::Tuple{Int, Int})
+    a[1] == b[1] || throw(ArgumentError("Cannot compose rotations of orders $(a[1]) and $(b[1])"))
+    return (a[1], mod(a[2] + b[2], a[1]))
+end
+
+# Return the exact geometric keys of the physical reconstruction sectors in
+# the same order used by `full_boundary`: identity followed by the registry.
+function _reflection_sector_keys(billiard::Bi) where {Bi<:AbsBilliard}
+    keys = NTuple{4, Int}[_SYMMETRY_IDENTITY_KEY]
+    @inbounds for sym in billiard.symmetries
+        sym isa AbsReflection || throw(ArgumentError("Expected a reflection-group SymmetryRegistry; found $(typeof(sym))"))
+        sym isa CompositeReflection && throw(ArgumentError("CompositeReflection cannot be a physical reconstruction-sector element"))
+        push!(keys, _symmetry_key(sym))
+    end
+    length(unique(keys)) == length(keys) || throw(ArgumentError("SymmetryRegistry contains duplicate geometric actions"))
+    return keys
+end
+
+# Compute how one reflection permutes the physical reconstruction sectors by
+# exact group multiplication, without inspecting any boundary coordinates.
+function _reflection_sector_permutation(billiard::Bi, action::AbsReflection) where {Bi<:AbsBilliard}
+    action isa CompositeReflection && throw(ArgumentError("CompositeReflection is a generator set, not one geometric action"))
+    keys = _reflection_sector_keys(billiard)
+    g = _symmetry_key(action)
+    p = Vector{Int}(undef, length(keys))
+    @inbounds for s in eachindex(keys)
+        target = _compose_symmetry_keys(g, keys[s])
+        j = findfirst(==(target), keys)
+        isnothing(j) && throw(ArgumentError("$(typeof(action)) is not contained in the billiard's registered physical symmetry group"))
+        p[s] = j
+    end
+    return p
+end
+
+# Return the exact cyclic keys of the physical rotational reconstruction
+# sectors in the same order used by `full_boundary`.
+function _rotation_sector_keys(billiard::Bi) where {Bi<:AbsBilliard}
+    isempty(billiard.symmetries) && throw(ArgumentError("Billiard has no registered rotational symmetry"))
+    firstsym = first(billiard.symmetries)
+    firstsym isa NFoldRotation || throw(ArgumentError("Expected a rotational SymmetryRegistry; found $(typeof(firstsym))"))
+    n = firstsym.order
+    keys = Tuple{Int, Int}[_rotation_identity_key(n)]
+    @inbounds for sym in billiard.symmetries
+        sym isa NFoldRotation || throw(ArgumentError("SymmetryRegistry mixes rotational and reflection actions"))
+        sym.order == n || throw(ArgumentError("SymmetryRegistry mixes rotation orders"))
+        push!(keys, _rotation_key(sym))
+    end
+    length(unique(keys)) == length(keys) || throw(ArgumentError("SymmetryRegistry contains duplicate rotational actions"))
+    return keys
+end
+
+# Compute how one N-fold rotation permutes the physical reconstruction sectors
+# by exact cyclic-group addition.
+function _rotation_sector_permutation(billiard::Bi, action::NFoldRotation) where {Bi<:AbsBilliard}
+    keys = _rotation_sector_keys(billiard)
+    g = _rotation_key(action)
+    p = Vector{Int}(undef, length(keys))
+    @inbounds for s in eachindex(keys)
+        target = _compose_rotation_keys(g, keys[s])
+        j = findfirst(==(target), keys)
+        isnothing(j) && throw(ArgumentError("Rotation m = $(action.m) is not contained in the billiard's registered physical symmetry group"))
+        p[s] = j
+    end
+    return p
+end
+
+################################################################################
+# EXACT MIDPOINT-GRID PERMUTATIONS
+################################################################################
 
 """
-    _build_symmetry_orbit_map(::Type{T}, N::Int, perms::Vector{Vector{Int}}, scales::Vector{Complex{T}}=ones(Complex{T},length(perms))) where {T<:Real} → orbits::SymmetryOrbitMap{T}
+    _sector_node_permutation(N::Int, sector_perm::Vector{Int}, reversing::Bool) → p::Vector{Int}
 
-Builds a [`SymmetryOrbitMap`](@ref) from a group of exact full-boundary index
-permutations `perms` (one per group element, `perms[1]` the identity) and
-their corresponding irrep factors `scales` (defaulting to the trivial
-representation, `phase` equal to `one(Complex{T})` everywhere).
+Lift an exact reconstruction-sector permutation to a periodic midpoint-node
+permutation.
+
+## Description
+The complete invariant boundary component is divided into one equal
+parametrization block per registered physical symmetry sector. An
+orientation-preserving action preserves the local midpoint index; an
+orientation-reversing action reverses it. All operations are exact integer
+operations.
+
+## Arguments
+* `N::Int`: Number of nodes on the complete invariant boundary component.
+* `sector_perm::Vector{Int}`: Exact permutation of reconstruction sectors.
+* `reversing::Bool`: Whether the geometric action reverses boundary orientation.
+
+## Returns
+* `p::Vector{Int}`: Exact full-component node permutation.
 """
-function _build_symmetry_orbit_map(::Type{T}, N::Int, perms::Vector{Vector{Int}}, scales::Vector{Complex{T}}=ones(Complex{T}, length(perms))) where {T<:Real}
+function _sector_node_permutation(N::Int, sector_perm::Vector{Int}, reversing::Bool)
+    ng = length(sector_perm)
+    N % ng == 0 || throw(ArgumentError("Node count N = $N must be divisible by physical symmetry-group order $ng"))
+    M = N ÷ ng
+    p = Vector{Int}(undef, N)
+    @inbounds for q in 1:N
+        j = q - 1
+        s = j ÷ M
+        u = j - s * M
+        sp = sector_perm[s + 1] - 1
+        up = reversing ? M - 1 - u : u
+        p[q] = sp * M + up + 1
+    end
+    return p
+end
+
+# Construct the exact midpoint-index permutation induced by one physical
+# reflection on an invariant boundary component.
+function _boundary_symmetry_permutation(billiard::Bi, N::Int, symmetry::AbsReflection) where {Bi<:AbsBilliard}
+    symmetry isa CompositeReflection && throw(ArgumentError("CompositeReflection contains several geometric generators"))
+    sectors = _reflection_sector_permutation(billiard, symmetry)
+    return _sector_node_permutation(N, sectors, _orientation_reversing(symmetry))
+end
+
+# Construct the exact midpoint-index permutation induced by one physical
+# N-fold rotation on an invariant boundary component.
+function _boundary_symmetry_permutation(billiard::Bi, N::Int, symmetry::NFoldRotation) where {Bi<:AbsBilliard}
+    sectors = _rotation_sector_permutation(billiard, symmetry)
+    return _sector_node_permutation(N, sectors, false)
+end
+
+# Compose two index permutations as a ∘ b, so the resulting image of q is
+# a[b[q]].
+@inline function _compose_index_permutations(a::Vector{Int}, b::Vector{Int})
+    length(a) == length(b) || throw(DimensionMismatch("Cannot compose permutations of lengths $(length(a)) and $(length(b))"))
+    return [a[b[q]] for q in eachindex(b)]
+end
+
+################################################################################
+# ORBIT-MAP CONSTRUCTION
+################################################################################
+
+# Build the final orbit lookup tables from exact full-boundary permutations
+# and their corresponding irreducible-representation factors.
+function _build_symmetry_orbit_map(::Type{T}, N::Int, perms::Vector{Vector{Int}}, scales::Vector{Complex{T}} = ones(Complex{T}, length(perms))) where {T<:Real}
     ng = length(perms)
-    N%ng==0 || throw(ArgumentError("Node count N=$N must be divisible by symmetry-group order $ng"))
-    length(scales)==ng || throw(DimensionMismatch("Received $ng permutations but $(length(scales)) irrep factors"))
-    nf = N÷ng
+    N % ng == 0 || throw(ArgumentError("Node count N = $N must be divisible by symmetry-group order $ng"))
+    length(scales) == ng || throw(DimensionMismatch("Received $ng permutations but $(length(scales)) irrep factors"))
+    all(length(p) == N for p in perms) || throw(DimensionMismatch("Every symmetry permutation must have length N = $N"))
+    nf = N ÷ ng
     fundamental_indices = Vector{Int}(undef, nf)
     orbit_of = Vector{Int}(undef, N)
     phase = Vector{Complex{T}}(undef, N)
@@ -147,167 +315,132 @@ function _build_symmetry_orbit_map(::Type{T}, N::Int, perms::Vector{Vector{Int}}
     @inbounds for q in 1:N
         seen[q] && continue
         b += 1
+        b <= nf || throw(ArgumentError("Symmetry action does not produce free orbits of size $ng"))
         fundamental_indices[b] = q
         for g in 1:ng
             qi = perms[g][q]
             χ = scales[g]
+            1 <= qi <= N || throw(ArgumentError("Invalid symmetry image index $qi for N = $N"))
             orbit_of[qi] = b
             phase[qi] = χ
-            fund_to_full[g,b] = qi
-            fund_to_scale[g,b] = χ
+            fund_to_full[g, b] = qi
+            fund_to_scale[g, b] = χ
             seen[qi] = true
         end
     end
+    b == nf || throw(ArgumentError("Symmetry action produced $b boundary orbits; expected $nf"))
     return SymmetryOrbitMap{T}(fundamental_indices, orbit_of, phase, N, nf, fund_to_full, fund_to_scale)
 end
 
-"""
-    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::AbsSymmetry, character...) where {T<:Real} → orbits::SymmetryOrbitMap{T}
+################################################################################
+# PUBLIC SINGLE-COMPONENT API
+################################################################################
 
-Constructs the [`SymmetryOrbitMap`](@ref) folding the fully discretized
-boundary points `xy` onto a fundamental domain under `symmetry`.
+"""
+    symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::AbsSymmetry, character...) where {T<:Real,Bi<:AbsBilliard} → orbits::SymmetryOrbitMap{T}
+
+Construct the exact symmetry-orbit map for one complete invariant physical
+boundary component.
 
 ## Description
-The reduction uses the exact integer index permutation the symmetry induces
-on a canonically ordered periodic boundary sampling (the same convention used
-by the BIM solvers' `evaluate_points` methods), not floating-point nearest-
-neighbor matching on `xy`: `length(xy)` must already be a multiple of
-[`symmetry_node_multiple`](@ref)`(symmetry)`. The per-node `phase` factors
-are the irreducible-representation character(s) requested via the trailing
-`character` argument(s) — a Layer-2 (per-solve representation) choice, kept
-separate from `symmetry`'s purely geometric data (see `SymmetrySector` in
-`QuantumBilliards.jl`) — defaulting to the trivial (fully symmetric)
-representation when omitted.
+The node permutation is derived from the billiard's registered physical
+symmetry reconstruction and the integer midpoint-grid index. Boundary
+coordinates are never inspected and no floating-point matching is performed.
+
+The physical boundary component must be individually invariant under the
+requested symmetry. Symmetries that exchange distinct physical components
+are currently unsupported.
 
 ## Arguments
-* `T`: Real scalar type used by the boundary discretization.
-* `xy`: Complete (unfolded) boundary points in Cartesian coordinates, canonically ordered.
-* `symmetry`: The discrete symmetry the boundary points are invariant under.
-* `character`: The requested one-dimensional irrep character(s) (`±1` for a single-axis reflection; `character_x,character_y` for `XYAxisReflection`; `sector::Int` for `NFoldRotation`), defaulting to the trivial representation.
+* `T::Type{<:Real}`: Real scalar type of the boundary discretization.
+* `billiard::Bi`: Billiard defining the registered physical symmetry group.
+* `N::Int`: Number of nodes on the complete invariant physical component.
+* `symmetry::AbsSymmetry`: Active symmetry reduction.
+* `character`: Requested irreducible-representation character or rotational sector.
 
 ## Returns
-* `orbits`: A [`SymmetryOrbitMap{T}`](@ref) instance.
+* `orbits::SymmetryOrbitMap{T}`: Exact boundary symmetry-orbit map.
 """
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::XAxisReflection, character::Complex{T}=one(Complex{T})) where {T<:Real}
-    N = length(xy)
-    N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("XAxisReflection requires N divisible by 4; received N=$N"))
+function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::XAxisReflection, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard}
+    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("XAxisReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
     id = collect(1:N)
-    refl = [_idx_reflect_x(q,N) for q in 1:N]
-    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), character])
+    refl = _boundary_symmetry_permutation(billiard, N, symmetry)
+    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, refl]), Complex{T}[one(Complex{T}), character])
 end
 
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::YAxisReflection, character::Complex{T}=one(Complex{T})) where {T<:Real}
-    N = length(xy)
-    N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("YAxisReflection requires N divisible by 4; received N=$N"))
+function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::YAxisReflection, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard}
+    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("YAxisReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
     id = collect(1:N)
-    refl = [_idx_reflect_y(q,N) for q in 1:N]
-    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), character])
+    refl = _boundary_symmetry_permutation(billiard, N, symmetry)
+    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, refl]), Complex{T}[one(Complex{T}), character])
 end
 
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::XYAxisReflection, character_x::Complex{T}=one(Complex{T}), character_y::Complex{T}=one(Complex{T})) where {T<:Real}
-    N = length(xy)
-    N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("XYAxisReflection requires N divisible by 4; received N=$N"))
+function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::DiagonalReflection, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard}
+    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("DiagonalReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
     id = collect(1:N)
-    rx = [_idx_reflect_x(q,N) for q in 1:N]
-    ry = [_idx_reflect_y(q,N) for q in 1:N]
-    rxy = [_idx_rotate_pi(q,N) for q in 1:N]
-    # χ_xy, the character of the combined π-rotation, is the product of the
-    # two individual axis-reflection characters.
-    χ_xy = character_x*character_y
-    return _build_symmetry_orbit_map(T, N, [id,rx,ry,rxy], Complex{T}[one(Complex{T}), character_x, character_y, χ_xy])
+    refl = _boundary_symmetry_permutation(billiard, N, symmetry)
+    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, refl]), Complex{T}[one(Complex{T}), character])
 end
 
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::NFoldRotation, sector::Int=0) where {T<:Real}
-    N = length(xy)
-    n = symmetry_node_multiple(symmetry)
-    N%n==0 || throw(ArgumentError("NFoldRotation of order $n requires N divisible by $n; received N=$N"))
-    perms = [[_idx_rotate(q,N,n,l) for q in 1:N] for l in 0:n-1]
-    scales = Complex{T}[cis(T(2*pi)*T(sector*l)/T(n)) for l in 0:n-1]
+function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::AntiDiagonalReflection, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard}
+    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("AntiDiagonalReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
+    id = collect(1:N)
+    refl = _boundary_symmetry_permutation(billiard, N, symmetry)
+    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, refl]), Complex{T}[one(Complex{T}), character])
+end
+
+function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::XYAxisReflection, character_x::Complex{T} = one(Complex{T}), character_y::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard}
+    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("XYAxisReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
+    id = collect(1:N)
+    rx = _boundary_symmetry_permutation(billiard, N, XAxisReflection())
+    ry = _boundary_symmetry_permutation(billiard, N, YAxisReflection())
+    rxy = _compose_index_permutations(rx, ry)
+    χxy = character_x * character_y
+    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, rx, ry, rxy]), Complex{T}[one(Complex{T}), character_x, character_y, χxy])
+end
+
+function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::NFoldRotation, sector::Int = 0) where {T<:Real,Bi<:AbsBilliard}
+    n = symmetry.order
+    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("NFoldRotation of order $n requires N divisible by $n; received N = $N"))
+    g = _boundary_symmetry_permutation(billiard, N, NFoldRotation(n, 1; T = typeof(symmetry.angle)))
+    perms = Vector{Vector{Int}}(undef, n)
+    perms[1] = collect(1:N)
+    @inbounds for l in 2:n
+        perms[l] = _compose_index_permutations(g, perms[l - 1])
+    end
+    scales = Complex{T}[cis(T(2 * pi) * T(sector * l) / T(n)) for l in 0:n - 1]
     return _build_symmetry_orbit_map(T, N, perms, scales)
 end
 
-"""
-    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::DiagonalReflection, character::Complex{T}=one(Complex{T})) where {T<:Real} → orbits::SymmetryOrbitMap{T}
-
-Builds the exact two-element boundary orbits generated by reflection across
-the `y=x` diagonal, using the requested irrep `character` (trivial by default).
-"""
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::DiagonalReflection, character::Complex{T}=one(Complex{T})) where {T<:Real}
-    N = length(xy)
-    N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("DiagonalReflection requires N divisible by 8; received N=$N"))
-    id = collect(1:N)
-    refl = [_idx_reflect_diag_plus(q,N) for q in 1:N]
-    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), character])
-end
-
-"""
-    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::AntiDiagonalReflection, character::Complex{T}=one(Complex{T})) where {T<:Real} → orbits::SymmetryOrbitMap{T}
-
-Builds the exact two-element boundary orbits generated by reflection across
-the `y=-x` anti-diagonal, using the requested irrep `character` (trivial by default).
-"""
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::AntiDiagonalReflection, character::Complex{T}=one(Complex{T})) where {T<:Real}
-    N = length(xy)
-    N%symmetry_node_multiple(symmetry)==0 || throw(ArgumentError("AntiDiagonalReflection requires N divisible by 8; received N=$N"))
-    id = collect(1:N)
-    refl = [_idx_reflect_diag_minus(q,N) for q in 1:N]
-    return _build_symmetry_orbit_map(T, N, [id,refl], Complex{T}[one(Complex{T}), character])
-end
-
-"""
-    symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::CompositeReflection, characters::Vector{Complex{T}}=ones(Complex{T},length(symmetry.reflections))) where {T<:Real} → orbits::SymmetryOrbitMap{T}
-
-Builds the complete boundary-orbit map generated by a [`CompositeReflection`](@ref).
-
-The constituent reflections are first expanded into primitive exact index
-generators (`XYAxisReflection` contributes both coordinate-axis reflections,
-sharing its entry of `characters`). Starting from the identity, the complete
-finite symmetry group is generated by closure under composition; the irrep
-factor of a generated action is the product of the factors of its
-generators, taken from the requested `characters` (trivial by default, one
-entry per `symmetry.reflections`). If the same geometric action is generated
-with two different factors, the requested characters are inconsistent and an
-`ArgumentError` is thrown.
-"""
-function symmetry_index_orbits(::Type{T}, xy::AbstractVector{SVector{2,T}}, symmetry::CompositeReflection, characters::Vector{Complex{T}}=ones(Complex{T}, length(symmetry.reflections))) where {T<:Real}
-    N = length(xy)
+function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::CompositeReflection, characters::Vector{Complex{T}} = ones(Complex{T}, length(symmetry.reflections))) where {T<:Real,Bi<:AbsBilliard}
     isempty(symmetry.reflections) && throw(ArgumentError("CompositeReflection requires at least one reflection"))
-    length(characters)==length(symmetry.reflections) || throw(DimensionMismatch("Received $(length(symmetry.reflections)) reflections but $(length(characters)) characters"))
+    length(characters) == length(symmetry.reflections) || throw(DimensionMismatch("Received $(length(symmetry.reflections)) reflections but $(length(characters)) characters"))
+    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("CompositeReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
     genperms = Vector{Vector{Int}}()
     genscales = Complex{T}[]
-    for (k, ref) in enumerate(symmetry.reflections)
+    @inbounds for (k, ref) in enumerate(symmetry.reflections)
         χ = characters[k]
-        if ref isa XAxisReflection
-            push!(genperms, [_idx_reflect_x(q,N) for q in 1:N])
+        if ref isa XYAxisReflection
+            push!(genperms, _boundary_symmetry_permutation(billiard, N, XAxisReflection()))
             push!(genscales, χ)
-        elseif ref isa YAxisReflection
-            push!(genperms, [_idx_reflect_y(q,N) for q in 1:N])
+            push!(genperms, _boundary_symmetry_permutation(billiard, N, YAxisReflection()))
             push!(genscales, χ)
-        elseif ref isa XYAxisReflection
-            push!(genperms, [_idx_reflect_x(q,N) for q in 1:N])
-            push!(genscales, χ)
-            push!(genperms, [_idx_reflect_y(q,N) for q in 1:N])
-            push!(genscales, χ)
-        elseif ref isa DiagonalReflection
-            push!(genperms, [_idx_reflect_diag_plus(q,N) for q in 1:N])
-            push!(genscales, χ)
-        elseif ref isa AntiDiagonalReflection
-            push!(genperms, [_idx_reflect_diag_minus(q,N) for q in 1:N])
+        elseif ref isa XAxisReflection || ref isa YAxisReflection || ref isa DiagonalReflection || ref isa AntiDiagonalReflection
+            push!(genperms, _boundary_symmetry_permutation(billiard, N, ref))
             push!(genscales, χ)
         else
             throw(ArgumentError("Unsupported reflection type $(typeof(ref)) in CompositeReflection"))
         end
     end
-    perms = Vector{Int}[collect(1:N)]
+    perms = Vector{Vector{Int}}([collect(1:N)])
     scales = Complex{T}[one(Complex{T})]
     head = 1
     while head <= length(perms)
         p = perms[head]
         χ = scales[head]
-        for g in eachindex(genperms)
-            gp = genperms[g]
-            pref = [gp[p[q]] for q in 1:N]
-            χnew = genscales[g]*χ
+        @inbounds for g in eachindex(genperms)
+            pref = _compose_index_permutations(genperms[g], p)
+            χnew = genscales[g] * χ
             j = findfirst(==(pref), perms)
             if isnothing(j)
                 push!(perms, pref)
