@@ -127,13 +127,20 @@ end
     @test !BilliardGeometry._is_true_corner(line1, line3, Float64)
     @test isempty(BilliardGeometry._component_corner_locations(Float64, [line1,line3]))
 
-    # _boundary_components normalizes bare curve vectors into single-segment components
-    comps = BilliardGeometry._boundary_components([line1,line2])
+    # `_boundary_components` was renamed/replaced by `_group_curves_by_domain_id`
+    # (groups a flat physical-boundary curve list into connected components by
+    # curve `domain_id`, preserving first-seen order): curves with distinct
+    # `domain_id`s become distinct components, curves sharing one `domain_id`
+    # stay in a single component.
+    line1b = LineSegment([0.0,0.0], [1.0,0.0]; domain_id=1)
+    line2b = LineSegment([1.0,0.0], [1.0,1.0]; domain_id=2)
+    comps = BilliardGeometry._group_curves_by_domain_id(AbsCurve[line1b,line2b])
     @test length(comps) == 2
-    @test comps[1] == [line1]
-    @test comps[2] == [line2]
-    # already-nested input is passed through unchanged
-    @test BilliardGeometry._boundary_components([comp]) == [comp]
+    @test comps[1] == [line1b]
+    @test comps[2] == [line2b]
+    comps_same = BilliardGeometry._group_curves_by_domain_id(AbsCurve[line1,line2])
+    @test length(comps_same) == 1
+    @test comps_same[1] == [line1,line2]
 end
 
 @testset "kressgrading.jl" begin
@@ -187,44 +194,70 @@ end
     @test symmetry_node_multiple(XYAxisReflection()) == 4
     @test symmetry_node_multiple(_make_nfold(6)) == 6
 
+    # Step 15 migration: `symmetry_index_orbits` no longer takes a raw point
+    # vector; it derives the exact midpoint-node permutation from a real
+    # billiard's registered `SymmetryRegistry` (`billiard.symmetries`), never
+    # from floating-point coordinates. Every sub-test below therefore builds
+    # a real billiard with the relevant symmetry actually registered, then
+    # samples true boundary points from its `full_boundary` reconstruction to
+    # independently check the returned orbit permutation against the actual
+    # geometric symmetry (mirrors the "fullboundary.jl" testset's index-
+    # permutation consistency check below).
+    function _sample_full_boundary(billiard, N)
+        fb = full_boundary(billiard)
+        _, _, Lt = component_lengths(fb)
+        function _point_at_sigma(sigma)
+            target = Lt*sigma/(2*pi)
+            offset = 0.0
+            for j in eachindex(fb)
+                Lj = fb[j].length
+                if target < offset+Lj || j==lastindex(fb)
+                    u = clamp((target-offset)/Lj, 0.0, 1.0)
+                    return curve(fb[j], u)
+                end
+                offset += Lj
+            end
+        end
+        return [_point_at_sigma(2*pi*(k-0.5)/N) for k in 1:N]
+    end
+
+    # CircleBilliard: real D2-symmetric billiard (sym_id 1=Y, 2=XY, 3=X).
+    circ = CircleBilliard(1.0)
     N = 40
-    xy = [SVector(cos(2*pi*(k-0.5)/N), sin(2*pi*(k-0.5)/N)) for k in 1:N]
+    xy = _sample_full_boundary(circ, N)
 
     for (sym, reflect) in ((XAxisReflection(), pt->SVector(pt[1],-pt[2])),
                            (YAxisReflection(), pt->SVector(-pt[1],pt[2])))
-        orbits = symmetry_index_orbits(Float64, xy, sym)
+        orbits = symmetry_index_orbits(Float64, circ, N, sym)
         @test fundamental_size(orbits) == N÷2
         @test length(orbits) == N
         for b in 1:fundamental_size(orbits)
             members = findall(==(b), orbits.orbit_of)
             @test length(members) == 2
             q1,q2 = members
-            @test isapprox(reflect(xy[q1]), xy[q2]; atol=1e-10)
+            @test isapprox(reflect(xy[q1]), xy[q2]; atol=1e-8) || isapprox(reflect(xy[q2]), xy[q1]; atol=1e-8)
         end
-        # Step 10.9 item A: `symmetry_index_orbits` now wires in
-        # `symmetry_irrep_character` for XAxisReflection/YAxisReflection, so
-        # `phase` is no longer trivially `1` everywhere. Each fundamental
-        # representative's own node keeps phase `1`; its reflected partner
-        # carries the reflection's irrep character (`-1` by default).
-        χ = symmetry_irrep_character(Float64, sym)
-        @test all(==(one(ComplexF64)), orbits.phase[orbits.fundamental_indices])
-        partners = setdiff(1:N, orbits.fundamental_indices)
-        @test all(==(χ), orbits.phase[partners])
+        # Step 15 removed `symmetry_irrep_character`: the irrep character is
+        # now an explicit trailing argument to `symmetry_index_orbits`
+        # (defaulting to the trivial representation). Passing `-1` explicitly
+        # reproduces the old default-antisymmetric-partner behavior.
+        orbits_χ = symmetry_index_orbits(Float64, circ, N, sym, ComplexF64(-1))
+        @test all(==(one(ComplexF64)), orbits_χ.phase[orbits_χ.fundamental_indices])
+        partners = setdiff(1:N, orbits_χ.fundamental_indices)
+        @test all(==(ComplexF64(-1)), orbits_χ.phase[partners])
     end
 
-    orbits_xy = symmetry_index_orbits(Float64, xy, XYAxisReflection())
+    # XYAxisReflection: built from the composition of X and Y, giving
+    # 4-element orbits {p, X(p), Y(p), XY(p)}.
+    orbits_xy = symmetry_index_orbits(Float64, circ, N, XYAxisReflection())
     @test fundamental_size(orbits_xy) == N÷4
     for b in 1:fundamental_size(orbits_xy)
         members = findall(==(b), orbits_xy.orbit_of)
         @test length(members) == 4
-    end
-
-    n = 5
-    orbits_rot = symmetry_index_orbits(Float64, xy[1:N-mod(N,n)], _make_nfold(n))
-    Nr = N-mod(N,n)
-    @test fundamental_size(orbits_rot) == Nr÷n
-    for b in 1:fundamental_size(orbits_rot)
-        @test length(findall(==(b), orbits_rot.orbit_of)) == n
+        p = xy[orbits_xy.fundamental_indices[b]]
+        expected = Set([p, SVector(p[1],-p[2]), SVector(-p[1],p[2]), SVector(-p[1],-p[2])])
+        actual = [xy[m] for m in members]
+        @test all(e -> any(a -> isapprox(e,a;atol=1e-8), actual), expected)
     end
 
     # fund_to_full/fund_to_scale/symmetry_orbit: consistent with orbit_of/phase
@@ -238,31 +271,124 @@ end
     end
     @test full_size(orbits_xy) == N
 
-    # DiagonalReflection / AntiDiagonalReflection: two-element orbits
-    @test symmetry_node_multiple(DiagonalReflection()) == 8
-    @test symmetry_node_multiple(AntiDiagonalReflection()) == 8
-    for (sym, reflect) in ((DiagonalReflection(), pt->SVector(pt[2],pt[1])),
-                           (AntiDiagonalReflection(), pt->SVector(-pt[2],-pt[1])))
-        orbits = symmetry_index_orbits(Float64, xy, sym)
-        @test fundamental_size(orbits) == N÷2
-        @test length(orbits) == N
-        for b in 1:fundamental_size(orbits)
-            members = findall(==(b), orbits.orbit_of)
-            @test length(members) == 2
-            q1,q2 = members
-            @test isapprox(reflect(xy[q1]), xy[q2]; atol=1e-10)
+    # NFoldRotation: real C3-symmetric billiard (sym_id 1,2 = rotate by
+    # +2π/3, +4π/3).
+    c3 = C3Billiard(0.2)
+    n = 3
+    N3 = 39
+    xy3 = _sample_full_boundary(c3, N3)
+    orbits_rot = symmetry_index_orbits(Float64, c3, N3, _make_nfold(n))
+    @test fundamental_size(orbits_rot) == N3÷n
+    rotate(pt) = BilliardGeometry.rotation_matrix_z(2*pi/n)*pt
+    for b in 1:fundamental_size(orbits_rot)
+        members = findall(==(b), orbits_rot.orbit_of)
+        @test length(members) == n
+        p = xy3[orbits_rot.fundamental_indices[b]]
+        actual = [xy3[m] for m in members]
+        pk = p
+        for _ in 1:n
+            @test any(a -> isapprox(pk,a;atol=1e-8), actual)
+            pk = rotate(pk)
         end
     end
 
+    # DiagonalReflection: real fixture (`SquareWithinSquareBilliard` registers
+    # exactly this reflection, sym_id 1).
+    sq = SquareWithinSquareBilliard(1.0)
+    @test symmetry_node_multiple(DiagonalReflection()) == 8
+    Nd = 40
+    xy_diag = _sample_full_boundary(sq, Nd)
+    orbits_diag = symmetry_index_orbits(Float64, sq, Nd, DiagonalReflection())
+    @test fundamental_size(orbits_diag) == Nd÷2
+    @test length(orbits_diag) == Nd
+    for b in 1:fundamental_size(orbits_diag)
+        members = findall(==(b), orbits_diag.orbit_of)
+        @test length(members) == 2
+        q1,q2 = members
+        reflect_diag(pt) = SVector(pt[2],pt[1])
+        @test isapprox(reflect_diag(xy_diag[q1]), xy_diag[q2]; atol=1e-8) || isapprox(reflect_diag(xy_diag[q2]), xy_diag[q1]; atol=1e-8)
+    end
+
+    # AntiDiagonalReflection: no shipped billiard registers this reflection
+    # alone, so a real (perfectly circular) `PolarBilliard` fixture is built
+    # here with it as the sole registered generator (a single non-identity
+    # reflection is always a closed order-2 group, so this is a valid
+    # `SymmetryRegistry` regardless of the underlying shape). The circle's
+    # angular origin is shifted by `-π/4` so the periodic midpoint grid's
+    # sector seams align with the anti-diagonal mirror line.
+    @test symmetry_node_multiple(AntiDiagonalReflection()) == 8
+    ad_seg = FourierCoeffPolarSegment(Float64[]; shift_angle=-pi/4)
+    ad_dom = BilliardGeometry.PolarDomain{Float64}([ad_seg], [curve(ad_seg,0.0)], 1)
+    circ_ad = PolarBilliard{Float64}(ad_dom, register_symmetries(AntiDiagonalReflection()))
+    xy_ad = _sample_full_boundary(circ_ad, N)
+    orbits_ad = symmetry_index_orbits(Float64, circ_ad, N, AntiDiagonalReflection())
+    @test fundamental_size(orbits_ad) == N÷2
+    @test length(orbits_ad) == N
+    for b in 1:fundamental_size(orbits_ad)
+        members = findall(==(b), orbits_ad.orbit_of)
+        @test length(members) == 2
+        q1,q2 = members
+        reflect_antidiag(pt) = SVector(-pt[2],-pt[1])
+        @test isapprox(reflect_antidiag(xy_ad[q1]), xy_ad[q2]; atol=1e-8) || isapprox(reflect_antidiag(xy_ad[q2]), xy_ad[q1]; atol=1e-8)
+    end
+
     # CompositeReflection(XAxisReflection(),YAxisReflection()) generates the
-    # same D2 group as XYAxisReflection() by closure.
+    # same D2 group as XYAxisReflection() by closure, on the same
+    # `CircleBilliard` fixture used above (its registry already contains X,Y,XY).
     comp = CompositeReflection(XAxisReflection(), YAxisReflection())
     @test symmetry_node_multiple(comp) == 4
-    orbits_comp = symmetry_index_orbits(Float64, xy, comp)
+    orbits_comp = symmetry_index_orbits(Float64, circ, N, comp)
     @test fundamental_size(orbits_comp) == N÷4
     for b in 1:fundamental_size(orbits_comp)
-        @test length(findall(==(b), orbits_comp.orbit_of)) == 4
+        members = findall(==(b), orbits_comp.orbit_of)
+        @test length(members) == 4
+        p = xy[orbits_comp.fundamental_indices[b]]
+        expected = Set([p, SVector(p[1],-p[2]), SVector(-p[1],p[2]), SVector(-p[1],-p[2])])
+        actual = [xy[m] for m in members]
+        @test all(e -> any(a -> isapprox(e,a;atol=1e-8), actual), expected)
     end
+    # The generated closure and the native `XYAxisReflection` registration
+    # reach the same group order/reduction on the same billiard: two paths
+    # to the same D2 group element agree on a real fixture.
+    @test fundamental_size(orbits_comp) == fundamental_size(orbits_xy)
+    @test orbit_size(orbits_comp) == orbit_size(orbits_xy)
+
+    # `get_symmetries`: minimal generating subset, not the full registry.
+    # A D2 billiard registers 3 elements (Y,XY,X) but only 2 are needed to
+    # generate the group by composition.
+    rect = RectangleBilliard(1.0, 0.6)
+    gens_d2 = get_symmetries(rect)
+    @test length(gens_d2) == 2
+    @test all(g -> g isa YAxisReflection || g isa XAxisReflection, gens_d2)
+    @test !any(g -> g isa XYAxisReflection, gens_d2)
+    # A cyclic Cn billiard registers n-1 rotation images but is generated by
+    # the single m=1 element alone.
+    gens_c3 = get_symmetries(c3)
+    @test length(gens_c3) == 1
+    @test only(gens_c3) isa NFoldRotation
+    @test only(gens_c3).m == 1
+    # No registered symmetry: empty generating set.
+    tri_empty = TriangleBilliard(1.0, 1.0)
+    @test get_symmetries(tri_empty) == ()
+
+    # `symmetry_of` error path: an unknown sym_id must raise ArgumentError,
+    # not silently return `nothing` or the wrong generator.
+    @test_throws ArgumentError symmetry_of(rect.symmetries, 999)
+
+    # `SymmetryOrbitMap` internal consistency (partition/counting sanity
+    # checks computable from the orbit map alone, without any externally
+    # known reference value): every fundamental orbit has exactly
+    # `orbit_size` members, the orbits partition `1:full_size` exactly once,
+    # and `fundamental_size * orbit_size == full_size`.
+    @test fundamental_size(orbits_xy) * orbit_size(orbits_xy) == full_size(orbits_xy)
+    @test sum(b -> count(==(b), orbits_xy.orbit_of), 1:fundamental_size(orbits_xy)) == full_size(orbits_xy)
+    all_members = Int[]
+    for b in 1:fundamental_size(orbits_xy)
+        qs, _ = symmetry_orbit(orbits_xy, b)
+        append!(all_members, qs)
+    end
+    @test sort(all_members) == collect(1:full_size(orbits_xy))
+    @test length(all_members) == length(unique(all_members))
 end
 
 @testset "fullboundary.jl" begin
@@ -315,6 +441,20 @@ end
         @test isapprox(apply_symmetry(YAxisReflection(), xy[q]), xy[_idx_reflect_y(q,N)]; atol=1e-8)
     end
 
+    # `full_boundary` on a rotation (Cn) billiard: generalizes the D2 stadium
+    # check above to `NFoldRotation`. `C3Billiard`'s fundamental domain has a
+    # single physical curve (the arc; the two wedge-cut walls are
+    # `SymmetryWall`-tagged and excluded), so the reconstructed boundary has
+    # exactly 3 copies of it, forming a closed CCW loop.
+    c3 = C3Billiard(0.2)
+    fb_c3 = full_boundary(c3)
+    @test length(fb_c3) == 3*length(get_boundary_curves(c3))
+    for i in eachindex(fb_c3)
+        p_end = curve(fb_c3[i], 1.0)
+        p_start = curve(fb_c3[mod1(i+1,length(fb_c3))], 0.0)
+        @test isapprox(p_end, p_start; atol=1e-8)
+    end
+
     # Step 10.9 item B: `full_boundary` support for `FourierCoeffPolarSegment`
     # under a D2-symmetric polar billiard. The core correctness identity is
     # `curve(_apply_symmetry_to_curve(sym,c), t) == apply_symmetry(sym, curve(c,t))`
@@ -337,9 +477,62 @@ end
     # and returns the expected number/type of curves (fundamental curve plus
     # one image per non-identity symmetry).
     D2sym = [YAxisReflection(), XYAxisReflection(), XAxisReflection()]
-    polar_bil_d2 = PolarBilliard{Float64}(polar_bil.fundamental_domain, D2sym)
+    polar_bil_d2 = PolarBilliard{Float64}(polar_bil.fundamental_domain, register_symmetries(D2sym...))
     fb_polar = full_boundary(polar_bil_d2)
     @test length(fb_polar) == 4
     @test all(c isa FourierCoeffPolarSegment for c in fb_polar)
+end
+
+@testset "boundarytypes.jl - SymmetryWall" begin
+    # Round-trip: fields are read back unchanged, and a `SymmetryWall`-tagged
+    # curve is excluded from `get_boundary_curves`'s physical-boundary filter
+    # (`typeof(crv.bc) <: SpecularReflection`), since it is a fundamental-
+    # domain cut, not part of the physical boundary. `RectangleBilliard`
+    # tags its two symmetry walls with `SymmetryWall(1,2)`/`SymmetryWall(3,2)`
+    # (see rectangle.jl), giving a real fixture rather than a synthetic curve.
+    wall = SymmetryWall(2, 3)
+    @test wall.sym_id == 2
+    @test wall.sector_id == 3
+
+    rect = RectangleBilliard(1.0, 0.6)
+    bc = get_boundary_curves(rect)
+    @test length(bc) == 2 # only the two SpecularReflection curves; both SymmetryWall curves excluded
+    @test all(c -> typeof(c.bc) <: SpecularReflection, bc)
+
+    walls = filter(c -> c.bc isa SymmetryWall, rect.fundamental_domain.boundary)
+    @test length(walls) == 2
+    @test Set((w.bc.sym_id, w.bc.sector_id) for w in walls) == Set([(1,2),(3,2)])
+end
+
+@testset "poincarebirkhoff.jl" begin
+    # Smoke test on a real D2 billiard (`RectangleBilliard`) and a real Cn
+    # billiard (`C3Billiard`): `pb_sectors` must return a sorted, deduplicated
+    # set of breakpoints starting at 0 and ending at the full (symmetry-
+    # unfolded) perimeter; `pb_coords` for a point known to lie in the
+    # `sym_sector`-th copy must map back into that copy's own global-
+    # coordinate window `[(sym_sector-1)*L, sym_sector*L]` (an exact,
+    # computable structural invariant of `apply_symmetry_pb`'s reconstruction
+    # formula -- both the orientation-reversing and orientation-preserving
+    # branches produce this same range -- not a fabricated numeric reference).
+    for billiard in (RectangleBilliard(1.0, 0.6), C3Billiard(0.2))
+        nsym = length(billiard.symmetries)
+        L = CompositeCurve(get_boundary_curves(billiard)).length
+
+        sectors = pb_sectors(billiard)
+        @test issorted(sectors)
+        @test length(sectors) == length(unique(sectors))
+        @test isapprox(first(sectors), 0.0; atol=1e-8)
+        @test isapprox(last(sectors), (nsym+1)*L; atol=1e-8)
+
+        crv = first(get_boundary_curves(billiard))
+        pt = curve(crv, 0.5)
+        tang = tangent(crv, 0.5)
+        vel = SVector(tang[2], -tang[1]) # any nonzero velocity; only its direction matters
+        for sym_sector in 1:(nsym+1)
+            coords = pb_coords(billiard, crv.segment_id, crv.domain_id, sym_sector, pt, vel)
+            lo, hi = (sym_sector-1)*L, sym_sector*L
+            @test lo - 1e-8 <= coords.s <= hi + 1e-8
+        end
+    end
 end
 

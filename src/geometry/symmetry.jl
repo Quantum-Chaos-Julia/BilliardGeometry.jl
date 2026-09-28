@@ -1,10 +1,3 @@
-ident = IdentityTransformation()
-reflect_x = LinearMap(SMatrix{2,2}([-1.0 0.0;0.0 1.0]))
-reflect_y = LinearMap(SMatrix{2,2}([1.0 0.0;0.0 -1.0]))
-reflect_diag = LinearMap(SMatrix{2,2}([0.0 1.0;1.0 0.0]))
-reflect_antidiag = LinearMap(SMatrix{2,2}([0.0 -1.0;-1.0 0.0]))
-reflect_xy = reflect_x ∘ reflect_y
-
 """
     XAxisReflection(sym_id=0)
 
@@ -97,41 +90,27 @@ end
 CompositeReflection(reflections::AbstractVector{<:AbsReflection}) = CompositeReflection(AbsReflection[reflections...])
 CompositeReflection(reflections::AbsReflection...) = CompositeReflection(AbsReflection[reflections...])
 
-function apply_symmetry(sym::XAxisReflection, pt::SVector{2,T}) where T<:Real
-    return reflect_y(pt)
-end
+"""
+    _sym_matrix(sym::AbsReflection, ::Type{T}=Float64) where T<:Real → M::SMatrix{2,2,T}
 
-function apply_symmetry(sym::XAxisReflection, pts)
-    return [reflect_y(pt) for pt in pts]
-end
+2x2 linear-map matrix implementing [`apply_symmetry`](@ref) for a pure
+reflection generator, built directly at the numeric type `T` of the point
+being transformed (defaults to `Float64` for callers with no natural `T`,
+e.g. symmetry-orbit bookkeeping that only inspects the matrix's sign
+pattern). Entries are exact `±1`/`0` integer literals, so promotion to any
+`T<:Real` (including `BigFloat`) is lossless. Reused by `apply_symmetry` and
+by `fullboundary.jl`'s curve-image reconstruction.
+"""
+_sym_matrix(::XAxisReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(1, 0, 0, -1)
+_sym_matrix(::YAxisReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(-1, 0, 0, 1)
+_sym_matrix(::XYAxisReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(-1, 0, 0, -1)
+_sym_matrix(::DiagonalReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(0, 1, 1, 0)
+_sym_matrix(::AntiDiagonalReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(0, -1, -1, 0)
 
-function apply_symmetry(sym::YAxisReflection, pt::SVector{2,T})  where T<:Real
-    return reflect_x(pt)
+function apply_symmetry(sym::AbsReflection, pt::SVector{2,T}) where T<:Real
+    return SVector{2,T}(_sym_matrix(sym, T) * pt)
 end
-function apply_symmetry(sym::YAxisReflection, pts)
-    return [reflect_x(pt) for pt in pts]
-end
-
-function apply_symmetry(sym::XYAxisReflection, pt::SVector{2,T})  where T<:Real
-    return reflect_xy(pt)
-end
-function apply_symmetry(sym::XYAxisReflection, pts)
-    return [reflect_xy(pt) for pt in pts]
-end
-
-function apply_symmetry(sym::DiagonalReflection, pt::SVector{2,T}) where T<:Real
-    return reflect_diag(pt)
-end
-function apply_symmetry(sym::DiagonalReflection, pts)
-    return [reflect_diag(pt) for pt in pts]
-end
-
-function apply_symmetry(sym::AntiDiagonalReflection, pt::SVector{2,T}) where T<:Real
-    return reflect_antidiag(pt)
-end
-function apply_symmetry(sym::AntiDiagonalReflection, pts)
-    return [reflect_antidiag(pt) for pt in pts]
-end
+apply_symmetry(sym::AbsReflection, pts) = [apply_symmetry(sym, pt) for pt in pts]
 
 """
     apply_symmetry_pb(sym::AbsSymmetry, sym_sector::Int64, s::T, p::T, L::T) where T<:Real
@@ -150,7 +129,7 @@ under `billiard.symmetries[k]`. Orientation-preserving images
 (`XYAxisReflection`, [`NFoldRotation`](@ref)) continue the same traversal
 direction, so `s` maps to `k*L+s` with `p` unchanged; orientation-reversing
 images (pure reflections) reverse it, so `s` maps to `(k+1)*L-s` with `p`
-negated — see [`_orientation_reversing`](@ref).
+negated — see [`orientation_reversing`](@ref).
 
 ## Arguments
 * `sym`: The symmetry generator whose image sector `(s,p)` is mapped into (only its orientation-reversal behavior is used; not called for `sym_sector==1`).
@@ -160,7 +139,7 @@ negated — see [`_orientation_reversing`](@ref).
 """
 function apply_symmetry_pb(sym::AbsSymmetry, sym_sector::Int64, s::T, p::T, L::T) where T<:Real
     k = sym_sector - 1
-    if _orientation_reversing(sym)
+    if orientation_reversing(sym)
         return (k+1)*L - s, -p
     else
         return k*L + s, p

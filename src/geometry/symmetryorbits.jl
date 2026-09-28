@@ -372,7 +372,7 @@ end
 function _boundary_symmetry_permutation(billiard::Bi, N::Int, symmetry::AbsReflection) where {Bi<:AbsBilliard}
     symmetry isa CompositeReflection && throw(ArgumentError("CompositeReflection contains several geometric generators"))
     sectors = _reflection_sector_permutation(billiard, symmetry)
-    return _sector_node_permutation(N, sectors, _orientation_reversing(symmetry))
+    return _sector_node_permutation(N, sectors, orientation_reversing(symmetry))
 end
 
 # Construct the exact midpoint-index permutation induced by one physical
@@ -457,29 +457,8 @@ are currently unsupported.
 ## Returns
 * `orbits::SymmetryOrbitMap{T}`: Exact boundary symmetry-orbit map.
 """
-function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::XAxisReflection, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard}
-    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("XAxisReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
-    id = collect(1:N)
-    refl = _boundary_symmetry_permutation(billiard, N, symmetry)
-    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, refl]), Complex{T}[one(Complex{T}), character])
-end
-
-function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::YAxisReflection, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard}
-    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("YAxisReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
-    id = collect(1:N)
-    refl = _boundary_symmetry_permutation(billiard, N, symmetry)
-    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, refl]), Complex{T}[one(Complex{T}), character])
-end
-
-function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::DiagonalReflection, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard}
-    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("DiagonalReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
-    id = collect(1:N)
-    refl = _boundary_symmetry_permutation(billiard, N, symmetry)
-    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, refl]), Complex{T}[one(Complex{T}), character])
-end
-
-function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::AntiDiagonalReflection, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard}
-    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("AntiDiagonalReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
+function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::S, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard,S<:Union{XAxisReflection,YAxisReflection,DiagonalReflection,AntiDiagonalReflection}}
+    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("$S requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
     id = collect(1:N)
     refl = _boundary_symmetry_permutation(billiard, N, symmetry)
     return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, refl]), Complex{T}[one(Complex{T}), character])

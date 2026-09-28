@@ -27,21 +27,18 @@
 # `true` for the pure (orientation-reversing) reflections, `false` for
 # symmetries that preserve boundary traversal direction (π-rotations,
 # N-fold rotations).
-_orientation_reversing(::XAxisReflection) = true
-_orientation_reversing(::YAxisReflection) = true
-_orientation_reversing(::DiagonalReflection) = true
-_orientation_reversing(::AntiDiagonalReflection) = true
-_orientation_reversing(::XYAxisReflection) = false
-_orientation_reversing(::NFoldRotation) = false
+orientation_reversing(::XAxisReflection) = true
+orientation_reversing(::YAxisReflection) = true
+orientation_reversing(::DiagonalReflection) = true
+orientation_reversing(::AntiDiagonalReflection) = true
+orientation_reversing(::XYAxisReflection) = false
+orientation_reversing(::NFoldRotation) = false
 
-# 2x2 linear-map matrix implementing `apply_symmetry(sym, ·)`, reused to
-# transform a `CircleSegment`'s center and angular parametrization.
-_sym_matrix(::XAxisReflection) = reflect_y.linear
-_sym_matrix(::YAxisReflection) = reflect_x.linear
-_sym_matrix(::XYAxisReflection) = reflect_xy.linear
-_sym_matrix(::DiagonalReflection) = reflect_diag.linear
-_sym_matrix(::AntiDiagonalReflection) = reflect_antidiag.linear
-_sym_matrix(sym::NFoldRotation) = sym.sym_map.linear
+# 2x2 linear-map matrix implementing `apply_symmetry(sym, ·)` for a rotation,
+# reused to transform a `CircleSegment`'s center and angular parametrization
+# (the reflection cases are defined alongside `apply_symmetry` in
+# `symmetry.jl`, included earlier).
+_sym_matrix(sym::NFoldRotation, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(sym.sym_map.linear)
 
 # Pointwise image of a `LineSegment` under `sym` (endpoints only). The
 # `orientation` field is negated since swapping the roles of "inside"/
@@ -65,7 +62,7 @@ end
 # A negative `arc_angle'` (reflection case) is resolved by `_reverse_curve`,
 # which reverses the parametrization direction back to a positive arc angle.
 function _apply_symmetry_to_curve(sym::AbsSymmetry, c::CircleSegment{T}) where {T<:Real}
-    M = _sym_matrix(sym)
+    M = _sym_matrix(sym, T)
     center2 = SVector{2,T}(M*c.center)
     if det(M) > 0
         φ = atan(M[2,1], M[1,1])
@@ -87,8 +84,8 @@ end
 # phase); the radial function (`coef`/`r_func`) is invariant under rotation
 # of the ambient frame and is carried through unchanged by the caller.
 function _polar_symmetry_image(sym::AbsSymmetry, c::L) where {L<:AbsPolarCurve}
-    M = _sym_matrix(sym)
     T = eltype(c.center)
+    M = _sym_matrix(sym, T)
     center2 = SVector{2,T}(M*c.center)
     if det(M) > 0
         φ = atan(M[2,1], M[1,1])
@@ -170,7 +167,7 @@ function _full_boundary_data(billiard::Bi) where {Bi<:AbsBilliard}
     sector = ones(Int, np)
     reversed = falses(np)
     @inbounds for (k, sym) in enumerate(billiard.symmetries)
-        if _orientation_reversing(sym)
+        if orientation_reversing(sym)
             images = [_reverse_curve(_apply_symmetry_to_curve(sym, c)) for c in P]
             append!(curves, reverse(images))
             append!(source, np:-1:1)
