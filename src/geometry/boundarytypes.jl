@@ -186,3 +186,47 @@ boundary's `domain_id` listed first in `domain.boundary` by construction, see
 boundary_components(domain::AbsDomain) = [get_boundary_curves(domain)]
 boundary_components(domain::AbsMultiplyConnectedDomain) = _group_curves_by_domain_id(get_boundary_curves(domain))
 boundary_components(billiard::B) where B<:AbsBilliard = boundary_components(billiard.fundamental_domain)
+
+# Connects the complete exterior boundary of a simple/composite domain --
+# every curve regardless of boundary-condition type EXCEPT Transparent
+# (which marks an internal join stitching two AbsCompositeDomain subdomains
+# together, not a real exterior edge). Unlike get_boundary_curves/
+# boundary_components, which retain only SpecularReflection curves for
+# solver-matrix construction, this keeps SymmetryWall/QuantumSolverIgnore/
+# PeriodicX curves too, since they are real exterior edges of the
+# fundamental domain.
+_is_exterior_curve(crv) = !(typeof(crv.bc) <: Transparent)
+_connected_geometric_curves(boundary::Vector{AbsCurve}) = connect_curves(filter(_is_exterior_curve, boundary))
+
+_geometric_boundary(domain::AbsDomain) = _connected_geometric_curves(domain.boundary)
+function _geometric_boundary(composite_domain::AbsCompositeDomain)
+    boundary = Vector{AbsCurve}()
+    for domain in composite_domain.subdomains
+        append!(boundary, domain.boundary)
+    end
+    return _connected_geometric_curves(boundary)
+end
+
+"""
+    geometric_boundary_components(domain::AbsDomain) → components::Vector{Vector{AbsCurve}}
+    geometric_boundary_components(billiard::AbsBilliard) → components::Vector{Vector{AbsCurve}}
+
+Returns the complete exterior boundary curves of `domain`/`billiard`,
+grouped one vector per connected component (outer boundary first, then each
+hole for [`AbsMultiplyConnectedDomain`](@ref)).
+
+## Description
+Unlike [`boundary_components`](@ref)/[`get_boundary_curves`](@ref), which
+retain only `SpecularReflection` curves (the ones a solver actually places
+quadrature points on), this keeps every real exterior curve regardless of
+boundary condition -- including `SymmetryWall` cuts closing off a
+symmetry-reduced fundamental domain -- while still excluding `Transparent`
+curves (internal joins stitching together an [`AbsCompositeDomain`](@ref)'s
+subdomains). This is needed by [`corner_angles`](@ref) to correctly locate
+every true corner of the fundamental domain, including corners where a
+physical curve meets a symmetry-wall cut (e.g. [`LimaconBilliard`](@ref)'s
+reflection axis).
+"""
+geometric_boundary_components(domain::AbsDomain) = [_geometric_boundary(domain)]
+geometric_boundary_components(domain::AbsMultiplyConnectedDomain) = _group_curves_by_domain_id(filter(_is_exterior_curve, domain.boundary))
+geometric_boundary_components(billiard::B) where B<:AbsBilliard = geometric_boundary_components(billiard.fundamental_domain)

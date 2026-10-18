@@ -116,15 +116,16 @@ field convention) at every true corner of `billiard`'s boundary.
 
 ## Keyword Arguments
 * `fundamental::Bool = true`: When `true` (default), uses
-  [`boundary_components`](@ref) (the fundamental-domain boundary actually
-  diagonalized over by basis/BIM solvers); when `false`, uses
-  [`full_boundary`](@ref) (the complete physical boundary), treated as a
-  single component.
+  [`geometric_boundary_components`](@ref) (the fundamental-domain boundary
+  actually diagonalized over by basis/BIM solvers, including any
+  symmetry-wall cuts so corners where a physical curve meets a cut are
+  correctly located); when `false`, uses [`full_boundary`](@ref) (the
+  complete physical boundary), treated as a single component.
 * `angle_tol = 1e-8`: Minimum turning angle (radians) classified as a true
   corner rather than a smooth join.
 """
 function corner_angles(billiard::AbsBilliard; fundamental::Bool=true, angle_tol=1e-8)
-    comps = fundamental ? boundary_components(billiard) : [full_boundary(billiard)]
+    comps = fundamental ? geometric_boundary_components(billiard) : [full_boundary(billiard)]
     T = typeof(first(comps[1]).length)
     angles = T[]
     for comp in comps
