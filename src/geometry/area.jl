@@ -58,6 +58,10 @@ function area(curves::AbstractVector{<:AbsCurve}; rtol=1e-10)
     return abs(I)/2
 end
 
+# Floating-point type `T` of a `Billiard{T}`; read from the type so that it is
+# inferable even though the boundary is stored as `Vector{AbsCurve}`.
+@inline _billiard_eltype(::Bi) where {Bi<:AbsBilliard} = Bi.parameters[1]
+
 """
     area(billiard::AbsBilliard; kwargs...) → A::Real
 
@@ -65,7 +69,7 @@ Returns the area of the complete physical billiard, using
 [`full_boundary`](@ref) so the result is independent of any symmetry
 reduction represented by the billiard's fundamental domain.
 """
-@inline area(billiard::AbsBilliard; kwargs...) = area(full_boundary(billiard); kwargs...)
+@inline area(billiard::AbsBilliard; kwargs...) = area(full_boundary(billiard); kwargs...)::_billiard_eltype(billiard)
 
 # How many-fold a discrete symmetry divides the physical area onto the
 # fundamental domain (used to estimate the fundamental-domain area below,
@@ -90,7 +94,7 @@ end
 
 @inline function symmetry_reduction_factor(billiard::AbsBilliard)
     sym = maximal_symmetry(billiard)
-    return isnothing(sym) ? 1 : symmetry_reduction_factor(sym)
+    return (isnothing(sym) ? 1 : symmetry_reduction_factor(sym))::Int
 end
 
 """
@@ -126,7 +130,7 @@ field convention) at every true corner of `billiard`'s boundary.
 """
 function corner_angles(billiard::AbsBilliard; fundamental::Bool=true, angle_tol=1e-8)
     comps = fundamental ? geometric_boundary_components(billiard) : [full_boundary(billiard)]
-    T = typeof(first(comps[1]).length)
+    T = _billiard_eltype(billiard)
     angles = T[]
     for comp in comps
         append!(angles, _component_corner_angles(T, comp; angle_tol=T(angle_tol)))

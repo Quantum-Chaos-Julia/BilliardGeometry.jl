@@ -90,6 +90,9 @@ end
 CompositeReflection(reflections::AbstractVector{<:AbsReflection}) = CompositeReflection(AbsReflection[reflections...])
 CompositeReflection(reflections::AbsReflection...) = CompositeReflection(AbsReflection[reflections...])
 
+Base.:(==)(a::CompositeReflection, b::CompositeReflection) = a.reflections == b.reflections
+Base.hash(a::CompositeReflection, h::UInt) = hash(a.reflections, hash(:CompositeReflection, h))
+
 """
     _sym_matrix(sym::AbsReflection, ::Type{T}=Float64) where T<:Real → M::SMatrix{2,2,T}
 

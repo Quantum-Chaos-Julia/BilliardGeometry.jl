@@ -63,7 +63,8 @@ function sample_points(sampler::FourierNodes, N::Int)
     start::T = zero(T)
     dt_end::T = zero(T)
     ds::T = zero(T)
-    for l in crv_lengths
+    ncurves = length(crv_lengths)
+    for (i, l) in enumerate(crv_lengths)
         ds = L/(l*M) 
         #println(start*ds)
         t = collect(range(start*ds,one(T),step=ds))
@@ -72,7 +73,9 @@ function sample_points(sampler::FourierNodes, N::Int)
         start = (ds - dt_end)/ds
         push!(ts,t)
         dt = diff(t)
-        push!(dt,dt_end)
+        # The last node of a curve (except the final one) is followed by the first node of the next curve at
+        # arclength distance L/M, so its weight is the full node spacing; the final curve wraps onto t = 0.
+        push!(dt, i < ncurves ? ds : dt_end)
         push!(dts,dt)
     end
     return ts,dts

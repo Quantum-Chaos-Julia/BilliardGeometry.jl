@@ -180,6 +180,32 @@ end
     @test s_mid(1,4) ≈ 2*pi*0.5/4
 end
 
+@testset "samplers.jl - FourierNodes weights across curve junctions" begin
+    for lengths in ([1.0, 0.5], [0.3, 1.1, 0.7], [2.0, 1.0, 1.0, 0.25]), N in (16, 64, 512)
+        ts, dts = sample_points(FourierNodes(lengths), N)
+        L = sum(lengths)
+        weights = reduce(vcat, [dts[i] .* lengths[i] for i in eachindex(lengths)])
+        @test sum(weights) ≈ L rtol = 1e-12
+        @test all(w -> isapprox(w, L / N; rtol = 1e-9), weights[1:end-1])
+        @test all(i -> length(ts[i]) == length(dts[i]), eachindex(lengths))
+    end
+end
+
+@testset "symmetry.jl - CompositeReflection equality and hash" begin
+    a = CompositeReflection(XAxisReflection(), YAxisReflection())
+    b = CompositeReflection(XAxisReflection(), YAxisReflection())
+    c = CompositeReflection(YAxisReflection(), XAxisReflection())
+    d = CompositeReflection(XAxisReflection())
+    @test a !== b
+    @test a == b
+    @test isequal(a, b)
+    @test hash(a) == hash(b)
+    @test a != c                       # generator order is part of the identity
+    @test a != d
+    @test length(unique([a, b])) == 1
+    @test Dict(a => 1)[b] == 1
+end
+
 @testset "symmetryorbits.jl" begin
     # `NFoldRotation(N,m)`'s convenience constructor bug (it used to build
     # `LinearMap(RotZ(...))`, a 3x3 rotation, which could not convert to the
