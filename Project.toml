@@ -21,18 +21,19 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
+Accessors = "0.1"
+CircularArrays = "1"
+CoordinateTransformations = "0.6"
 DataInterpolations = "8.6.1"
 Elliptic = "1.0.1"
 FastGaussQuadrature = "1.0.2"
 FFTW = "1"
+ForwardDiff = "1"
+LinearAlgebra = "1"
 Optim = "1.13.2"
 QuadGK = "2.11.2"
 Roots = "2.2.8"
+Rotations = "1"
+StaticArrays = "1"
 StatsBase = "0.34.4"
-julia = "1.9"
-
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Test"]
+julia = "1.12"
