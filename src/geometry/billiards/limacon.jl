@@ -1,4 +1,4 @@
-# Limaçon billiard r(φ) = R(1 + a*cos(φ)); x-axis reflection symmetry.
+# Limaçon billiard r(φ) = R + a*cos(φ); x-axis reflection symmetry.
 
 struct LimaconBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::SimpleDomain{T}

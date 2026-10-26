@@ -17,7 +17,8 @@ using BilliardGeometry: _is_true_corner, _junction_angle, _component_corner_loca
 
 # Absolute tolerance for closed-form comparisons of angles and trigonometric expressions (a few ulps of Float64).
 const bc_ATOL = 1e-12
-const bc_ATOL_F32 = 1f-5
+# Absolute tolerance for Float32 results (a few ulps of Float32).
+const bc_ATOL_F32 = 1.0f-6
 
 # Output of `f()` written to stdout, returned as a vector of lines.
 function bc_captured_lines(f)
@@ -130,8 +131,8 @@ end
     lines = bc_captured_lines(() -> print_component_junctions(bc_square()))
     @test lines[1] == "junction diagnostics:"
     @test length(lines) == 5
-    @test count(contains("TRUE CORNER"), lines) == 4
-    @test count(contains("smooth join"), lines) == 0
+    @test count(occursin("TRUE CORNER"), lines) == 4
+    @test count(occursin("smooth join"), lines) == 0
     # one line per join, the last one closes the loop at the seam sigma = 0
     @test occursin("1 -> 2", lines[2])
     @test occursin("4 -> 1", lines[5])
@@ -144,11 +145,11 @@ end
     smooth = [LineSegment([0.0, 0.0], [1.0, 0.0]), LineSegment([1.0, 0.0], [2.0, 0.0])]
     smooth_lines = bc_captured_lines(() -> print_component_junctions(smooth; T=Float32))
     @test length(smooth_lines) == 3
-    @test count(contains("smooth join"), smooth_lines) == 2
-    @test count(contains("TRUE CORNER"), smooth_lines) == 0
+    @test count(occursin("smooth join"), smooth_lines) == 2
+    @test count(occursin("TRUE CORNER"), smooth_lines) == 0
     # a large angle_tol makes every join smooth
     tol_lines = bc_captured_lines(() -> print_component_junctions(bc_square(); angle_tol=2.0))
-    @test count(contains("smooth join"), tol_lines) == 4
+    @test count(occursin("smooth join"), tol_lines) == 4
 end
 
 @testset "_global_t_to_segment_u" begin
@@ -166,7 +167,7 @@ end
     # unequal lengths: sides of length 1 and 3, so the second side starts at t = pi / 2 and t = pi is at u = 1/3
     uneven = [LineSegment([0.0, 0.0], [1.0, 0.0]), LineSegment([1.0, 0.0], [1.0, 3.0])]
     @test _global_t_to_segment_u(Float64, uneven, pi / 4) == (1, 0.5)
-    j2, u2 = _global_t_to_segment_u(Float64, uneven, Float64(pi))
+    j2, u2 = _global_t_to_segment_u(Float64, uneven, pi)
     @test j2 == 2
     @test u2 ≈ 1 / 3 atol = bc_ATOL
 
@@ -178,6 +179,7 @@ end
         @test ut ≈ s - floor(s) atol = bc_ATOL
     end
     @test @inferred(_global_t_to_segment_u(Float64, comp, 1.0)) isa Tuple{Int,Float64}
+    # Float32 components: the middle of the second of two unit sides (total length 2, so t = 3 pi / 2 is s = 1.5)
     comp32 = [LineSegment(Float32[0, 0], Float32[1, 0]), LineSegment(Float32[1, 0], Float32[1, 1])]
     j32, u32 = _global_t_to_segment_u(Float32, comp32, Float32(3 * pi / 2))
     @test j32 == 2
