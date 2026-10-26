@@ -40,15 +40,15 @@ orientation_reversing(::NFoldRotation) = false
 # `symmetry.jl`, included earlier).
 _sym_matrix(sym::NFoldRotation, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(sym.sym_map.linear)
 
-# Pointwise image of a `LineSegment` under `sym` (endpoints only). The
-# `orientation` field is negated since swapping the roles of "inside"/
-# "outside" is exactly what a reflected/rotated line implies for the raw
-# `line_domain` formula; `full_boundary` curves are not used for `is_inside`
-# checks, so this is a minor correctness nicety rather than a requirement.
+# Pointwise image of a `LineSegment` under `sym` (endpoints only). `line_domain` is the cross product of the line
+# direction with the offset of the point, which a linear map `M` scales by `det(M)`; the `orientation` field is therefore
+# kept for rotations and flipped for reflections, so that `domain_fun` of the image at `sym(p)` equals `domain_fun` of
+# the source at `p`.
 function _apply_symmetry_to_curve(sym::AbsSymmetry, c::LineSegment{T}) where {T<:Real}
     pt0 = SVector{2,T}(apply_symmetry(sym, c.pt0))
     pt1 = SVector{2,T}(apply_symmetry(sym, c.pt1))
-    return LineSegment(pt0, pt1; bc=c.bc, orientation=-c.orientation, domain_id=c.domain_id, segment_id=c.segment_id)
+    orientation = orientation_reversing(sym) ? -c.orientation : c.orientation
+    return LineSegment(pt0, pt1; bc=c.bc, orientation=orientation, domain_id=c.domain_id, segment_id=c.segment_id)
 end
 
 # Pointwise image of a `CircleSegment` under `sym`. Writing the 2x2 matrix

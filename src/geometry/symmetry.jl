@@ -115,6 +115,9 @@ function apply_symmetry(sym::AbsReflection, pt::SVector{2,T}) where T<:Real
 end
 apply_symmetry(sym::AbsReflection, pts) = [apply_symmetry(sym, pt) for pt in pts]
 
+_throw_not_svector_point(sym) = throw(ArgumentError("apply_symmetry(::$(nameof(typeof(sym))), pt) requires a point of type SVector{2}; got a plain vector of reals. Convert with SVector{2}(pt)."))
+apply_symmetry(sym::AbsReflection, ::AbstractVector{<:Real}) = _throw_not_svector_point(sym)
+
 """
     apply_symmetry_pb(sym::AbsSymmetry, sym_sector::Int64, s::T, p::T, L::T) where T<:Real
 
@@ -203,6 +206,7 @@ end
 function apply_symmetry(sym::NFoldRotation, pts)
     return [sym.sym_map(pt) for pt in pts]
 end
+apply_symmetry(sym::NFoldRotation, ::AbstractVector{<:Real}) = _throw_not_svector_point(sym)
 
 """
     Cn_symmetry(n; T::Type{<:Real}=Float64) → reg::SymmetryRegistry

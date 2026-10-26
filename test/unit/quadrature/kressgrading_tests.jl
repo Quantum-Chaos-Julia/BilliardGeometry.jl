@@ -182,3 +182,88 @@ end
     @test left == 1.0
     @test right ≈ 1.0 + 2 * pi atol = kg_ATOL
 end
+
+# G14: single corner away from 0 gives an interval that does not contain x
+@testset "_corner_interval single corner containment" begin
+    # for any x in [0, 2 pi) the interval has length 2 pi and contains x, whichever side of the corner x lies on
+    for c in (0.0, 1.0, 3.0, 6.0), x in (0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 6.0)
+        left, right = _corner_interval([c], x)
+        @test right - left ≈ 2 * pi atol = kg_ATOL
+        @test left <= x < right
+        # x >= c starts at the corner, x < c ends at the corner
+        @test (x >= c ? (left, right) == (c, c + 2 * pi) : (left, right) == (c - 2 * pi, c))
+    end
+
+    # exact tuples
+    @test _corner_interval([1.0], 0.5) == (1.0 - 2 * pi, 1.0)
+    @test _corner_interval([1.0], 3.0) == (1.0, 1.0 + 2 * pi)
+    # x on the corner starts the interval at the corner
+    @test _corner_interval([1.0], 1.0) == (1.0, 1.0 + 2 * pi)
+    # a corner at 0 is unchanged
+    @test _corner_interval([0.0], 3.0) == (0.0, 2 * pi)
+
+    # element type is preserved on both sides of the corner
+    for x in (0.5f0, 3.0f0)
+        left, right = _corner_interval([1.0f0], x)
+        @test left isa Float32 && right isa Float32
+        @test left <= x < right
+        @test right - left ≈ 2f0 * Float32(pi) atol = kg_ATOL_F32
+    end
+end
+
+# Checks of the single-corner graded grid built by multi_kress_graded_nodes_data for a corner at c (no log records allowed).
+function kg_single_corner_data(c; N = 64, q = 4)
+    return @test_logs multi_kress_graded_nodes_data(Float64, N, [c]; q = q)
+end
+
+# Smallest periodic gap of the sorted node set `t` in [0, 2 pi) and the midpoint of the gap (periodic wrap aware).
+function kg_min_gap(t)
+    ts = sort(t)
+    gaps = [diff(ts); 2 * pi + ts[1] - ts[end]]
+    i = argmin(gaps)
+    mid = i < length(ts) ? (ts[i] + ts[i+1]) / 2 : mod(ts[end] + gaps[i] / 2, 2 * pi)
+    return gaps[i], mid
+end
+
+# Periodic distance on the circle of length 2 pi.
+kg_circ_dist(a, b) = (d = mod(a - b, 2 * pi); min(d, 2 * pi - d))
+
+# G14: single corner away from 0 gives an interval that does not contain x
+@testset "multi_kress_graded_nodes_data single corner" begin
+    N = 64
+    h = 2 * pi / N
+    @testset "corner at $c" for c in (0.0, 1.0, 5.5)
+        σ, tmap, jac, jac2, wq = kg_single_corner_data(c; N = N)
+        @test length(tmap) == N
+        @test all(isfinite, tmap) && all(isfinite, jac) && all(isfinite, jac2)
+        @test all(0 .<= tmap .< 2 * pi)
+
+        # nodes stay distinct and cyclically increasing (at most one wrap-around descent)
+        gap, gapmid = kg_min_gap(tmap)
+        @test gap > 1e-12
+        @test count(<(0), diff(tmap)) <= 1
+        @test all(jac .> 0)
+        @test all(wq .≈ h .* jac)
+        @test sum(wq) ≈ 2 * pi atol = kg_WSUM_ATOL
+
+        # nodes cluster at the corner: the tightest gap sits next to c, and some node is far closer to c than a grid step
+        @test kg_circ_dist(gapmid, c) < 3h
+        @test minimum(kg_circ_dist.(tmap, c)) < h / 10
+        @test minimum(kg_circ_dist.(tmap, c)) < maximum(kg_circ_dist.(tmap, c))
+    end
+
+    # corner at 0 gives a fully sorted, strictly increasing map
+    @testset "corner at 0 is sorted" begin
+        _, tmap0, _, _, _ = kg_single_corner_data(0.0; N = N)
+        @test issorted(tmap0; lt = <=)
+    end
+
+    # a corner at an integer multiple of the grid step is a rotation of the corner-at-0 grid
+    @testset "rotation by 16 grid steps" begin
+        c = 16 * h
+        _, tmap0, jac0, _, _ = kg_single_corner_data(0.0; N = N)
+        _, tmapc, jacc, _, _ = kg_single_corner_data(c; N = N)
+        @test sort(jacc) ≈ sort(jac0) atol = kg_ATOL
+        @test sort(tmapc) ≈ sort(mod.(tmap0 .+ c, 2 * pi)) atol = kg_ATOL
+    end
+end

@@ -112,6 +112,26 @@ end
     @test apply_symmetry(YAxisReflection(), apply_symmetry(XAxisReflection(), pt)) == apply_symmetry(XYAxisReflection(), pt)
 end
 
+@testset "apply_symmetry (plain vector point)" begin
+    # G15: points are SVector{2}; a plain Vector of reals is rejected with an ArgumentError instead of recursing forever
+    for sym in (XAxisReflection(), YAxisReflection(), XYAxisReflection(), DiagonalReflection(), AntiDiagonalReflection(),
+                NFoldRotation(3, 1), NFoldRotation(4, 2))
+        @test_throws ArgumentError apply_symmetry(sym, [1.0, 2.0])
+        @test_throws ArgumentError apply_symmetry(sym, Float32[1, 2])
+    end
+    err = try
+        apply_symmetry(XAxisReflection(), [1.0, 2.0])
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("SVector", err.msg)
+
+    # collections of SVector points and single SVector points are unaffected
+    @test apply_symmetry(XAxisReflection(), [SVector(1.0, 2.0)]) == [SVector(1.0, -2.0)]
+    @test apply_symmetry(NFoldRotation(4, 1), [SVector(1.0, 0.0)]) ≈ [SVector(0.0, 1.0)] atol = 1e-12
+end
+
 @testset "orientation_reversing" begin
     @test orientation_reversing(XAxisReflection())
     @test orientation_reversing(YAxisReflection())

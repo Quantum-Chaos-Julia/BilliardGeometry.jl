@@ -5,7 +5,8 @@
 # Reference object: arcs of the circle of radius R about a center c, r(t) = c + R (cos(a t + s), sin(a t + s)) with arc
 # angle a and shift angle s. Every checked quantity has a closed form: the arc length is R |a| t, the signed domain function is
 # (|x - c| - R) * orientation and its gradient is the radial unit vector. The G4 regression for arc_length(circle, pt) on
-# negative arcs is not part of this file. No eigen solves, no pinned wavefunction values. Helper constants use the prefix `cs_`.
+# negative arcs, lower-half-plane arcs and arcs across the branch cut of atan is the testset "arc_length(::CircleSegment, pt)
+# on arbitrary arcs". No eigen solves, no pinned wavefunction values. Helper constants use the prefix `cs_`.
 
 using StaticArrays: SVector
 using LinearAlgebra: norm
@@ -141,6 +142,29 @@ end
     full = CircleSegment(R, 2 * pi, 0.0, [0.3, -0.1])
     @test arc_length(full, 1.0) ≈ 2 * pi * R atol = cs_ARCLEN_ATOL
     @test full.length ≈ 2 * pi * R atol = cs_ATOL
+end
+
+@testset "arc_length(::CircleSegment, pt) on arbitrary arcs" begin
+    # G4: the point method equals R |a| t on the arc, whatever the sign of a, the position of the arc and the branch cut of atan
+    cases = (
+        (1.5, -0.5 * pi, 0.0, [0.0, 0.0]),            # clockwise arc
+        (1.0, 1.5 * pi, 0.0, [0.0, 0.0]),             # reaches the lower half plane
+        (1.0, 0.5 * pi, 0.75 * pi, [0.0, 0.0]),       # crosses the cut of atan at angle pi
+        (2.0, -pi, 0.5 * pi, [0.3, -0.4]),            # clockwise, off center, through the lower half plane
+        (0.7, -1.5 * pi, -0.25 * pi, [-1.0, 0.5]),    # clockwise, negative shift, crosses the cut
+        (1.0, 0.25 * pi, 1.9 * pi, [0.0, 0.0]),       # shift beyond one turn
+    )
+    for (R, a, s, c) in cases, t in (0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0)
+        crv = CircleSegment(R, a, s, c)
+        len = arc_length(crv, curve(crv, t))
+        @test len ≈ R * abs(a) * t atol = cs_ATOL
+        @test len > -cs_ARCLEN_ATOL
+    end
+
+    # known limit: the end point of a full turn is the start point and maps to 0, not to the length
+    full = CircleSegment(1.0, 2 * pi, 0.0, [0.0, 0.0])
+    @test arc_length(full, curve(full, 1.0)) ≈ 0.0 atol = cs_ARCLEN_ATOL
+    @test arc_length(full, curve(full, 0.75)) ≈ 1.5 * pi atol = cs_ATOL
 end
 
 @testset "domain_fun and is_inside (::CircleSegment)" begin

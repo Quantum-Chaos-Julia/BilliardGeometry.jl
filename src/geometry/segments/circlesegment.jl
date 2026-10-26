@@ -53,9 +53,12 @@ function domain_fun(circle::L, pts::AbstractArray) where {L<:CircleSegment}
     end
 end
 
-# arc length
+# arc length from the start of the arc to the point `pt` on it, measured along the sense of traversal; the angle is
+# wrapped into [-ε, 2π-ε) so that points at the start map to 0 (up to rounding) and the end of a full turn maps to 0
 function arc_length(circle::L, pt::SVector{2,T}) where {L<:CircleSegment, T<:Real}
     center = circle.center
-    angle = atan(pt[2]-center[2], pt[1]-center[1]) - circle.shift_angle
-    return circle.radius*angle
+    ε = sqrt(eps(T))
+    direction = circle.arc_angle < 0 ? -one(T) : one(T)
+    swept = direction*(atan(pt[2]-center[2], pt[1]-center[1]) - circle.shift_angle)
+    return circle.radius*(mod(swept + ε, 2*T(π)) - ε)
 end

@@ -10,8 +10,9 @@
 # A polar image reuses the radial function of its source, so it is the exact image only under a symmetry that leaves the
 # radial function invariant; the polar fixtures are therefore D4-symmetric (cos 4 phi) and are only mapped by the five
 # reflections and the rotations of order 4, and the C3 fundamental curve only by rotations of order 3.
-# The orientation field of line images is not tested. Closure of the reconstructed loop and its total length on real
-# billiards are covered by the integration tier. No eigen solves, no pinned wavefunction values. Helper functions and
+# The orientation field of line images keeps domain_fun consistent with the source curve (G13). Closure of the
+# reconstructed loop and its total length on real billiards are covered by the integration tier. No eigen solves,
+# no pinned wavefunction values. Helper functions and
 # constants use the prefix `fb_`.
 
 using StaticArrays: SVector
@@ -33,6 +34,7 @@ const fb_D4_SYMMETRIES = (XAxisReflection(), YAxisReflection(), XYAxisReflection
 const fb_REFLECTIONS = (XAxisReflection(), YAxisReflection(), DiagonalReflection(), AntiDiagonalReflection())
 
 # Off-axis curves with non-default metadata, so that the transfer of domain_id and segment_id is visible.
+# The Fourier coefficients are ordered (sin phi, cos phi, sin 2 phi, cos 2 phi, ...), so the eighth entry is cos 4 phi.
 fb_line() = LineSegment([0.3, 0.1], [1.2, 0.7]; domain_id = 2, segment_id = 5)
 fb_arc() = CircleSegment(0.8, 1.1, 0.4, [0.5, 0.2]; domain_id = 2, segment_id = 5)
 fb_fourier() = FourierCoeffPolarSegment([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3]; arc_angle = 1.3, shift_angle = 0.4, center = [0.3, -0.2],
@@ -56,7 +58,8 @@ end
         img = _apply_symmetry_to_curve(sym, c)
         @test img isa LineSegment
         @test fb_image_matches(sym, c, img)
-        @test img.pt0 == apply_symmetry(sym, c.pt0) || isapprox(img.pt0, apply_symmetry(sym, c.pt0); atol = fb_ATOL)
+        @test isapprox(img.pt0, apply_symmetry(sym, c.pt0); atol = fb_ATOL)
+        @test isapprox(img.pt1, apply_symmetry(sym, c.pt1); atol = fb_ATOL)
         @test isapprox(img.length, c.length; atol = fb_ATOL)
         @test img.domain_id == c.domain_id && img.segment_id == c.segment_id
         @test img.bc == c.bc
@@ -64,6 +67,30 @@ end
     # the image under X is the mirror image about the x axis
     img = _apply_symmetry_to_curve(XAxisReflection(), c)
     @test img.pt0 == [0.3, -0.1] && img.pt1 == [1.2, -0.7]
+end
+
+@testset "_apply_symmetry_to_curve (LineSegment orientation)" begin
+    # G13: orientation-preserving images (det > 0) keep the orientation field, reflections flip it
+    for o in (1, -1)
+        c = LineSegment([0.3, 0.1], [1.2, 0.7]; orientation = o)
+        for sym in (XYAxisReflection(), NFoldRotation(3, 1), NFoldRotation(4, 3))
+            @test _apply_symmetry_to_curve(sym, c).orientation == o
+        end
+        for sym in fb_REFLECTIONS
+            @test _apply_symmetry_to_curve(sym, c).orientation == -o
+        end
+    end
+    # domain_fun of the image at the image of a point equals domain_fun of the source at the point
+    pts = (SVector(0.1, 0.9), SVector(0.8, -0.3), SVector(-0.4, 0.2))
+    for o in (1, -1), sym in fb_SYMMETRIES
+        c = LineSegment([0.3, 0.1], [1.2, 0.7]; orientation = o)
+        img = _apply_symmetry_to_curve(sym, c)
+        rimg = _reverse_curve(img)
+        for p in pts
+            @test isapprox(domain_fun(img, apply_symmetry(sym, p)), domain_fun(c, p); atol = fb_ATOL)
+            @test isapprox(domain_fun(rimg, apply_symmetry(sym, p)), domain_fun(c, p); atol = fb_ATOL)
+        end
+    end
 end
 
 @testset "_apply_symmetry_to_curve (CircleSegment)" begin
@@ -219,6 +246,11 @@ end
     rect = RectangleBilliard(1.0, 0.6)
     @test full_boundary(rect)[1:2] == get_boundary_curves(rect)
     @test full_boundary(rect) == first(_full_boundary_data(rect))
+
+    # G13: every wall of the unfolded rectangle sees an interior point on its inner side
+    for p in (SVector(0.1, 0.1), SVector(-0.5, 0.3), SVector(0.7, -0.2))
+        @test all(c -> domain_fun(c, p) < 0, full_boundary(rect))
+    end
 end
 
 @testset "_full_boundary_data" begin

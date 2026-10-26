@@ -213,9 +213,6 @@ end
 
 function _corner_interval(corners::Vector{T}, x::T) where {T<:Real}
     m = length(corners)
-    if m==1
-        return corners[1], corners[1]+T(2*pi)
-    end
     j = searchsortedlast(corners,x)
     if j==0
         left = corners[end]-T(2*pi); right = corners[1]
@@ -274,7 +271,7 @@ function multi_kress_graded_nodes_data(::Type{T}, N::Int, corners_in; q=3, minse
             jac2[i] = vpp/L
             wq[i] = h*jac[i]
         end
-        minsep = _min_periodic_spacing_sorted(tmap)
+        minsep = _min_periodic_spacing_sorted(sort(tmap))
         minsep>=minsep_tol && return σ,tmap,jac,jac2,wq
         qnew = max(one(T),qT*0.9)
         @warn "Kress grading nodes too close; reducing q." q_old=qT q_new=qnew minsep=minsep minsep_tol=minsep_tol N=N

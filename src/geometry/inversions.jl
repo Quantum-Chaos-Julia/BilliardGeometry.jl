@@ -38,18 +38,23 @@ end
 
 """
 Roots.jl based inversion (fastest for well-behaved curves).
+
+Solves the stationarity condition `g(t) = <γ(t) - pt, γ'(t)> = 0` of the squared distance with a Gauss-Newton iteration,
+that is Newton's method with `g'(t)` replaced by `|γ'(t)|²`. The two agree at a point on the curve, where the residual
+vanishes, so the root is simple and convergence is quadratic there, while the step stays a descent direction of the
+distance away from the root. A stationary point that is not at zero distance from `pt` is rejected, so only points on
+the curve are accepted.
 """
 function invert_curve_roots(crv::C, pt::SVector{2,T}, t_init, rtol, atol, maxevals) where {C<:AbsCurve, T<:Real}
-    # Define objective function: distance squared
-    function objective(t)
-        pos = curve(crv, t)
-        return sum((pos .- pt).^2)
+    g(t) = dot(curve(crv, t) - pt, tangent(crv, t))
+    dg(t) = dot(tangent(crv, t), tangent(crv, t))
+
+    result = find_zero((g, dg), t_init, Roots.Newton(); xatol=atol, xrtol=rtol, maxiters=maxevals)
+    if norm(curve(crv, result) - pt) > sqrt(atol) + rtol * (1 + norm(pt))
+        error("point is not on the curve: the stationary point of the distance is at nonzero distance")
     end
-    
-    result = find_zero(objective, t_init, atol=atol, rtol=rtol, maxevals=maxevals)
     # Wrap to [0, 1]
-    t = mod(result, 1.0)
-    return t
+    return mod(result, 1.0)
 end
 
 """

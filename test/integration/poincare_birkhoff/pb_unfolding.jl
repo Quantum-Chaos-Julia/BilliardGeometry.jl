@@ -12,11 +12,9 @@
 using StaticArrays: SVector
 using BilliardGeometry: _full_boundary_data
 
-# Parameter values on every fundamental curve at which pb_coords is compared with the full-boundary arc length. The C3 arc is
-# only probed at its midpoint: pb_coords obtains s from arc_length(curve, point), which inverts the curve with a root finder on
-# the squared distance, and for the curved C3 arc this inversion is off by about 1e-4 in s away from the midpoint.
+# Parameter values on every fundamental curve at which pb_coords is compared with the full-boundary arc length.
 const pu_US_LINES = (0.2, 0.5, 0.9)
-const pu_US_ARC = (0.5,)
+const pu_US_ARC = (0.2, 0.5, 0.9)
 
 # Point of the curve at parameter `u` together with a velocity (any nonzero vector, only its direction enters).
 function pu_point_and_velocity(crv, u)
