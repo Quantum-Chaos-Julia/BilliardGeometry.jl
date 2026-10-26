@@ -93,7 +93,7 @@ function get_all_curves(domain::D) where D<:AbsDomain
     if typeof(domain) <: AbsCompositeDomain
         subdomains = domain.subdomains
     else
-        subdomains = domain
+        subdomains = (domain,)
     end
     curves = Vector{AbsCurve}()
     for dom in subdomains

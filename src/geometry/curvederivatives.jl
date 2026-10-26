@@ -115,6 +115,16 @@ function tangent_vec(crv::AbsCurve, ts::AbstractArray{<:Real})
 end
 
 """
+    tangent_vec(crv::AbsCurve, t::Real) → t̂
+
+Unit tangent vector at the single parameter value `t`.
+"""
+function tangent_vec(crv::AbsCurve, t::Real)
+    v = tangent(crv, t)
+    return v/norm(v)
+end
+
+"""
     normal_vec(crv::AbsCurve, ts::AbstractArray) → n̂::Vector
 
 Unit outward normal vectors, obtained from the unit tangent by a clockwise
@@ -125,6 +135,16 @@ the outward normal of the billiard domain.
 function normal_vec(crv::AbsCurve, ts::AbstractArray{<:Real})
     ta = tangent_vec(crv, ts)
     return [SVector(ti[2], -ti[1]) for ti in ta]
+end
+
+"""
+    normal_vec(crv::AbsCurve, t::Real) → n̂
+
+Unit outward normal at the single parameter value `t`; same convention as the array method.
+"""
+function normal_vec(crv::AbsCurve, t::Real)
+    ti = tangent_vec(crv, t)
+    return SVector(ti[2], -ti[1])
 end
 
 """

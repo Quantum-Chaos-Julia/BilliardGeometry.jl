@@ -14,4 +14,7 @@ function StadiumBilliard(half_width::T) where T<:Real
     return StadiumBilliard{T}(CompositeDomain([circle_dom,rectangle_dom]), symmetries)
 end
 
+StadiumBilliard(fundamental_domain::CompositeDomain, symmetries::SymmetryRegistry) =
+    StadiumBilliard{_domain_eltype(fundamental_domain)}(fundamental_domain, symmetries)
+
 

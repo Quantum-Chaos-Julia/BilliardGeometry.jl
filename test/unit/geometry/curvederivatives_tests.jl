@@ -6,8 +6,10 @@
 # unit tangent (-sin, cos), unit outward normal (cos, sin) and curvature 1/R (sign of a), a line with constant tangent pt1 - pt0
 # and zero second derivative, and the parabola (t, t^2). The first and second derivatives of every concrete curve are also
 # compared with central finite differences of `curve`, and the analytic Fourier polar derivatives with the ForwardDiff based
-# derivatives of the PolarSegment of the same radial function. Scalar tangent_vec and normal_vec are not part of this file. No eigen
-# solves, no pinned wavefunction values. Helper functions and constants use the prefix `cd_`.
+# derivatives of the PolarSegment of the same radial function. The scalar methods tangent_vec(crv, t::Real) and
+# normal_vec(crv, t::Real) are compared elementwise with the array methods and with the closed form of the line, circle and a
+# polar circle: unit length, normal = (ty, -tx), orthogonal to the tangent. No eigen solves, no pinned wavefunction values.
+# Helper functions and constants use the prefix `cd_`.
 
 using StaticArrays: SVector
 using LinearAlgebra: norm, dot
@@ -187,4 +189,87 @@ end
     l2 = LineSegment([0.0, 0.0], chord)
     @test tangent_vec(l2, [0.2, 0.8]) == [chord / 5.0, chord / 5.0]
     @test normal_vec(l2, [0.2, 0.8]) == [SVector(0.8, -0.6), SVector(0.8, -0.6)]
+end
+
+# Checks of the scalar unit tangent and unit normal of `crv` at the parameters `ts`: agreement with the array methods, unit
+# length, normal = (ty, -tx) and orthogonality.
+function cd_check_scalar_unit_vectors(crv, ts)
+    for t0 in ts
+        tv = tangent_vec(crv, t0)
+        nv = normal_vec(crv, t0)
+        @test tv isa SVector{2}
+        @test nv isa SVector{2}
+        @test norm(tv) ≈ 1.0 atol = cd_ATOL
+        @test norm(nv) ≈ 1.0 atol = cd_ATOL
+        @test nv ≈ SVector(tv[2], -tv[1]) atol = cd_ATOL
+        @test abs(dot(tv, nv)) < cd_ATOL
+        @test tv ≈ tangent_vec(crv, [t0])[1] atol = cd_ATOL
+        @test nv ≈ normal_vec(crv, [t0])[1] atol = cd_ATOL
+    end
+end
+
+@testset "tangent_vec and normal_vec (scalar, ::LineSegment)" begin
+    # G11: scalar tangent_vec/normal_vec do not exist, only the array methods do
+    chord = SVector(3.0, 4.0)
+    line = LineSegment([0.0, 0.0], chord)
+    for t0 in (0.0, 0.3, 1.0)
+        @test tangent_vec(line, t0) ≈ SVector(0.6, 0.8) atol = cd_ATOL
+        @test normal_vec(line, t0) ≈ SVector(0.8, -0.6) atol = cd_ATOL
+    end
+    cd_check_scalar_unit_vectors(line, (0.0, 0.3, 1.0))
+    # elementwise agreement with the array method
+    ts = [0.1, 0.5, 0.9]
+    @test [tangent_vec(line, t) for t in ts] ≈ tangent_vec(line, ts)
+    @test [normal_vec(line, t) for t in ts] ≈ normal_vec(line, ts)
+
+    # type stability and eltype
+    @test @inferred(tangent_vec(line, 0.3)) isa SVector{2,Float64}
+    @test @inferred(normal_vec(line, 0.3)) isa SVector{2,Float64}
+    line32 = LineSegment(Float32[0, 0], Float32[3, 4])
+    @test tangent_vec(line32, 0.3) isa SVector{2,Float32}
+    @test normal_vec(line32, 0.3) isa SVector{2,Float32}
+end
+
+@testset "tangent_vec and normal_vec (scalar, ::CircleSegment)" begin
+    # G11: counter-clockwise circle, unit tangent (-sin(phi), cos(phi)) and outward unit normal (cos(phi), sin(phi))
+    a, s = 2 * pi, 0.3
+    circ = CircleSegment(2.0, a, s, [0.1, -0.2])
+    for t0 in (0.0, 0.2, 0.55, 0.9)
+        phi = a * t0 + s
+        @test tangent_vec(circ, t0) ≈ SVector(-sin(phi), cos(phi)) atol = cd_ATOL
+        @test normal_vec(circ, t0) ≈ SVector(cos(phi), sin(phi)) atol = cd_ATOL
+    end
+    cd_check_scalar_unit_vectors(circ, (0.0, 0.2, 0.55, 0.9))
+    ts = [0.1, 0.5, 0.9]
+    @test [tangent_vec(circ, t) for t in ts] ≈ tangent_vec(circ, ts)
+    @test [normal_vec(circ, t) for t in ts] ≈ normal_vec(circ, ts)
+
+    # a clockwise arc flips the tangent, and with it the normal
+    cw = CircleSegment(2.0, -0.5 * pi, 0.3, [0.1, -0.2])
+    phi = -0.5 * pi * 0.4 + 0.3
+    @test tangent_vec(cw, 0.4) ≈ SVector(sin(phi), -cos(phi)) atol = cd_ATOL
+    @test normal_vec(cw, 0.4) ≈ SVector(-cos(phi), -sin(phi)) atol = cd_ATOL
+
+    @test @inferred(tangent_vec(circ, 0.3)) isa SVector{2,Float64}
+    @test @inferred(normal_vec(circ, 0.3)) isa SVector{2,Float64}
+end
+
+@testset "tangent_vec and normal_vec (scalar, polar segments)" begin
+    # G11: polar circle of radius 2, same closed form as the CircleSegment
+    a = 2.0 * pi
+    pcirc = PolarSegment(phi -> 2.0)
+    for t0 in (0.1, 0.45, 0.8)
+        phi = a * t0
+        @test tangent_vec(pcirc, t0) ≈ SVector(-sin(phi), cos(phi)) atol = cd_ATOL
+        @test normal_vec(pcirc, t0) ≈ SVector(cos(phi), sin(phi)) atol = cd_ATOL
+    end
+
+    # a non-circular radial function: unit length, orthogonality and agreement with the array method
+    pseg = PolarSegment(cd_rfunc; arc_angle=pi, shift_angle=0.2, center=[0.3, -0.4])
+    cd_check_scalar_unit_vectors(pseg, (0.1, 0.5, 0.9))
+    fseg = FourierCoeffPolarSegment([0.1, 0.2, 0.3, 0.4]; R=1.5, arc_angle=pi, shift_angle=0.2, center=[0.3, -0.4])
+    cd_check_scalar_unit_vectors(fseg, (0.1, 0.5, 0.9))
+    ts = [0.1, 0.5, 0.9]
+    @test [tangent_vec(pseg, t) for t in ts] ≈ tangent_vec(pseg, ts)
+    @test [normal_vec(fseg, t) for t in ts] ≈ normal_vec(fseg, ts)
 end

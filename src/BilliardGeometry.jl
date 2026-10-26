@@ -31,7 +31,7 @@ abstract type AbsReflection <: AbsSymmetry end
 export AbsCurve, AbsPolarCurve, AbsCompositeCurve, AbsCoords, AbsDomain, AbsPolarDomain, AbsCompositeDomain, AbsSimpleDomain, AbsMultiplyConnectedDomain, AbsBilliard, AbsBoundaryCondition, AbsSampler, AbsSymmetry
 
 include("geometry/utils.jl")
-export is_overlaping, is_connected, is_closed, angle, connect_curves, find_unique_elements, point_curve_parameter
+export is_overlaping, is_connected, is_closed, connect_curves, find_unique_elements, point_curve_parameter
 
 include("geometry/symmetry.jl")
 include("geometry/symmetryregistry.jl")
@@ -81,7 +81,7 @@ export TriangleBilliard
 export StadiumBilliard
 export MushroomBilliard
 export PolarBilliard, PolarDomain
-export LimaconBilliard, LimaconSegment
+export LimaconBilliard
 export CircleBilliard
 export EllipseBilliard
 export RectangleBilliard

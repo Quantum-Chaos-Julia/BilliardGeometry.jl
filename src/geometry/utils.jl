@@ -1,7 +1,9 @@
 
 function is_overlaping(pt1, pt2)
-    x = isapprox(pt1[1],pt2[1])
-    y = isapprox(pt1[2],pt2[2])
+    T = float(promote_type(typeof(pt1[1]), typeof(pt2[1]), typeof(pt1[2]), typeof(pt2[2])))
+    atol = sqrt(eps(T))
+    x = isapprox(pt1[1], pt2[1]; atol=atol)
+    y = isapprox(pt1[2], pt2[2]; atol=atol)
     return x && y
 end
 
@@ -86,10 +88,11 @@ function signed_angle(a,b)
 end
 
 function find_unique_elements(vector)    
-    u = [true for p in vector]
+    atol = sqrt(eps(float(eltype(vector))))
+    u = trues(length(vector))
     for i in 1:(length(vector)-1)
-        if isapprox(vector[i],vector[i+1])
-            vector[i] = false
+        if isapprox(vector[i], vector[i+1]; atol=atol)
+            u[i] = false
         end
     end
     return unique(vector[u])

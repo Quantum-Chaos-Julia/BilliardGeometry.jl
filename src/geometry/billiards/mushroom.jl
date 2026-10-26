@@ -26,4 +26,7 @@ function MushroomBilliard(half_width::T, stem_heigth::T=one(T); R=one(T), origin
     return MushroomBilliard{T}(CompositeDomain([circle_dom, triangle_dom, stem_dom]), symmetries)
 end
 
+MushroomBilliard(fundamental_domain::CompositeDomain, symmetries::SymmetryRegistry) =
+    MushroomBilliard{_domain_eltype(fundamental_domain)}(fundamental_domain, symmetries)
+
 

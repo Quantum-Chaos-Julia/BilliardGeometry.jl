@@ -6,8 +6,12 @@
 # and the two symmetry walls (segments 2, 3); RectangleBilliard(1.0, 0.6) with two physical edges (segments 1, 2) and two
 # symmetry walls (segments 3, 4); StadiumBilliard(1.0), a composite domain of two subdomains (ids 1, 2) joined by a
 # Transparent curve; AnnularBilliard(0.3, 0.1), a multiply connected domain of genus 1 with the outer circle first.
-# get_all_curves is only called on billiards and update_boundary_condition only on a simple-domain billiard. No eigen solves,
-# no pinned wavefunction values. Helper constants use the prefix `bt_`.
+# get_all_curves is called on billiards and on simple and composite domains (the CircleBilliard fundamental domain and the
+# StadiumBilliard fundamental domain, whose curve count is the sum over its subdomains). update_boundary_condition is called
+# on a simple-domain billiard (CircleBilliard) and on composite-domain billiards (StadiumBilliard with Float64 and Float32,
+# MushroomBilliard with three subdomains), where the result must keep the billiard type and its element type, change only the
+# targeted curve and leave the original billiard untouched. No eigen solves, no pinned wavefunction values. Helper functions
+# and constants use the prefix `bt_`.
 
 using StaticArrays: SVector
 
@@ -16,6 +20,20 @@ bt_circle() = CircleBilliard(1.0)
 bt_rect() = RectangleBilliard(1.0, 0.6)
 bt_stadium() = StadiumBilliard(1.0)
 bt_annulus() = AnnularBilliard(0.3, 0.1)
+
+# True if `updated` has the same curves (by domain and segment id, in the same order) as `original` and every curve other than
+# (domain_id, segment_id) keeps its boundary condition.
+function bt_other_bcs_unchanged(original, updated, domain_id, segment_id)
+    old = get_all_curves(original)
+    new = get_all_curves(updated)
+    length(old) == length(new) || return false
+    for (c_old, c_new) in zip(old, new)
+        (c_old.domain_id == c_new.domain_id && c_old.segment_id == c_new.segment_id) || return false
+        (c_old.domain_id == domain_id && c_old.segment_id == segment_id) && continue
+        c_old.bc == c_new.bc || return false
+    end
+    return true
+end
 
 @testset "boundary condition types" begin
     @test SpecularReflection() isa AbsBoundaryCondition
@@ -122,6 +140,28 @@ end
     @test count(c -> c.bc isa SpecularReflection, get_all_curves(rect)) == 2
 end
 
+@testset "get_all_curves (::AbsDomain)" begin
+    # G8: get_all_curves(domain) iterates the domain itself for a simple domain instead of wrapping it, MethodError on SimpleDomain
+    circle = bt_circle()
+    dom = circle.fundamental_domain
+    crvs = get_all_curves(dom)
+    @test crvs isa Vector{AbsCurve}
+    @test length(crvs) == 3
+    @test crvs == dom.boundary
+    @test crvs == get_all_curves(circle)
+
+    # G8: composite domain, the curves of all subdomains in subdomain order
+    stadium = bt_stadium()
+    cdom = stadium.fundamental_domain
+    crvs = get_all_curves(cdom)
+    @test crvs isa Vector{AbsCurve}
+    @test length(crvs) == sum(length(sd.boundary) for sd in cdom.subdomains)
+    @test length(crvs) == 7
+    @test crvs == vcat((sd.boundary for sd in cdom.subdomains)...)
+    @test crvs == get_all_curves(stadium)
+    @test [c.domain_id for c in crvs] == [1, 1, 1, 2, 2, 2, 2]
+end
+
 @testset "get_curve" begin
     circle = bt_circle()
     arc = get_curve(circle, 1, 1)
@@ -157,6 +197,74 @@ end
     @test get_curve(updated, 1, 3).bc == SymmetryWall(3, 2)
     @test get_curve(circle, 1, 2).bc == SymmetryWall(1, 2)
     @test length(get_boundary_curves(circle)) == 1
+end
+
+@testset "update_boundary_condition (StadiumBilliard)" begin
+    # G7: @set on a composite-domain billiard rebuilds it through a constructor that does not exist,
+    # MethodError: no constructor StadiumBilliard(::CompositeDomain, ::SymmetryRegistry)
+    stadium = bt_stadium()
+    updated = update_boundary_condition(stadium, 1, 1, QuantumSolverIgnore())
+    @test updated isa StadiumBilliard{Float64}
+    @test updated.symmetries == stadium.symmetries
+    @test length(updated.fundamental_domain.subdomains) == 2
+    # the target curve changed and kept its geometry
+    target = get_curve(updated, 1, 1)
+    @test target isa CircleSegment
+    @test target.bc isa QuantumSolverIgnore
+    @test target.radius == 1.0
+    @test target.domain_id == 1 && target.segment_id == 1
+    # all other curves keep their conditions
+    @test bt_other_bcs_unchanged(stadium, updated, 1, 1)
+    @test get_curve(updated, 1, 2).bc == Transparent(2)
+    @test get_curve(updated, 2, 4).bc == Transparent(1)
+    # the original billiard is untouched
+    @test get_curve(stadium, 1, 1).bc isa SpecularReflection
+    @test length(get_boundary_curves(stadium)) == 2
+    @test length(get_boundary_curves(updated)) == 1
+
+    # a curve of the second subdomain: the Transparent joint becomes a specular wall
+    updated2 = update_boundary_condition(stadium, 2, 4, SpecularReflection())
+    @test updated2 isa StadiumBilliard{Float64}
+    @test get_curve(updated2, 2, 4).bc isa SpecularReflection
+    @test bt_other_bcs_unchanged(stadium, updated2, 2, 4)
+    @test get_curve(stadium, 2, 4).bc == Transparent(1)
+
+    # G7: the element type is preserved
+    stadium32 = StadiumBilliard(1.0f0)
+    updated32 = update_boundary_condition(stadium32, 1, 1, QuantumSolverIgnore())
+    @test updated32 isa StadiumBilliard{Float32}
+    @test get_curve(updated32, 1, 1).bc isa QuantumSolverIgnore
+    @test get_curve(updated32, 1, 1).radius isa Float32
+    @test bt_other_bcs_unchanged(stadium32, updated32, 1, 1)
+    @test get_curve(stadium32, 1, 1).bc isa SpecularReflection
+end
+
+@testset "update_boundary_condition (MushroomBilliard)" begin
+    # G7: same MethodError as for the stadium, a composite domain with three subdomains (cap circle, triangle, stem)
+    mushroom = MushroomBilliard(1.0)
+    updated = update_boundary_condition(mushroom, 1, 1, QuantumSolverIgnore())
+    @test updated isa MushroomBilliard{Float64}
+    @test updated.symmetries == mushroom.symmetries
+    @test length(updated.fundamental_domain.subdomains) == 3
+    @test get_curve(updated, 1, 1) isa LineSegment
+    @test get_curve(updated, 1, 1).bc isa QuantumSolverIgnore
+    @test bt_other_bcs_unchanged(mushroom, updated, 1, 1)
+    @test get_curve(updated, 1, 3).bc == Transparent(2)
+    # the original billiard is untouched
+    @test get_curve(mushroom, 1, 1).bc isa SpecularReflection
+
+    # a curve of the third subdomain (stem bottom, segment 2)
+    updated3 = update_boundary_condition(mushroom, 3, 2, QuantumSolverIgnore())
+    @test updated3 isa MushroomBilliard{Float64}
+    @test get_curve(updated3, 3, 2).bc isa QuantumSolverIgnore
+    @test bt_other_bcs_unchanged(mushroom, updated3, 3, 2)
+    @test get_curve(mushroom, 3, 2).bc isa SpecularReflection
+
+    # G7: the element type is preserved
+    mushroom32 = MushroomBilliard(1.0f0)
+    updated32 = update_boundary_condition(mushroom32, 1, 1, QuantumSolverIgnore())
+    @test updated32 isa MushroomBilliard{Float32}
+    @test get_curve(updated32, 1, 1).bc isa QuantumSolverIgnore
 end
 
 @testset "genus" begin

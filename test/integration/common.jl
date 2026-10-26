@@ -7,22 +7,22 @@ using StaticArrays: SVector
 
 # --- tolerances -------------------------------------------------------------------------------------------------------
 
-# Maximum gap between the end of a curve and the start of the next one in a reconstructed boundary loop (PROVISIONAL)
-const CLOSURE_ATOL = 1e-6
-# Absolute error of a total boundary length against its analytic value (PROVISIONAL)
-const PERIMETER_ATOL = 1e-6
-# Absolute error of the shoelace area of a densely sampled boundary against its analytic value (PROVISIONAL)
-const AREA_ATOL_SHOELACE = 1e-3
-# Distance between a boundary node mapped by a symmetry and the node the orbit map assigns to it (PROVISIONAL)
-const ORBIT_ATOL = 1e-6
-# Distance between a point of a polar-curve image and the radial function of its source curve (PROVISIONAL)
-const POLAR_IMAGE_ATOL = 1e-6
-# Slack of the Poincare-Birkhoff coordinate s around the window [(k - 1) L, k L] of its sector (PROVISIONAL)
-const PB_WINDOW_ATOL = 1e-6
-# Difference between s of a sector image and the cumulative length of the full boundary at that image (PROVISIONAL)
-const PB_ARCLENGTH_ATOL = 1e-6
-# Difference between pb_sectors and the cumulative curve lengths of the full boundary (PROVISIONAL)
-const PB_SECTOR_ATOL = 1e-6
+# Gap between the end of a curve and the start of the next one in a reconstructed boundary loop
+const CLOSURE_ATOL = 1e-12            # full-boundary closure (worst observed 8.6e-16, C3Billiard)
+# Absolute error of a total boundary length against its analytic value
+const PERIMETER_ATOL = 1e-12          # full-boundary perimeter (worst observed 7.1e-15, C3Billiard against independent quadrature)
+# Absolute error of the shoelace area (500 points per curve) against the analytic area
+const AREA_ATOL_SHOELACE = 1e-4       # full-boundary area (worst observed 8.6e-6, C3Billiard; 5.2e-6 StadiumBilliard and CircleBilliard)
+# Distance between a boundary node mapped by a symmetry and the node assigned to it by the index permutation or orbit map
+const ORBIT_ATOL = 1e-12              # node permutations and orbit maps (worst observed 1.8e-15, C3Billiard)
+# Distance between a point of a polar-curve image and the radial function of its source curve
+const POLAR_IMAGE_ATOL = 1e-12        # polar D2 images (worst observed 2.2e-16)
+# Slack of the Poincare-Birkhoff coordinate s around the window [(k - 1) L, k L] of its sector
+const PB_WINDOW_ATOL = 1e-12          # pb_coords window (worst observed 0.0, exactly inside; floored at 1e-12)
+# Difference between s of a sector image and the cumulative length of the full boundary at that image
+const PB_ARCLENGTH_ATOL = 1e-10       # pb_coords against full-boundary arc length (worst observed 4.2e-15, C3Billiard; quadrature based)
+# Difference between pb_sectors and the cumulative curve lengths of the full boundary
+const PB_SECTOR_ATOL = 1e-12          # pb_sectors breakpoints (worst observed 8.9e-16, C3Billiard)
 
 # --- reference helpers ------------------------------------------------------------------------------------------------
 
