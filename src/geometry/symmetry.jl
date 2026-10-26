@@ -170,6 +170,7 @@ function apply_symmetry_pb(sym::AbsSymmetry, sym_sector::Int64, s::T, p::T, L::T
     else
         return k*L + s, p
     end
+    throw(ArgumentError("sym_sector must be in 1:4; received $sym_sector"))
 end
 
 """
