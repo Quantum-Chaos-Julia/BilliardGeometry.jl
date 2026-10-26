@@ -1,3 +1,10 @@
+"""
+    is_inside(billiard::AbsBilliard, pt::SVector{2}) → flag::Bool
+    is_inside(billiard::AbsBilliard, pts::AbstractArray) → flags::Vector{Bool}
+
+`true` when `pt` lies in the fundamental domain of `billiard`, i.e. inside at
+least one of its simple domains. Points are in the fundamental frame.
+"""
 function is_inside(billiard::B, pt::SVector{2,T}) where {B<:AbsBilliard, T<:Real}
     return _is_inside_domain(billiard.fundamental_domain, pt)
 end
@@ -26,6 +33,16 @@ function is_inside(domain::AbsMultiplyConnectedDomain, pts::AbstractArray)
 end
 
 
+"""
+    is_inside(domain::AbsDomain, pt::SVector{2}) → flags::Vector{Bool}
+    is_inside(domain::AbsDomain, pts::AbstractArray) → flags::Matrix{Bool}
+
+For a simple `domain`, test `pt` against each curve of `domain.boundary`:
+`flags[i]` is `true` when `pt` is on the inner side of the `i`-th curve
+according to [`is_inside`](@ref) for curves. For an array of points the
+result has one column per curve. A point is in the domain when all flags are
+`true`; composite domains are handled by the billiard method.
+"""
 function is_inside(domain::D, pt::SVector{2,T}) where {D<:AbsDomain, T<:Real}
     d = [is_inside(crv, pt) for crv in domain.boundary]
     return d
@@ -38,6 +55,13 @@ end
 
 
 #check if points inside for general curves
+"""
+    is_inside(crv::AbsCurve, pt::SVector{2}) → flag::Bool
+    is_inside(crv::AbsCurve, pts::AbstractArray) → flags::Vector{Bool}
+
+`true` when [`domain_fun`](@ref)`(crv, pt) ≤ 0`, i.e. `pt` is on the inner side
+of the curve (or on it).
+"""
 function is_inside(curve::C, pt::SVector{2,T}) where {C<:AbsCurve, T<:Real}
     return domain_fun(curve, pt) .<= zero(eltype(pt)) 
 end
@@ -50,6 +74,14 @@ function is_inside(curve::C, pts::AbstractArray) where {C<:AbsCurve}
 end
 
 #gradient of domain_function gives normal direcrion
+"""
+    domain_gradient_vector(crv::AbsCurve, pt::SVector{2}) → g::SVector{2}
+    domain_gradient_vector(crv::AbsCurve, pts::AbstractArray) → gs::Vector
+
+Gradient of [`domain_fun`](@ref) with respect to the point, computed by
+automatic differentiation. Since `domain_fun` increases away from the interior,
+it points along the outward normal of the curve.
+"""
 function domain_gradient_vector(curve::C, pt::SVector{2,T}) where {C<:AbsCurve, T<:Real}
     f(r) = domain_fun(curve, r)
     g = ForwardDiff.gradient(f, pt)

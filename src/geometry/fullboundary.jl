@@ -24,9 +24,13 @@
 # order with no per-curve reversal.
 ################################################################################
 
-# `true` for the pure (orientation-reversing) reflections, `false` for
-# symmetries that preserve boundary traversal direction (π-rotations,
-# N-fold rotations).
+"""
+    orientation_reversing(sym::AbsSymmetry) → flag::Bool
+
+`true` for the pure reflections, which reverse the sense of boundary traversal,
+and `false` for the symmetries that preserve it: [`XYAxisReflection`](@ref) (a
+π rotation) and [`NFoldRotation`](@ref).
+"""
 orientation_reversing(::XAxisReflection) = true
 orientation_reversing(::YAxisReflection) = true
 orientation_reversing(::DiagonalReflection) = true

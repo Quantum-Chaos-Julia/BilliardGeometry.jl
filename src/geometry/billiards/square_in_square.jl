@@ -1,8 +1,37 @@
+"""
+    SquareWithinSquareBilliard{T} <: AbsBilliard
+
+Square `[-a,a] × [-a,a]` containing square obstacles centered on the diagonal
+`y = x`. The system is symmetric under reflection about the diagonal, so the
+fundamental domain is the triangle below the diagonal, with the obstacles cut
+by the diagonal appearing as notches bounded by [`SymmetryWall`](@ref) edges. The
+obstacle edges are [`LineSegment`](@ref)s with `orientation = -1` and
+`domain_id = i + 1`, `i` counting the obstacles from the lower left.
+
+## Attributes
+* `fundamental_domain::SimpleDomain{T}`: The triangle with the notches.
+* `symmetries::SymmetryRegistry`: The single [`DiagonalReflection`](@ref).
+"""
 struct SquareWithinSquareBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::SimpleDomain{T}
     symmetries::SymmetryRegistry
 end
 
+"""
+    SquareWithinSquareBilliard(a = 1; positions = [-a/2, a/2], sizes = fill(a/4, 2)) → billiard::SquareWithinSquareBilliard
+
+Construct a [`SquareWithinSquareBilliard`](@ref).
+
+## Arguments
+* `a`: Half side length of the outer square, must be positive.
+
+## Keyword arguments
+* `positions` : Coordinate `d` of the center `(d, d)` of each obstacle on the diagonal.
+* `sizes` : Side length of each obstacle, positive and of the same length as `positions`.
+
+## Throws
+`ArgumentError` if the lengths differ, a size is not positive, an obstacle does not lie strictly inside the outer square, or two obstacles overlap or touch.
+"""
 function SquareWithinSquareBilliard(a::T=one(T); positions::AbstractVector{<:Real}=T[-a/2,a/2], sizes::AbstractVector{<:Real}=fill(a/4,2)) where {T<:Real}
     a > zero(T) || throw(ArgumentError("a must be positive; received $a"))
     length(positions) == length(sizes) || throw(ArgumentError("positions and sizes must have the same length"))

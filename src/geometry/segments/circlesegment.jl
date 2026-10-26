@@ -5,6 +5,29 @@ end
 
 circle_domain(R, center, x, y) = @. hypot(y-center[2],x-center[1]) - R
 
+"""
+    CircleSegment{T,BC} <: AbsCurve{BC}
+
+Circular arc `r(t) = center + radius*(cos φ, sin φ)` with `φ = shift_angle +
+arc_angle*t`, `t ∈ [0,1]`.
+
+## Description
+A negative `arc_angle` traverses the arc clockwise. [`domain_fun`](@ref) is
+`|pt - center| - radius` times `orientation`, so with `orientation = 1` the
+inside is the disk and with `orientation = -1` the exterior of the circle (an
+obstacle).
+
+## Attributes
+* `radius::T`: Radius.
+* `arc_angle::T`: Signed angle swept by the arc, `2π` for a full circle.
+* `shift_angle::T`: Polar angle of the start point.
+* `center::SVector{2,T}`: Center of the circle.
+* `orientation::Int64`: `+1` or `-1`, selects the inside.
+* `length::T`: Arc length `radius*|arc_angle|`.
+* `bc::BC`: Boundary condition, see [`AbsBoundaryCondition`](@ref).
+* `domain_id::Int64`: Id of the domain the segment belongs to.
+* `segment_id::Int64`: Id of the segment inside its domain.
+"""
 struct CircleSegment{T,BC}  <: AbsCurve{BC} where {T<:Real}
     radius::T
     arc_angle::T
@@ -17,6 +40,26 @@ struct CircleSegment{T,BC}  <: AbsCurve{BC} where {T<:Real}
     segment_id::Int64
 end
 
+"""
+    CircleSegment(R, arc_angle, shift_angle, center; bc = SpecularReflection(), orientation = 1, domain_id = 1, segment_id = 1) → arc::CircleSegment
+    CircleSegment(R, arc_angle, shift_angle, x0, y0; bc = SpecularReflection(), orientation = 1, domain_id = 1, segment_id = 1) → arc::CircleSegment
+
+Construct a [`CircleSegment`](@ref) with the center given as a 2-element vector
+or as the coordinates `x0`, `y0`. The numeric type is the promotion of all
+numeric arguments.
+
+## Arguments
+* `R`: Radius.
+* `arc_angle`: Signed angle swept by the arc.
+* `shift_angle`: Polar angle of the start point.
+* `center`, `x0`, `y0`: Center of the circle.
+
+## Keyword arguments
+* `bc = SpecularReflection()` : Boundary condition.
+* `orientation = 1` : `+1` or `-1`, selects the inside.
+* `domain_id = 1` : Id of the domain the segment belongs to.
+* `segment_id = 1` : Id of the segment inside its domain.
+"""
 function CircleSegment(R, arc_angle, shift_angle, center; bc = SpecularReflection(), orientation = 1, domain_id=1, segment_id=1)
     T = promote_type(typeof(R), typeof(arc_angle), typeof(shift_angle), eltype(center))
     center = SVector{2,T}(center)

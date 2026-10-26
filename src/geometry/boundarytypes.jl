@@ -1,23 +1,49 @@
+"""
+    SpecularReflection <: AbsBoundaryCondition
+
+Physical hard wall: a billiard trajectory is specularly reflected. Only curves
+with this boundary condition are returned by [`get_boundary_curves`](@ref) and
+are discretized by boundary solvers. It is the default `bc` of every curve.
+"""
 struct SpecularReflection <:AbsBoundaryCondition end
 
+"""
+    Transparent(next_id) <: AbsBoundaryCondition
+
+Internal join between two subdomains of an [`AbsCompositeDomain`](@ref); not a
+physical wall.
+
+## Attributes
+* `next_id::Int64`: `id` of the neighbouring subdomain across the curve.
+"""
 struct Transparent <:AbsBoundaryCondition
     next_id::Int64
 end
 
+"""
+    PeriodicX(next_id) <: AbsBoundaryCondition
+
+Periodic boundary condition in the `x` direction, linking the curve to the
+subdomain `next_id`. No billiard of this package uses it and the geometry
+routines treat it like any non-physical exterior curve: it is excluded from
+[`get_boundary_curves`](@ref) and kept by [`geometric_boundary_components`](@ref).
+
+## Attributes
+* `next_id::Int64`: `id` of the subdomain the curve is linked to.
+"""
 struct PeriodicX <:AbsBoundaryCondition
     next_id::Int64
 end
 
 """
-SymmetryWall <: AbsBoundaryCondition
+    SymmetryWall(sym_id, sector_id) <: AbsBoundaryCondition
 
 Boundary condition marking a curve as a symmetry wall: crossing it
 corresponds to applying the billiard's registered symmetry generator
-identified by `sym_id` (see [`SymmetryRegistry`](@ref)/
+identified by `sym_id` (see [`SymmetryRegistry`](@ref),
 [`register_symmetries`](@ref)), landing in the neighboring fundamental-domain
-copy `sector_id`. Covers both reflection walls and rotation wedge cuts
-(`AbsRotation` generators), which previously had no dedicated boundary
-condition at all.
+copy `sector_id`. It covers both reflection walls and the cuts of a rotational
+wedge ([`AbsRotation`](@ref) generators).
 
 ## Attributes
 * `sym_id::Int64`: `sym_id` of the billiard's registered symmetry generator this wall corresponds to.
@@ -28,6 +54,14 @@ struct SymmetryWall <:AbsBoundaryCondition
     sector_id::Int64
 end
 
+"""
+    QuantumSolverIgnore <: AbsBoundaryCondition
+
+Marks a virtual edge: the curve is part of the boundary geometry but is
+excluded from [`get_boundary_curves`](@ref), so solvers do not impose a wall
+condition on it. Used for instance for the unused edges of a
+[`TriangleBilliard`](@ref) when a basis is adapted to a single edge.
+"""
 struct QuantumSolverIgnore <:AbsBoundaryCondition end
 
 # Shared body of get_boundary_curves(::AbsSimpleDomain): filters the flat
@@ -43,6 +77,15 @@ function get_boundary_curves(domain::D) where D<:AbsSimpleDomain
     return _connected_physical_curves(domain.boundary)
 end
 
+"""
+    get_boundary_curves(domain::AbsSimpleDomain) → curves::Vector{AbsCurve}
+    get_boundary_curves(domain::AbsCompositeDomain) → curves::Vector{AbsCurve}
+
+Physical ([`SpecularReflection`](@ref)) curves of `domain`, reordered into
+contiguous runs by [`connect_curves`](@ref). For a composite domain the physical
+curves of all subdomains are collected first, so [`Transparent`](@ref) joins and
+[`SymmetryWall`](@ref) cuts are excluded.
+"""
 function get_boundary_curves(composite_domain::D) where D<:AbsCompositeDomain
     boundary = Vector{AbsCurve}()
     for domain in composite_domain.subdomains
@@ -134,6 +177,12 @@ function get_all_domains(domain::AbsMultiplyConnectedDomain)
 end
 get_all_domains(billiard::B) where B<:AbsBilliard = get_all_domains(billiard.fundamental_domain)
 
+"""
+    get_domain(billiard::AbsBilliard, id) → domain::AbsSimpleDomain
+
+Simple domain of `billiard` whose `id` equals `id`, searched among
+[`get_all_domains`](@ref). Returns `nothing` if there is none.
+"""
 function get_domain(billiard::B, id) where B<:AbsBilliard
     domains = get_all_domains(billiard)
     for dom in domains
@@ -143,6 +192,13 @@ function get_domain(billiard::B, id) where B<:AbsBilliard
     end
 end
 
+"""
+    get_all_curves(billiard::AbsBilliard) → curves::Vector{AbsCurve}
+    get_all_curves(domain::AbsDomain) → curves::Vector{AbsCurve}
+
+Every curve of the `boundary` of every simple domain returned by
+[`get_all_domains`](@ref), whatever its boundary condition, in domain order.
+"""
 function get_all_curves(billiard::B) where B<:AbsBilliard
     subdomains = get_all_domains(billiard)
     curves = Vector{AbsCurve}()
@@ -160,6 +216,13 @@ function get_all_curves(domain::D) where D<:AbsDomain
     return curves
 end
 
+"""
+    get_curve(billiard::AbsBilliard, domain_id, segment_id) → crv::AbsCurve
+    get_curve(composite_curve::AbsCompositeCurve, domain_id, segment_id) → crv::AbsCurve
+
+Curve identified by the pair `(domain_id, segment_id)`, as stored in the curve
+fields of the same names. Returns `nothing` if there is no such curve.
+"""
 function get_curve(billiard::B, domain_id, segment_id) where B<:AbsBilliard
     curves = get_all_curves(billiard)
     for crv in curves
@@ -210,6 +273,24 @@ function _set_curve_bc(domain::AbsMultiplyConnectedDomain, domain_id, segment_id
     return nothing
 end
 
+"""
+    update_boundary_condition(billiard::AbsBilliard, domain_id, segment_id, bc::AbsBoundaryCondition) → billiard′::AbsBilliard
+
+Return a copy of `billiard` in which the curve identified by `(domain_id,
+segment_id)` has boundary condition `bc`. The input billiard is not modified.
+
+## Arguments
+* `billiard`: Billiard to be updated.
+* `domain_id`: `domain_id` of the curve.
+* `segment_id`: `segment_id` of the curve.
+* `bc`: New boundary condition.
+
+## Returns
+* `billiard′`: Billiard with the replaced boundary condition.
+
+## Throws
+`ArgumentError` for a [`MultiplyConnectedDomain`](@ref) when no curve has the given identifiers.
+"""
 function update_boundary_condition(billiard::B, domain_id, segment_id, bc::BC) where {B<:AbsBilliard, BC<:AbsBoundaryCondition}
     fundamental_domain = billiard.fundamental_domain
 
@@ -259,7 +340,7 @@ one vector per connected component (outer boundary first, then each hole for
 ## Description
 For [`AbsSimpleDomain`](@ref)/[`AbsCompositeDomain`](@ref) (genus `0`), this is
 a single-element vector containing [`get_boundary_curves`](@ref)'s result. For
-For [`AbsMultiplyConnectedDomain`](@ref), the first component is the outer
+[`AbsMultiplyConnectedDomain`](@ref), the first component is the outer
 boundary (all subdomain physical curves, connected, fundamental frame) and is
 followed by one component per hole loop (full frame, hole region on the left),
 see [`boundary_component_is_hole`](@ref).

@@ -29,12 +29,30 @@ end
 
 _domain_eltype(h::DomainHole) = _domain_eltype(h.domain)
 
+"""
+    hole_domains(hole::AbsDomainHole) → domains::Vector{AbsDomain}
+
+Domains making up the region of `hole`; for a [`DomainHole`](@ref) the single wrapped domain.
+"""
 hole_domains(h::DomainHole) = AbsDomain[h.domain]
+
+"""
+    hole_leaves(hole::AbsDomainHole) → leaves::Vector{AbsDomainHole}
+
+Elementary holes `hole` is composed of; a [`DomainHole`](@ref) is its own single leaf.
+"""
 hole_leaves(h::DomainHole) = AbsDomainHole[h]
 get_all_domains(h::DomainHole) = get_all_domains(h.domain)
 get_all_curves(h::DomainHole) = get_all_curves(h.domain)
 get_boundary_curves(h::DomainHole) = get_boundary_curves(h.domain)
 boundary_components(h::DomainHole) = _split_closed_loops(get_boundary_curves(h.domain))
+
+"""
+    hole_loop_count(hole::AbsDomainHole) → n::Int
+
+Number of closed boundary loops of `hole`, each traversed with the hole region
+on its left. Their sum over all holes is the [`genus`](@ref) of the domain.
+"""
 hole_loop_count(h::DomainHole) = length(boundary_components(h))
 
 function _set_curve_bc(h::DomainHole, domain_id, segment_id, bc::AbsBoundaryCondition)

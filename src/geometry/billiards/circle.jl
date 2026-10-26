@@ -1,9 +1,30 @@
-#circular billiard, D2 symmetry (quadrant fundamental domain)
+"""
+    CircleBilliard{T} <: AbsBilliard
+
+Circular billiard. The fundamental domain is the first quadrant, bounded by a
+quarter arc and two [`SymmetryWall`](@ref) radii, with the `D₂` symmetry group
+of [`D2_symmetry`](@ref).
+
+## Attributes
+* `fundamental_domain::SimpleDomain{T}`: The quarter disk.
+* `symmetries::SymmetryRegistry`: Reflections `YAxisReflection`, `XYAxisReflection`, `XAxisReflection` with `sym_id` `1, 2, 3`.
+"""
 struct CircleBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::SimpleDomain{T}
     symmetries::SymmetryRegistry
 end
 
+"""
+    CircleBilliard(R = 1.0; center = (0,0)) → billiard::CircleBilliard
+
+Construct a [`CircleBilliard`](@ref) of radius `R`.
+
+## Keyword arguments
+* `center` : Center of the circle; must be the origin because the reflections are about the coordinate axes.
+
+## Throws
+`ArgumentError` if `center` is not `(0,0)`.
+"""
 function CircleBilliard(R::T=1.0; center=SVector{2,T}(zero(T),zero(T))) where T<:Real
     c = SVector{2,T}(center)
     (iszero(c[1]) && iszero(c[2])) || throw(ArgumentError("D2 symmetry requires center == (0,0); received center=$c"))

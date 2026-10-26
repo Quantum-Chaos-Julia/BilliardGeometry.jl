@@ -1,22 +1,28 @@
 """
+    tangent(crv::AbsCurve, t::Real) → dr::SVector{2}
     tangent(crv::AbsCurve, ts::AbstractArray) → dr::Vector
 
-Evaluate the first parameter derivative `dr/dt` of `crv` at every parameter
+First parameter derivative `dr/dt` of `crv` at one parameter value or at every
 value in `ts`. This is a derivative with respect to the curve parameter `t`,
 not a normalized unit tangent and not a derivative with respect to arclength.
 
-Falls back to broadcasting the scalar-argument method; concrete curve types
-implement `tangent(crv, t::Real)`.
+## Description
+The generic scalar method differentiates [`curve`](@ref) with `ForwardDiff`.
+Analytic methods exist for [`LineSegment`](@ref), [`CircleSegment`](@ref) and
+[`FourierCoeffPolarSegment`](@ref).
 """
 function tangent(crv::AbsCurve, ts::AbstractArray{<:Real})
     return [tangent(crv, t) for t in ts]
 end
 
 """
+    tangent_2(crv::AbsCurve, t::Real) → ddr::SVector{2}
     tangent_2(crv::AbsCurve, ts::AbstractArray) → ddr::Vector
 
-Evaluate the second parameter derivative `d²r/dt²` of `crv` at every parameter
-value in `ts`. Falls back to broadcasting the scalar-argument method.
+Second parameter derivative `d²r/dt²` of `crv` at one parameter value or at
+every value in `ts`. Analytic for [`LineSegment`](@ref), [`CircleSegment`](@ref)
+and [`FourierCoeffPolarSegment`](@ref); obtained with nested `ForwardDiff` calls
+for [`PolarSegment`](@ref).
 """
 function tangent_2(crv::AbsCurve, ts::AbstractArray{<:Real})
     return [tangent_2(crv, t) for t in ts]

@@ -1,9 +1,34 @@
-#smooth star-shaped billiard r(phi) = R + a*cos(n*phi), n-fold rotational symmetry
+"""
+    StarBilliard{T} <: AbsBilliard
+
+Smooth star-shaped billiard `r(φ) = R + a*cos(nφ)` with `n`-fold rotational
+symmetry. The fundamental domain is the sector `0 ≤ φ ≤ 2π/n` bounded by the
+boundary arc and two [`SymmetryWall`](@ref) radii. Only the `n-1` nontrivial
+rotations of [`Cn_symmetry`](@ref) are registered, no reflections, to avoid
+duplicated curves in [`full_boundary`](@ref).
+
+## Attributes
+* `fundamental_domain::SimpleDomain{T}`: The sector.
+* `symmetries::SymmetryRegistry`: Rotations by `2πm/n`, `m = 1, ..., n-1`, with `sym_id = m`.
+"""
 struct StarBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::SimpleDomain{T}
     symmetries::SymmetryRegistry
 end
 
+"""
+    StarBilliard(R, a, n; center = (0,0)) → billiard::StarBilliard
+
+Construct a [`StarBilliard`](@ref).
+
+## Arguments
+* `R`: Mean radius, must satisfy `R > |a|` so that `r(φ) > 0`.
+* `a`: Amplitude of the modulation.
+* `n`: Order of the rotational symmetry, `n ≥ 2`.
+
+## Keyword arguments
+* `center` : Must be the origin, since [`NFoldRotation`](@ref) rotates about the origin.
+"""
 function StarBilliard(R::T, a::T, n::Int; center=SVector{2,T}(zero(T),zero(T))) where T<:Real
     n >= 2 || throw(ArgumentError("n must satisfy n>=2; received n=$n"))
     R > abs(a) || throw(ArgumentError("Require R>|a| so r(phi)>0; received R=$R, a=$a"))

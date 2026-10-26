@@ -1,9 +1,25 @@
-#rectangle billiard 2a x 2b, D2 symmetry (first-quadrant fundamental domain)
+"""
+    RectangleBilliard{T} <: AbsBilliard
+
+Rectangle `[-a,a] × [-b,b]` of size `2a × 2b`. The fundamental domain is the
+first quadrant `[0,a] × [0,b]` with the `D₂` symmetry group of
+[`D2_symmetry`](@ref).
+
+## Attributes
+* `fundamental_domain::SimpleDomain{T}`: The quadrant, with two physical edges and two [`SymmetryWall`](@ref) edges.
+* `symmetries::SymmetryRegistry`: Reflections `YAxisReflection`, `XYAxisReflection`, `XAxisReflection` with `sym_id` `1, 2, 3`.
+"""
 struct RectangleBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::SimpleDomain{T}
     symmetries::SymmetryRegistry
 end
 
+"""
+    RectangleBilliard(a = 1, b = 1; center = (0,0)) → billiard::RectangleBilliard
+
+Construct a [`RectangleBilliard`](@ref) with half-widths `a` along `x` and `b`
+along `y`. The `center` must be the origin.
+"""
 function RectangleBilliard(a::T=1.0, b::T=1.0; center=SVector{2,T}(zero(T),zero(T))) where T<:Real
     c = SVector{2,T}(center)
     (iszero(c[1]) && iszero(c[2])) || throw(ArgumentError("D2 symmetry requires center == (0,0); received center=$c"))

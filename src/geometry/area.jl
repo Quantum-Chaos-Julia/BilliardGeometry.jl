@@ -95,9 +95,17 @@ function _billiard_area(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliar
     return area(outer; kwargs...) - sum(area(h; kwargs...) for h in domain.holes; init=zero(_billiard_eltype(billiard)))
 end
 
-# How many-fold a discrete symmetry divides the physical area onto the
-# fundamental domain (used to estimate the fundamental-domain area below,
-# without needing a separate field on the billiard struct).
+"""
+    symmetry_reduction_factor(sym::AbsSymmetry) → n::Int
+    symmetry_reduction_factor(billiard::AbsBilliard) → n::Int
+
+Factor by which a discrete symmetry reduces the area of the billiard to that of
+its fundamental domain: `2` for a single reflection, `4` for
+[`XYAxisReflection`](@ref), the order for an [`NFoldRotation`](@ref). For a
+billiard it is the largest factor among its registered symmetries, `1` without
+symmetries. [`CompositeReflection`](@ref) is not reduced and returns `1`, which
+is a conservative value for Weyl-law windows.
+"""
 @inline symmetry_reduction_factor(::AbsSymmetry) = 1
 @inline symmetry_reduction_factor(::XAxisReflection) = 2
 @inline symmetry_reduction_factor(::YAxisReflection) = 2
@@ -105,9 +113,6 @@ end
 @inline symmetry_reduction_factor(::DiagonalReflection) = 2
 @inline symmetry_reduction_factor(::AntiDiagonalReflection) = 2
 @inline symmetry_reduction_factor(sym::NFoldRotation) = sym.order
-# Composite reflection's fundamental-domain reduction factor is not tracked
-# per-irrep here; only used as a Weyl-window size estimate in BeynSolver, so
-# a conservative (unreduced) factor of 1 never invalidates the windowing.
 @inline symmetry_reduction_factor(::CompositeReflection) = 1
 
 function maximal_symmetry(billiard::AbsBilliard)

@@ -143,6 +143,14 @@ requested grading order would push neighboring mapped nodes below
 `minsep_tol`, `q` is reduced (with a warning) until the minimum spacing
 requirement is met.
 
+## Arguments
+* `T`: Real scalar type of the nodes.
+* `N`: Number of nodes.
+
+## Keyword arguments
+* `q = 3` : Grading order, must exceed `1`; larger values cluster nodes more strongly at the corner.
+* `minsep_tol = 1e-12` : Minimum allowed spacing between mapped nodes.
+
 ## Returns
 * `σ`: uniform computational nodes.
 * `s`: graded physical parameter values `t(σ)`.
@@ -233,6 +241,15 @@ periodic parameter locations in `[0,2π)`; smooth joins must not be included).
 If `corners_in` is empty, returns the ungraded uniform periodic grid. As in
 [`kress_graded_nodes_data`](@ref), `q` is reduced with a warning if the
 requested grading pushes neighboring mapped nodes below `minsep_tol`.
+
+## Arguments
+* `T`: Real scalar type of the nodes.
+* `N`: Number of nodes.
+* `corners_in`: Corner locations in `[0,2π)`.
+
+## Keyword arguments
+* `q = 3` : Grading order, must exceed `1`.
+* `minsep_tol = 1e-12` : Minimum allowed spacing between mapped nodes.
 
 ## Returns
 * `σ`: uniform computational nodes.
