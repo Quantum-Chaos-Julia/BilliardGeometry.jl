@@ -1,7 +1,7 @@
 name = "BilliardGeometry"
 uuid = "944b2192-ee8e-4a70-bd94-055ac7d6d7d6"
 authors = ["Crt Lozej"]
-version = "1.0.0-DEV"
+version = "0.9.0"
 
 [deps]
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
