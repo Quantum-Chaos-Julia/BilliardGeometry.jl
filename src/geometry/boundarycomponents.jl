@@ -1,0 +1,197 @@
+"""
+    component_lengths(comp::Vector) → (lens, cum, Ltot)
+
+Computes the length of each curve segment in `comp`, the cumulative lengths
+`cum` (with `cum[1] = 0`), and the total component length `Ltot = cum[end]`.
+"""
+function component_lengths(comp::Vector)
+    lens = [crv.length for crv in comp]
+    cum = Vector{eltype(lens)}(undef, length(lens)+1)
+    cum[1] = zero(eltype(lens))
+    @inbounds for j in eachindex(lens)
+        cum[j+1] = cum[j] + lens[j]
+    end
+    return lens, cum, cum[end]
+end
+
+@inline function _unit_tangent_at_start(crv, ::Type{T}) where {T<:Real}
+    v = SVector{2,T}(tangent(crv, zero(T)))
+    return v/hypot(v[1], v[2])
+end
+
+@inline function _unit_tangent_at_end(crv, ::Type{T}) where {T<:Real}
+    v = SVector{2,T}(tangent(crv, one(T)))
+    return v/hypot(v[1], v[2])
+end
+
+"""
+    _junction_angle(cleft, cright, ::Type{T}) where {T<:Real} → angle::T
+
+Unsigned turning angle in `[0,π]` between the tangent leaving `cleft` and the
+tangent entering `cright`.
+"""
+@inline function _junction_angle(cleft, cright, ::Type{T}) where {T<:Real}
+    tL = _unit_tangent_at_end(cleft, T)
+    tR = _unit_tangent_at_start(cright, T)
+    cr = tL[1]*tR[2] - tL[2]*tR[1]
+    dt = clamp(tL[1]*tR[1] + tL[2]*tR[2], -one(T), one(T))
+    return atan(abs(cr), dt)
+end
+
+"""
+    _signed_junction_angle(cleft, cright, ::Type{T}) where {T<:Real} → angle::T
+
+Signed turning angle in `(-π,π]` from the tangent leaving `cleft` to the
+tangent entering `cright`, positive for a left turn.
+"""
+@inline function _signed_junction_angle(cleft, cright, ::Type{T}) where {T<:Real}
+    tL = _unit_tangent_at_end(cleft, T)
+    tR = _unit_tangent_at_start(cright, T)
+    cr = tL[1]*tR[2] - tL[2]*tR[1]
+    dt = clamp(tL[1]*tR[1] + tL[2]*tR[2], -one(T), one(T))
+    return atan(cr, dt)
+end
+
+"""
+    _is_true_corner(cleft, cright, ::Type{T}; angle_tol=T(1e-8)) where {T<:Real} → flag::Bool
+
+`true` when the junction between `cleft` and `cright` has a tangent
+discontinuity larger than `angle_tol`.
+"""
+@inline function _is_true_corner(cleft, cright, ::Type{T}; angle_tol=T(1e-8)) where {T<:Real}
+    return _junction_angle(cleft, cright, T) > angle_tol
+end
+
+"""
+    _component_corner_locations(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real} → corners::Vector{T}
+
+Locations of true corners of a composite boundary component in the global
+periodic parameter `σ ∈ [0,2π)`. Smooth joins are ignored. If the periodic
+seam between the final and first segments is a true corner, it is
+represented by `σ = 0`.
+"""
+function _component_corner_locations(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real}
+    _, cum, Ltot = component_lengths(comp)
+    corners = T[]
+    m = length(comp)
+    _is_true_corner(comp[end], comp[1], T; angle_tol=angle_tol) && push!(corners, zero(T))
+    @inbounds for j in 1:m-1
+        _is_true_corner(comp[j], comp[j+1], T; angle_tol=angle_tol) && push!(corners, T(2*pi)*cum[j+1]/Ltot)
+    end
+    return corners
+end
+
+"""
+    _component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real} → angles::Vector{T}
+
+Interior angles (`π` minus the tangent turning angle, i.e. the same
+convention as [`Polygon`](@ref)'s `angles` field) at every true corner of a
+composite boundary component `comp`, in the same traversal order as
+[`_component_corner_locations`](@ref) (periodic seam between the final and
+first segment checked first, if a true corner).
+"""
+function _component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8), hole::Bool=false) where {T<:Real}
+    hole && return _hole_component_corner_angles(T, comp; angle_tol=angle_tol)
+    angles = T[]
+    m = length(comp)
+    τ0 = _junction_angle(comp[end], comp[1], T)
+    τ0 > angle_tol && push!(angles, T(pi) - τ0)
+    @inbounds for j in 1:m-1
+        τ = _junction_angle(comp[j], comp[j+1], T)
+        τ > angle_tol && push!(angles, T(pi) - τ)
+    end
+    return angles
+end
+
+"""
+    _hole_component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real} → angles::Vector{T}
+
+Interior angles of the billiard region Ω at the corners of a hole loop
+traversed with the hole on the left: `π + τ` for the signed turning angle `τ`
+(a convex hole corner has Ω-angle larger than `π`). Same traversal order as
+[`_component_corner_angles`](@ref).
+"""
+function _hole_component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real}
+    angles = T[]
+    m = length(comp)
+    τ0 = _signed_junction_angle(comp[end], comp[1], T)
+    abs(τ0) > angle_tol && push!(angles, T(pi) + τ0)
+    @inbounds for j in 1:m-1
+        τ = _signed_junction_angle(comp[j], comp[j+1], T)
+        abs(τ) > angle_tol && push!(angles, T(pi) + τ)
+    end
+    return angles
+end
+
+"""
+    print_component_junctions(comp::Vector; T=Float64, angle_tol=1e-8)
+
+Prints diagnostic information (global periodic parameter, tangent
+discontinuity angle, corner classification) for every join of a composite
+boundary component.
+"""
+function print_component_junctions(comp::Vector; T=Float64, angle_tol=1e-8)
+    _, cum, Ltot = component_lengths(comp)
+    m = length(comp)
+    println("junction diagnostics:")
+    @inbounds for j in 1:m
+        jr = j == m ? 1 : j+1
+        σ = j == m ? zero(T) : T(2*pi)*cum[j+1]/Ltot
+        a = _junction_angle(comp[j], comp[jr], T)
+        flag = a > T(angle_tol) ? "TRUE CORNER" : "smooth join"
+        println("  $j -> $jr : σ = $σ, angle = $a, $flag")
+    end
+end
+
+"""
+    _global_t_to_segment_u(::Type{T}, comp::Vector, t::T) where {T<:Real} → (j::Int, u::T)
+
+Maps a global periodic component parameter `t ∈ [0,2π)` to the corresponding
+curve segment index `j` and local curve parameter `u ∈ [0,1]`, for a
+composite boundary component `comp` parametrized proportionally to arc
+length (used by [`_eval_composite_geom_global_t`](@ref) to evaluate a
+globally Kress-graded composite boundary).
+"""
+function _global_t_to_segment_u(::Type{T}, comp::Vector, t::T) where {T<:Real}
+    lens, cum, Ltot = component_lengths(comp)
+    twopi = T(2*pi)
+    s = (t/twopi)*Ltot
+    s >= Ltot && return 1, zero(T)
+    j = clamp(searchsortedlast(cum, s), 1, length(comp))
+    while j < length(comp) && s >= cum[j+1]
+        j += 1
+    end
+    slocal = s - cum[j]
+    u = lens[j] == zero(T) ? zero(T) : slocal/lens[j]
+    return j, clamp(u, zero(T), one(T))
+end
+
+"""
+    _eval_composite_geom_global_t(::Type{T}, comp::Vector, t::T) where {T<:Real} → (xy, γt, γtt)
+
+Evaluates a composite boundary component `comp` at the global periodic
+parameter `t ∈ [0,2π)`.
+
+## Description
+The global parameter is mapped to the active curve segment and its local
+parameter via [`_global_t_to_segment_u`](@ref); the local curve derivatives
+are then transformed to derivatives with respect to the global periodic
+parameter via the chain rule (`du/dt` constant on each segment).
+
+## Returns
+* `xy`: Boundary point.
+* `γt`: First derivative with respect to the global parameter.
+* `γtt`: Second derivative with respect to the global parameter.
+"""
+function _eval_composite_geom_global_t(::Type{T}, comp::Vector, t::T) where {T<:Real}
+    lens, _, Ltot = component_lengths(comp)
+    j, u = _global_t_to_segment_u(T, comp, t)
+    crv = comp[j]
+    xy = curve(crv, u)
+    du_dt = lens[j] == zero(T) ? zero(T) : Ltot/(T(2*pi)*lens[j])
+    γu = tangent(crv, u)
+    γuu = tangent_2(crv, u)
+    γt = γu*du_dt
+    γtt = γuu*du_dt^2
+    return xy, γt, γtt
+end
