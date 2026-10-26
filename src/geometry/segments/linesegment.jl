@@ -18,8 +18,9 @@ end
 
 #constructors
 function LineSegment(pt0, pt1; bc = SpecularReflection(), orientation = 1, domain_id=1, segment_id=1) 
-    pt0 = SVector{2,eltype(pt0)}(pt0)
-    pt1 = SVector{2,eltype(pt1)}(pt1)
+    T = promote_type(eltype(pt0), eltype(pt1))
+    pt0 = SVector{2,T}(pt0)
+    pt1 = SVector{2,T}(pt1)
     x, y = pt1 .- pt0        
     L = hypot(x,y)
     return LineSegment(pt0,pt1,orientation,L,bc, domain_id, segment_id)

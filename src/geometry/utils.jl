@@ -1,47 +1,66 @@
 
-export is_overlaping, is_connected, is_closed, angle, connect_curves, find_unique_elements, point_curve_parameter
-
 function is_overlaping(pt1, pt2)
-    x = isapprox(pt1[1],pt2[1])
-    y = isapprox(pt1[2],pt2[2])
+    T = float(promote_type(typeof(pt1[1]), typeof(pt2[1]), typeof(pt1[2]), typeof(pt2[2])))
+    atol = sqrt(eps(T))
+    x = isapprox(pt1[1], pt2[1]; atol=atol)
+    y = isapprox(pt1[2], pt2[2]; atol=atol)
     return x && y
 end
 
+#TODO: Let's test this function.
 function connect_curves(curves)
     if is_closed(curves)
         return curves
     end
-    connected_curves = Vector{AbsCurve}()
     remaining_curves = copy(curves)
-    push!(connected_curves, popfirst!(remaining_curves))
-    for i in 2:length(curves)
-        end_pt = curve(connected_curves[end],1.0)
-        N_remaining = length(remaining_curves)
-        for j in 1:N_remaining
-            start_pt = curve(remaining_curves[j],0.0)
-            if is_overlaping(end_pt, start_pt)
-                push!(connected_curves,splice!(remaining_curves,j))
-                break
+    chains = Vector{Vector{AbsCurve}}()
+    while !isempty(remaining_curves)
+        chain = Vector{AbsCurve}()
+        push!(chain, popfirst!(remaining_curves))
+        extended = true
+        while extended
+            extended = false
+            end_pt = curve(chain[end],1.0)
+            for j in eachindex(remaining_curves)
+                start_pt = curve(remaining_curves[j],0.0)
+                if is_overlaping(end_pt, start_pt)
+                    push!(chain, splice!(remaining_curves,j))
+                    extended = true
+                    break
+                end
             end
         end
+        push!(chains, chain)
     end
-    if length(remaining_curves) > 0
-        second_section = connect_curves(remaining_curves)
-        start_first, end_first = curve(connected_curves[1],0.0), curve(connected_curves[end],1.0)
-        start_second, end_second = curve(second_section[1],0.0), curve(second_section[end],1.0)
-        if is_overlaping(end_first, start_second)
-            append!(connected_curves,second_section)
-        elseif is_overlaping(end_second, start_first)
-            prepend!(connected_curves,second_section)
+    merged = true
+    while merged && length(chains) > 1
+        merged = false
+        for i in eachindex(chains)
+            end_pt = curve(chains[i][end], 1.0)
+            for j in eachindex(chains)
+                i == j && continue
+                start_pt = curve(chains[j][1], 0.0)
+                if is_overlaping(end_pt, start_pt)
+                    chains[i] = vcat(chains[i], chains[j])
+                    deleteat!(chains, j)
+                    merged = true
+                    break
+                end
+            end
+            merged && break
         end
+    end
+    connected_curves = Vector{AbsCurve}()
+    for chain in chains
+        append!(connected_curves, chain)
     end
     return connected_curves
 end
 
-function is_connected(boundary; start_intial = true)
+function is_connected(boundary; start_initial = true)
     start_pts = CircularArray([curve(crv,0.0) for crv in boundary])
     end_pts = CircularArray([curve(crv,1.0) for crv in boundary])    
-    if start_intial
+    if start_initial
         test = [is_overlaping(end_pts[i-1], start_pts[i]) for i in 1:length(start_pts)]
     else
         test = [is_overlaping(end_pts[i], start_pts[i+1]) for i in 1:length(start_pts)]
@@ -49,15 +68,15 @@ function is_connected(boundary; start_intial = true)
     return test
 end
 
-function is_closed(boundary; check_periodic=false,  start_intial = true)
+function is_closed(boundary; check_periodic=false,  start_initial = true)
     if check_periodic
-        return all(is_connected(boundary; start_intial))
+        return all(is_connected(boundary; start_initial=start_initial))
     end
 
-    if start_intial
-        return all(is_connected(boundary; start_intial)[2:end])
+    if start_initial
+        return all(is_connected(boundary; start_initial=start_initial)[2:end])
     else
-        return all(is_connected(boundary; start_intial)[1:end-1])
+        return all(is_connected(boundary; start_initial=start_initial)[1:end-1])
     end
 end 
 
@@ -69,15 +88,15 @@ function signed_angle(a,b)
 end
 
 function find_unique_elements(vector)    
-    u = [true for p in vector]
+    atol = sqrt(eps(float(eltype(vector))))
+    u = trues(length(vector))
     for i in 1:(length(vector)-1)
-        if isapprox(vector[i],vector[i+1])
-            vector[i] = false
+        if isapprox(vector[i], vector[i+1]; atol=atol)
+            u[i] = false
         end
     end
     return unique(vector[u])
 end
-
 
 function point_curve_parameter(crv::C, pt) where {C<:AbsCurve}
     inv_x(theta) = curve(crv,theta)[1] - pt[1] 

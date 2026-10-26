@@ -8,7 +8,7 @@ end
 
 function Polygon(corners, id; bcs = [SpecularReflection() for i in corners] )
     M = length(corners)
-    type = eltype(corners[1])
+    type = promote_type((eltype(c) for c in corners)...)
     corners  = [SVector{2,type}(c) for c in corners]
     boundary = Vector{AbsCurve}(undef,M)
     angles = Vector{type}(undef,M)
@@ -21,17 +21,3 @@ function Polygon(corners, id; bcs = [SpecularReflection() for i in corners] )
     end
     return Polygon(boundary,corners,angles,id)
 end
-
-#=
-function Polygon(corners, boundary_conditions, id)
-    type = eltype(corners[1])
-    corners  = [SVector{2,type}(c) for c in corners]
-    boundary = []
-    corners_1 = CircularArray(corners)
-    for i in 1:length(corners)
-        line = LineSegment(corners_1[i],corners_1[i+1];bc = boundary_conditions[i])
-        push!(boundary,line)
-    end
-    return Polygon(boundary,corners,id)
-end
-=#

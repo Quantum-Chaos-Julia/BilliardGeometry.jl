@@ -9,9 +9,14 @@ struct CompositeDomain <: AbsCompositeDomain
     subdomains::Vector{AbsSimpleDomain}
 end
 
-#generate new ids for the simple domains that make up the complex domain
+_domain_eltype(::SimpleDomain{T}) where T = T
+_domain_eltype(::Polygon{T}) where T = T
+_domain_eltype(::CircleWedge{T}) where T = T
+_domain_eltype(domain::CompositeDomain) = _domain_eltype(first(domain.subdomains))
+
 function reset_ids!(domain::AbsCompositeDomain)
     for (i, sd)  in enumerate(domain.subdomains)
-        @set sd.id = i
+        domain.subdomains[i] = @set sd.id = i
     end
+    return domain
 end
