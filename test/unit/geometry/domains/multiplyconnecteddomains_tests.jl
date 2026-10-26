@@ -175,9 +175,9 @@ end
     outer_curve, hole_curve = get_all_curves(ann)
     @test !is_hole_curve(ann, outer_curve)
     @test is_hole_curve(ann, hole_curve)
-    # without holes no curve is a hole curve, the orientation of the Sinai arc (-1) notwithstanding
+    # the Sinai circle is a hole curve, the four sides of its square are not
     sinai = SinaiBilliard(1.0, 0.3)
-    @test all(c -> !is_hole_curve(sinai, c), get_all_curves(sinai))
+    @test [is_hole_curve(sinai, c) for c in get_all_curves(sinai)] == [false, false, false, false, true]
     @test !is_hole_curve(mc_outer(), outer.boundary[1])
 end
 

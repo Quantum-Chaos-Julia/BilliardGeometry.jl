@@ -3,10 +3,9 @@
 # The N midpoint nodes of the complete boundary are sampled geometrically (uniform_boundary_samples, independent of the orbit
 # bookkeeping) and the orbit map is checked against the point maps of the symmetry: every orbit has exactly the expected
 # number of members, and the members are, up to ORBIT_ATOL, the base node and its images under the point maps. The cases are
-# X, Y, XY and CompositeReflection(X, Y) on the unit circle (D2), the rotation by 2 pi / 3 on the C3 billiard, the diagonal
-# reflection on the square within a square, and the anti-diagonal reflection on a circle whose angular origin is shifted by
-# -pi/4 (a circular PolarBilliard with the anti-diagonal reflection as its only registered symmetry, since no shipped billiard
-# registers it). A single order-2 reflection also gets the irrep character check: an explicit trailing character -1 gives the
+# X, Y, XY and CompositeReflection(X, Y) on the unit circle (D2), the rotation by 2 pi / 3 on the C3 billiard, and the diagonal and
+# anti-diagonal reflections on circles whose angular origin is shifted by +pi/4 and -pi/4 (circular PolarBilliards with that reflection
+# as their only registered symmetry, since no shipped billiard registers them). A single order-2 reflection also gets the irrep character check: an explicit trailing character -1 gives the
 # phase 1 on the fundamental nodes and -1 on their partners. Tolerances come from test/integration/common.jl.
 # No eigen solves, no pinned wavefunction values. Helper functions and constants use the prefix `om_`.
 
@@ -25,11 +24,11 @@ om_reflect_diagonal(p) = SVector(p[2], p[1])
 om_reflect_antidiagonal(p) = SVector(-p[2], -p[1])
 om_rotate(p, angle) = SVector(cos(angle) * p[1] - sin(angle) * p[2], sin(angle) * p[1] + cos(angle) * p[2])
 
-# Circle of unit radius whose angular origin is shifted by -pi/4, with the anti-diagonal reflection as the only symmetry.
-function om_antidiagonal_circle()
-    seg = FourierCoeffPolarSegment(Float64[]; shift_angle = -pi / 4)
+# Circle of unit radius whose angular origin is shifted by `shift`, with `sym` as the only registered symmetry.
+function om_shifted_circle(sym, shift)
+    seg = FourierCoeffPolarSegment(Float64[]; shift_angle = shift)
     dom = PolarDomain{Float64}([seg], [curve(seg, 0.0)], 1)
-    return PolarBilliard{Float64}(dom, register_symmetries(AntiDiagonalReflection()))
+    return PolarBilliard{Float64}(dom, register_symmetries(sym))
 end
 
 """
@@ -94,10 +93,10 @@ end
     om_check_orbit_map(C3Billiard(0.2), NFoldRotation(3, 1), om_N3, maps)
 end
 
-@testset "orbit maps (DiagonalReflection, SquareWithinSquareBilliard)" begin
-    om_check_orbit_map(SquareWithinSquareBilliard(1.0), DiagonalReflection(), om_N, [om_reflect_diagonal]; character = -1)
+@testset "orbit maps (DiagonalReflection, shifted circle)" begin
+    om_check_orbit_map(om_shifted_circle(DiagonalReflection(), pi / 4), DiagonalReflection(), om_N, [om_reflect_diagonal]; character = -1)
 end
 
 @testset "orbit maps (AntiDiagonalReflection, shifted circle)" begin
-    om_check_orbit_map(om_antidiagonal_circle(), AntiDiagonalReflection(), om_N, [om_reflect_antidiagonal]; character = -1)
+    om_check_orbit_map(om_shifted_circle(AntiDiagonalReflection(), -pi / 4), AntiDiagonalReflection(), om_N, [om_reflect_antidiagonal]; character = -1)
 end

@@ -1,18 +1,23 @@
 """
     SinaiBilliard{T} <: AbsBilliard
 
-Sinai billiard: the square `[-a,a] × [-a,a]` with a circular obstacle of radius
-`R` at the origin. The fundamental domain is the first quadrant of the square
-with the quarter disk removed, with the `D₂` symmetry group of
-[`D2_symmetry`](@ref). The obstacle arc is a [`CircleSegment`](@ref) with
-`orientation = -1` and `domain_id = 2`.
+Sinai billiard: the square `[-a,a] × [-a,a]` with a concentric circular
+obstacle of radius `R`.
+
+## Description
+The domain is multiply connected with genus `1`. No symmetry reduction is
+applied, so the fundamental domain is the full physical geometry. The outer
+region is a [`SimpleDomain`](@ref) holding the four sides of the square
+traversed counterclockwise with `domain_id = 1`; the obstacle is a
+[`DomainHole`](@ref) with a full counterclockwise [`CircleSegment`](@ref) with
+`domain_id = 2`, i.e. traversed with the hole region on its left.
 
 ## Attributes
-* `fundamental_domain::SimpleDomain{T}`: The quadrant with the obstacle cut out.
-* `symmetries::SymmetryRegistry`: Reflections `YAxisReflection`, `XYAxisReflection`, `XAxisReflection` with `sym_id` `1, 2, 3`.
+* `fundamental_domain::MultiplyConnectedDomain{T}`: Square with the circular hole.
+* `symmetries::SymmetryRegistry`: Empty registry.
 """
 struct SinaiBilliard{T} <: AbsBilliard where T<:Real
-    fundamental_domain::SimpleDomain{T}
+    fundamental_domain::MultiplyConnectedDomain{T}
     symmetries::SymmetryRegistry
 end
 
@@ -26,28 +31,27 @@ Construct a [`SinaiBilliard`](@ref).
 * `R`: Radius of the obstacle, `0 < R < a`.
 
 ## Keyword arguments
-* `center` : Center of the square and obstacle; must be the origin.
+* `center` : Center of the square and of the obstacle.
 
 ## Throws
-`ArgumentError` for non-positive `a` or `R`, `R ≥ a`, or a nonzero `center`.
+`ArgumentError` for non-positive `a` or `R`, or `R ≥ a`.
 """
 function SinaiBilliard(a::T, R::T; center=SVector{2,T}(zero(T),zero(T))) where T<:Real
     a > zero(T) || throw(ArgumentError("a must be positive; received $a"))
     R > zero(T) || throw(ArgumentError("R must be positive; received $R"))
     R < a || throw(ArgumentError("R must be smaller than a; received a=$a, R=$R"))
     c = SVector{2,T}(center)
-    (iszero(c[1]) && iszero(c[2])) || throw(ArgumentError("D2 symmetry requires center == (0,0); received center=$c"))
-    z = zero(T); bc = SpecularReflection()
-    q1 = SVector{2,T}(a,z); p3 = SVector{2,T}(a,a); q3 = SVector{2,T}(z,a)
-    p0 = SVector{2,T}(R,z); p1 = SVector{2,T}(z,R)
-    symmetries = D2_symmetry()
-    right = LineSegment(q1,p3; bc=bc, domain_id=1, segment_id=1)
-    top = LineSegment(p3,q3; bc=bc, domain_id=1, segment_id=2)
-    ywall = LineSegment(q3,p1; bc=SymmetryWall(1,2), domain_id=1, segment_id=3)
-    inner = CircleSegment(R,T(pi/2),z,c; bc=bc, orientation=-1, domain_id=2, segment_id=1)
-    xwall = LineSegment(p0,q1; bc=SymmetryWall(3,2), domain_id=1, segment_id=4)
-    fundamental_boundary = AbsCurve[right,top,ywall,inner,xwall]
-    vertices = SVector{2,T}[q1,p3,q3,p1,p0]
-    fundamental_domain = SimpleDomain{T}(fundamental_boundary,vertices,1)
-    return SinaiBilliard{T}(fundamental_domain,symmetries)
+    bc = SpecularReflection()
+    p0 = c+SVector{2,T}(-a,-a); p1 = c+SVector{2,T}(a,-a); p2 = c+SVector{2,T}(a,a); p3 = c+SVector{2,T}(-a,a)
+    bottom = LineSegment(p0,p1; bc=bc, orientation=1, domain_id=1, segment_id=1)
+    right = LineSegment(p1,p2; bc=bc, orientation=1, domain_id=1, segment_id=2)
+    top = LineSegment(p2,p3; bc=bc, orientation=1, domain_id=1, segment_id=3)
+    left = LineSegment(p3,p0; bc=bc, orientation=1, domain_id=1, segment_id=4)
+    inner = CircleSegment(R, T(2*pi), zero(T), c; bc=bc, orientation=1, domain_id=2, segment_id=1)
+    outer_domain = SimpleDomain{T}(AbsCurve[bottom,right,top,left], SVector{2,T}[p1,p2,p3,p0], 1)
+    hole_domain = SimpleDomain{T}(AbsCurve[inner], SVector{2,T}[c+SVector{2,T}(R,zero(T))], 2)
+    symmetries = register_symmetries()
+    fundamental_domain = MultiplyConnectedDomain(outer_domain, [DomainHole(hole_domain)], 1)
+    validate_holes(fundamental_domain, symmetries)
+    return SinaiBilliard{T}(fundamental_domain, symmetries)
 end

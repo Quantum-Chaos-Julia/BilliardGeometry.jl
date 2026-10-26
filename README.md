@@ -94,7 +94,7 @@ Available out of the box:
 Custom billiards are assembled from curves, grouped into a `SimpleDomain`, `CompositeDomain` or `MultiplyConnectedDomain`, and given a `SymmetryRegistry` (`register_symmetries`, `D2_symmetry`, `Cn_symmetry`). Interfaces between sub-domains are marked `Transparent`, and cuts along symmetry axes `SymmetryWall`. See the files in `src/geometry/billiards/` for templates.
 
 # Holes
-A billiard with obstacles uses a `MultiplyConnectedDomain(outer, holes, id)` as its fundamental domain, where `holes` is a vector of `DomainHole`s. `AnnularBilliard` is the reference example:
+A billiard with obstacles uses a `MultiplyConnectedDomain(outer, holes, id)` as its fundamental domain, where `holes` is a vector of `DomainHole`s. `AnnularBilliard`, `SinaiBilliard` and `SquareWithinSquareBilliard` are built this way, with `AnnularBilliard` the reference example:
 
 ```julia
 b = AnnularBilliard(0.3, 0.1)                 # inner radius, shift of the hole centre

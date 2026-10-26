@@ -87,9 +87,10 @@ end
     @test area(vcat(ar_square(0.0, 0.0, 2.0; ccw = false), ar_square(0.5, 0.5, 1.0; ccw = true))) ≈ 3.0 rtol = ar_RTOL
 
     # hole boundaries as stored by the hole billiards: the full circle of radius R = 0.3 has area pi R^2,
-    # the quarter arc about the origin (Sinai hole) has the sector area pi R^2 / 4
+    # the Sinai hole is the same full circle, the square hole of SquareWithinSquareBilliard has area side^2
     @test area(AnnularBilliard(0.3, 0.2).fundamental_domain.holes[1].domain.boundary) ≈ pi * 0.3^2 rtol = ar_RTOL
-    @test area(SinaiBilliard(1.0, 0.3).fundamental_domain.boundary[4:4]) ≈ pi * 0.3^2 / 4 rtol = ar_RTOL
+    @test area(SinaiBilliard(1.0, 0.3).fundamental_domain.holes[1].domain.boundary) ≈ pi * 0.3^2 rtol = ar_RTOL
+    @test area(SquareWithinSquareBilliard(1.0).fundamental_domain.holes[1].domain.boundary) ≈ 0.25^2 rtol = ar_RTOL
 end
 
 @testset "area (billiard)" begin
@@ -159,11 +160,16 @@ end
     end
     @testset "SinaiBilliard" begin
         # SinaiBilliard(a, R): square [-a, a]^2 with a disk of radius R removed: 4 a^2 - pi R^2
-        @test_broken area(SinaiBilliard(1.0, 0.3)) ≈ 4 - pi * 0.3^2 rtol = ar_RTOL
+        @test area(SinaiBilliard(1.0, 0.3)) ≈ 4 - pi * 0.3^2 rtol = ar_RTOL
+        @test area(SinaiBilliard(2.0, 0.5; center = [0.3, -0.4])) ≈ 16 - pi * 0.5^2 rtol = ar_RTOL
+        @test (@inferred area(SinaiBilliard(1.0, 0.3))) isa Float64
     end
     @testset "SquareWithinSquareBilliard" begin
         # square [-1, 1]^2 with two holes of side 1/4: 4 - 2 (1/4)^2
-        @test_broken area(SquareWithinSquareBilliard(1.0)) ≈ 4 - 2 * 0.25^2 rtol = ar_RTOL
+        @test area(SquareWithinSquareBilliard(1.0)) ≈ 4 - 2 * 0.25^2 rtol = ar_RTOL
+        # a single hole of side 0.4
+        @test area(SquareWithinSquareBilliard(1.0; positions = [0.0], sizes = [0.4])) ≈ 4 - 0.4^2 rtol = ar_RTOL
+        @test (@inferred area(SquareWithinSquareBilliard(1.0))) isa Float64
     end
 end
 
@@ -187,18 +193,18 @@ end
     # the factor is that of the largest generator in the registry
     @test symmetry_reduction_factor(CircleBilliard(1.0)) == 4       # D2
     @test symmetry_reduction_factor(StadiumBilliard(0.7)) == 4      # D2
-    @test symmetry_reduction_factor(SquareWithinSquareBilliard(1.0)) == 2   # diagonal reflection
     @test symmetry_reduction_factor(C3Billiard(0.1)) == 3           # C3
     # no registered symmetry: factor 1
     @test symmetry_reduction_factor(TriangleBilliard(pi / 2, 1.0)) == 1
     @test symmetry_reduction_factor(AnnularBilliard(0.3, 0.2)) == 1
+    @test symmetry_reduction_factor(SinaiBilliard(1.0, 0.3)) == 1
+    @test symmetry_reduction_factor(SquareWithinSquareBilliard(1.0)) == 1
     @test (@inferred symmetry_reduction_factor(CircleBilliard(1.0))) isa Int
 end
 
 @testset "maximal_symmetry" begin
     @test maximal_symmetry(CircleBilliard(1.0)) isa XYAxisReflection
     @test maximal_symmetry(RectangleBilliard(1.0, 0.6)) isa XYAxisReflection
-    @test maximal_symmetry(SquareWithinSquareBilliard(1.0)) isa DiagonalReflection
     c3 = maximal_symmetry(C3Billiard(0.1))
     @test c3 isa NFoldRotation
     @test c3.order == 3
@@ -207,6 +213,8 @@ end
     # empty registry: nothing
     @test maximal_symmetry(TriangleBilliard(pi / 2, 1.0)) === nothing
     @test maximal_symmetry(AnnularBilliard(0.3, 0.2)) === nothing
+    @test maximal_symmetry(SinaiBilliard(1.0, 0.3)) === nothing
+    @test maximal_symmetry(SquareWithinSquareBilliard(1.0)) === nothing
 end
 
 @testset "fundamental_area" begin
@@ -236,12 +244,12 @@ end
         @test_throws ArgumentError fundamental_area(hf_d2_with_hole())
         @test_throws "not compatible" fundamental_area(hf_d2_with_hole())
     end
-    # G1: follows area(b), which adds the hole area
+    # the registry of the Sinai and square-within-square billiards is empty: the fundamental area is the area
     @testset "SinaiBilliard" begin
-        @test_broken fundamental_area(SinaiBilliard(1.0, 0.3)) ≈ (4 - pi * 0.3^2) / 4 rtol = ar_RTOL
+        @test fundamental_area(SinaiBilliard(1.0, 0.3)) ≈ 4 - pi * 0.3^2 rtol = ar_RTOL
     end
     @testset "SquareWithinSquareBilliard" begin
-        @test_broken fundamental_area(SquareWithinSquareBilliard(1.0)) ≈ (4 - 2 * 0.25^2) / 2 rtol = ar_RTOL
+        @test fundamental_area(SquareWithinSquareBilliard(1.0)) ≈ 4 - 2 * 0.25^2 rtol = ar_RTOL
     end
 end
 
@@ -291,10 +299,13 @@ end
 end
 
 @testset "corner_angles (billiards with holes)" begin
-    # G2: the inner arc of SinaiBilliard is not chained into the fundamental boundary, so two corners are reported as 0 instead of pi/2
+    # SinaiBilliard: the four right angles of the outer square, the full circle of the hole has no corner
     sinai = SinaiBilliard(1.0, 0.3)
-    @test length(corner_angles(sinai)) == 5
-    @test_broken corner_angles(sinai) ≈ fill(pi / 2, 5) atol = ar_ANGLE_ATOL
+    @test length(corner_angles(sinai)) == 4
+    @test corner_angles(sinai) ≈ fill(pi / 2, 4) atol = ar_ANGLE_ATOL
+    # SquareWithinSquareBilliard: four right angles outside, 3 pi / 2 at each of the eight hole corners
+    sws = SquareWithinSquareBilliard(1.0)
+    @test corner_angles(sws) ≈ [fill(pi / 2, 4); fill(3pi / 2, 8)] atol = ar_ANGLE_ATOL
 end
 
 @testset "corner_angles (hole corners)" begin

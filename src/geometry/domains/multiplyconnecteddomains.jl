@@ -84,7 +84,7 @@ function _validate_hole_structure(subdomains::Vector{AbsSimpleDomain}, holes::Ve
             d isa AbsMultiplyConnectedDomain && throw(ArgumentError("hole $i contains a MultiplyConnectedDomain; holes must be simple or composite domains"))
         end
         try
-            boundary_components(h)
+            _split_closed_loops(_connected_geometric_curves(AbsCurve[crv for crv in get_all_curves(h)]))
         catch err
             err isa ArgumentError || rethrow()
             throw(ArgumentError("boundary of hole $i is not a union of closed loops: " * err.msg))
