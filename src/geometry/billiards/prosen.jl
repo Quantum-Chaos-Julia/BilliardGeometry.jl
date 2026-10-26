@@ -1,11 +1,26 @@
-#Prosen billiard r(phi) = 1+a*cos(4*phi); fourfold symmetric shape reduced via
-#reflection walls (D2 quadrant fundamental domain, matching the SymmetryWall
-#wall boundary conditions below) rather than a rotational sector.
+"""
+    ProsenBilliard{T} <: AbsBilliard
+
+Prosen billiard with the boundary `r(φ) = 1 + a*cos(4φ)`. The shape is
+fourfold symmetric but is reduced with the reflections of [`D2_symmetry`](@ref):
+the fundamental domain is the first quadrant, bounded by the boundary arc and
+two [`SymmetryWall`](@ref) radii, rather than a rotational sector.
+
+## Attributes
+* `fundamental_domain::SimpleDomain{T}`: The first quadrant.
+* `symmetries::SymmetryRegistry`: Reflections `YAxisReflection`, `XYAxisReflection`, `XAxisReflection` with `sym_id` `1, 2, 3`.
+"""
 struct ProsenBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::SimpleDomain{T}
     symmetries::SymmetryRegistry
 end
 
+"""
+    ProsenBilliard(a; center = (0,0)) → billiard::ProsenBilliard
+
+Construct a [`ProsenBilliard`](@ref) with deformation parameter `a`. The
+`center` must be the origin.
+"""
 function ProsenBilliard(a::T; center=SVector{2,T}(zero(T),zero(T))) where T<:Real
     c = SVector{2,T}(center)
     (iszero(c[1]) && iszero(c[2])) || throw(ArgumentError("D2 symmetry requires center == (0,0); received center=$c"))

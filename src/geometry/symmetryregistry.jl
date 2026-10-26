@@ -1,20 +1,13 @@
 ################################################################################
 ############################# SYMMETRY REGISTRY ################################
 ################################################################################
-# `SymmetryRegistry` replaces the old plain `Vector{AbsSymmetry}` stored on
-# `billiard.symmetries`: every concrete `AbsSymmetry` generator now carries a
-# stable `sym_id::Int`, assigned once (in declaration order) by
-# `register_symmetries` at billiard-construction time. This is Layer 1 of the
-# symmetry-framework split (see Step 15 of the migration plan): a purely
-# geometric, ordering-independent way to look up "the billiard's k-th
-# registered symmetry generator" by a stable id instead of a fragile
-# positional index (`symmetries[sym_sector-1]`).
+# `SymmetryRegistry` is stored on `billiard.symmetries`. Every concrete
+# `AbsSymmetry` carries a stable `sym_id::Int`, assigned once (in declaration
+# order) by `register_symmetries` at billiard-construction time, so a symmetry
+# is looked up by id via `symmetry_of` instead of by positional index.
 #
-# `SymmetryRegistry` still lists every non-identity symmetry-group element
-# `full_boundary`/`poincarebirkhoff.jl` need directly (not just a minimal
-# generating set, exactly as the old `Vector{AbsSymmetry}` did), so every
-# consumer that used to iterate/index `billiard.symmetries` keeps working
-# unchanged; only positional-index lookups are rewritten to use `symmetry_of`.
+# The registry lists every non-identity symmetry-group element needed by
+# `full_boundary`/`poincarebirkhoff.jl`, not just a minimal generating set.
 ################################################################################
 
 """

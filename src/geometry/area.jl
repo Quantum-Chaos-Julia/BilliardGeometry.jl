@@ -58,6 +58,23 @@ function area(curves::AbstractVector{<:AbsCurve}; rtol=1e-10)
     return abs(I)/2
 end
 
+"""
+    area(domain::AbsDomain; rtol=1e-10) → A::Real
+
+Area of a closed simple domain from the Green-theorem integral over its full
+`boundary` (symmetry walls included); for a composite domain the sum over its
+subdomains (assumed non-overlapping).
+"""
+area(domain::AbsSimpleDomain; kwargs...) = area(domain.boundary; kwargs...)
+area(domain::AbsCompositeDomain; kwargs...) = sum(area(sd; kwargs...) for sd in domain.subdomains)
+
+"""
+    area(hole::AbsDomainHole; rtol=1e-10) → A::Real
+
+Positive area of a hole: the sum over its loops of the absolute Green-theorem area.
+"""
+area(hole::DomainHole; kwargs...) = sum(area(loop; kwargs...) for loop in boundary_components(hole))
+
 # Floating-point type `T` of a `Billiard{T}`; read from the type so that it is
 # inferable even though the boundary is stored as `Vector{AbsCurve}`.
 @inline _billiard_eltype(::Bi) where {Bi<:AbsBilliard} = Bi.parameters[1]
@@ -67,13 +84,28 @@ end
 
 Returns the area of the complete physical billiard, using
 [`full_boundary`](@ref) so the result is independent of any symmetry
-reduction represented by the billiard's fundamental domain.
+reduction represented by the billiard's fundamental domain. For a billiard
+with holes, the outer area minus the area of every hole.
 """
-@inline area(billiard::AbsBilliard; kwargs...) = area(full_boundary(billiard); kwargs...)::_billiard_eltype(billiard)
+@inline area(billiard::AbsBilliard; kwargs...) = _billiard_area(billiard.fundamental_domain, billiard; kwargs...)::_billiard_eltype(billiard)
 
-# How many-fold a discrete symmetry divides the physical area onto the
-# fundamental domain (used to estimate the fundamental-domain area below,
-# without needing a separate field on the billiard struct).
+_billiard_area(::AbsDomain, billiard::AbsBilliard; kwargs...) = area(full_boundary(billiard); kwargs...)
+function _billiard_area(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard; kwargs...)
+    outer = first(_full_boundary_data(billiard))
+    return area(outer; kwargs...) - sum(area(h; kwargs...) for h in domain.holes; init=zero(_billiard_eltype(billiard)))
+end
+
+"""
+    symmetry_reduction_factor(sym::AbsSymmetry) → n::Int
+    symmetry_reduction_factor(billiard::AbsBilliard) → n::Int
+
+Factor by which a discrete symmetry reduces the area of the billiard to that of
+its fundamental domain: `2` for a single reflection, `4` for
+[`XYAxisReflection`](@ref), the order for an [`NFoldRotation`](@ref). For a
+billiard it is the largest factor among its registered symmetries, `1` without
+symmetries. [`CompositeReflection`](@ref) is not reduced and returns `1`, which
+is a conservative value for Weyl-law windows.
+"""
 @inline symmetry_reduction_factor(::AbsSymmetry) = 1
 @inline symmetry_reduction_factor(::XAxisReflection) = 2
 @inline symmetry_reduction_factor(::YAxisReflection) = 2
@@ -81,9 +113,6 @@ reduction represented by the billiard's fundamental domain.
 @inline symmetry_reduction_factor(::DiagonalReflection) = 2
 @inline symmetry_reduction_factor(::AntiDiagonalReflection) = 2
 @inline symmetry_reduction_factor(sym::NFoldRotation) = sym.order
-# Composite reflection's fundamental-domain reduction factor is not tracked
-# per-irrep here; only used as a Weyl-window size estimate in BeynSolver, so
-# a conservative (unreduced) factor of 1 never invalidates the windowing.
 @inline symmetry_reduction_factor(::CompositeReflection) = 1
 
 function maximal_symmetry(billiard::AbsBilliard)
@@ -102,10 +131,20 @@ end
 
 Returns the area of the billiard's fundamental domain, obtained by dividing
 the full physical [`area`](@ref) by the highest-order discrete symmetry's
-[`symmetry_reduction_factor`](@ref).
+[`symmetry_reduction_factor`](@ref). For a billiard with holes it is the
+full area divided by the symmetry group order, valid only when every hole is
+[`symmetry_compatible`](@ref) with the symmetry registry (`ArgumentError` otherwise).
 """
 @inline function fundamental_area(billiard::AbsBilliard)
-    return area(billiard)/symmetry_reduction_factor(billiard)
+    return _fundamental_area(billiard.fundamental_domain, billiard)
+end
+
+@inline _fundamental_area(::AbsDomain, billiard::AbsBilliard) = area(billiard)/symmetry_reduction_factor(billiard)
+function _fundamental_area(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard)
+    for (i, h) in enumerate(domain.holes)
+        symmetry_compatible(h, billiard.symmetries) || throw(ArgumentError("fundamental_area is undefined: hole $i is not compatible with the billiard symmetry registry"))
+    end
+    return area(billiard)/(length(billiard.symmetries) + 1)
 end
 
 ################################################################################
@@ -129,11 +168,21 @@ field convention) at every true corner of `billiard`'s boundary.
   corner rather than a smooth join.
 """
 function corner_angles(billiard::AbsBilliard; fundamental::Bool=true, angle_tol=1e-8)
-    comps = fundamental ? geometric_boundary_components(billiard) : [full_boundary(billiard)]
+    comps, is_hole = _corner_components(billiard.fundamental_domain, billiard, fundamental)
     T = _billiard_eltype(billiard)
     angles = T[]
-    for comp in comps
-        append!(angles, _component_corner_angles(T, comp; angle_tol=T(angle_tol)))
+    for (comp, hole) in zip(comps, is_hole)
+        append!(angles, _component_corner_angles(T, comp; angle_tol=T(angle_tol), hole=hole))
     end
     return angles
+end
+
+function _corner_components(::AbsDomain, billiard::AbsBilliard, fundamental::Bool)
+    comps = fundamental ? geometric_boundary_components(billiard) : [full_boundary(billiard)]
+    return comps, falses(length(comps))
+end
+function _corner_components(::AbsMultiplyConnectedDomain, billiard::AbsBilliard, fundamental::Bool)
+    fundamental && return geometric_boundary_components(billiard), boundary_component_is_hole(billiard)
+    map = full_boundary_components(billiard)
+    return map.curves, map.is_hole
 end

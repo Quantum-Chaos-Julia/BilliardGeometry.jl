@@ -1,9 +1,28 @@
-#ellipse billiard x^2/a^2 + y^2/b^2 = 1, D2 symmetry (quadrant fundamental domain)
+"""
+    EllipseBilliard{T} <: AbsBilliard
+
+Elliptic billiard `x²/a² + y²/b² = 1`. The fundamental domain is the first
+quadrant, with the `D₂` symmetry group of [`D2_symmetry`](@ref). The boundary is
+a [`PolarSegment`](@ref).
+
+## Attributes
+* `fundamental_domain::SimpleDomain{T}`: The quarter ellipse.
+* `symmetries::SymmetryRegistry`: Reflections `YAxisReflection`, `XYAxisReflection`, `XAxisReflection` with `sym_id` `1, 2, 3`.
+"""
 struct EllipseBilliard{T} <: AbsBilliard where T<:Real
     fundamental_domain::SimpleDomain{T}
     symmetries::SymmetryRegistry
 end
 
+"""
+    EllipseBilliard(a, b; center = (0,0)) → billiard::EllipseBilliard
+
+Construct an [`EllipseBilliard`](@ref) with semi-axes `a` (along `x`) and `b`
+(along `y`), both positive. The `center` must be the origin.
+
+## Throws
+`ArgumentError` for non-positive semi-axes or a nonzero `center`.
+"""
 function EllipseBilliard(a::T, b::T; center=SVector{2,T}(zero(T),zero(T))) where T<:Real
     a > zero(T) || throw(ArgumentError("a must be positive; received a=$a"))
     b > zero(T) || throw(ArgumentError("b must be positive; received b=$b"))

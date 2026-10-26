@@ -166,14 +166,55 @@ end
     @test is_inside(an, [SVector(0.9, 0.0), SVector(0.2, 0.0)]) == [true, false]
 end
 
+@testset "is_inside (MultiplyConnectedDomain)" begin
+    # rectangle [0,3] x [0,2] without [1,1.5] x [0.5,1.5]: ring, hole, outside
+    rect = hf_rect_with_hole()
+    dom = rect.fundamental_domain
+    @test is_inside(dom, SVector(0.5, 0.5)) === true
+    @test is_inside(dom, SVector(2.0, 1.0)) === true
+    @test is_inside(dom, SVector(1.25, 1.0)) === false     # in the hole
+    @test is_inside(dom, SVector(3.5, 1.0)) === false      # outside
+    @test is_inside(dom, [SVector(0.5, 0.5), SVector(1.25, 1.0), SVector(3.5, 1.0)]) == [true, false, false]
+    # the billiard method dispatches to the domain method: the hole is not a filled region
+    @test is_inside(rect, SVector(1.25, 1.0)) === false
+    @test is_inside(rect, SVector(0.5, 0.5)) === true
+    @test is_inside(rect, [SVector(0.5, 0.5), SVector(1.25, 1.0)]) == [true, false]
+
+    # a point in no outer subdomain is outside even if it is in no hole
+    ann = hf_concentric_annulus()
+    @test is_inside(ann.fundamental_domain, SVector(2.0, 0.0)) === false
+    @test is_inside(ann.fundamental_domain, SVector(0.0, 0.0)) === false
+    @test is_inside(ann.fundamental_domain, SVector(0.6, 0.0)) === true
+    @test is_inside(hf_eccentric_annulus(), SVector(0.3, 0.0)) === false   # hole center
+    @test is_inside(hf_eccentric_annulus(), SVector(-0.5, 0.0)) === true
+
+    # D2 billiard: the outer region is the quarter square, the asymmetric hole of radius 0.2 about (0.3, 0.4) is in the full frame
+    d2 = hf_d2_with_hole()
+    @test is_inside(d2, SVector(0.3, 0.4)) === false       # hole center
+    @test is_inside(d2, SVector(0.9, 0.1)) === true
+    @test is_inside(d2, SVector(-0.9, -0.1)) === false     # outside the fundamental quarter
+    # inside the fundamental quarter the billiard test is "not in the hole"
+    for x in 0.05:0.1:0.95, y in 0.05:0.1:0.95
+        p = SVector(x, y)
+        @test is_inside(d2, p) == (hypot(x - 0.3, y - 0.4) > 0.2)
+    end
+    # the hole is tested at the point itself, not at its symmetry images: the mirror image of the hole center is no hole point
+    hole = d2.fundamental_domain.holes[1]
+    @test is_inside(hole, SVector(0.3, 0.4)) === true
+    @test is_inside(hole, SVector(-0.3, 0.4)) === false
+end
+
 @testset "is_inside (SinaiBilliard)" begin
-    # quarter of the square [-1, 1]^2 without the disk of radius 0.3 about the origin
+    # the square [-1, 1]^2 without the disk of radius 0.3 about the origin
     sn = SinaiBilliard(1.0, 0.3)
     @test is_inside(sn, SVector(0.5, 0.5)) === true
+    @test is_inside(sn, SVector(-0.5, -0.5)) === true
+    @test is_inside(sn, SVector(-0.9, 0.1)) === true
     @test is_inside(sn, SVector(0.9, 0.1)) === true
     @test is_inside(sn, SVector(0.25, 0.25)) === true    # distance 0.354 from the origin
     @test is_inside(sn, SVector(0.31, 0.0)) === true
     @test is_inside(sn, SVector(0.1, 0.1)) === false     # inside the hole
+    @test is_inside(sn, SVector(-0.1, -0.2)) === false
     @test is_inside(sn, SVector(0.2, 0.2)) === false     # distance 0.283 from the origin
     @test is_inside(sn, SVector(0.29, 0.0)) === false
     @test is_inside(sn, SVector(1.1, 0.5)) === false
@@ -181,29 +222,29 @@ end
 end
 
 @testset "is_inside (SquareWithinSquareBilliard)" begin
-    # fundamental domain: the part x >= y of [-1, 1]^2 without the two square holes [0.375, 0.625]^2 and [-0.625, -0.375]^2
+    # the square [-1, 1]^2 without the two square holes [0.375, 0.625]^2 and [-0.625, -0.375]^2
     sws = SquareWithinSquareBilliard(1.0)
-    # points in the hole, beyond the diagonal wall or outside the outer square are outside
+    # points in a hole or outside the outer square are outside
     @test is_inside(sws, SVector(0.55, 0.45)) === false
     @test is_inside(sws, SVector(0.5, 0.4)) === false
     @test is_inside(sws, SVector(-0.5, -0.6)) === false
-    @test is_inside(sws, SVector(0.2, 0.9)) === false
-    @test is_inside(sws, SVector(-0.9, 0.1)) === false
     @test is_inside(sws, SVector(1.2, 0.1)) === false
+    @test is_inside(sws, SVector(-1.2, 0.1)) === false
 
-    # G6: is_inside ANDs the half-planes of the hole edges, but the exterior of a convex polygonal hole is their union,
-    # so points of the billiard outside the holes are reported as outside
+    # points of the billiard, on both sides of the diagonal, are inside
     @testset "points of the billiard" begin
-        @test_broken is_inside(sws, SVector(0.9, 0.2)) === true
-        @test_broken is_inside(sws, SVector(0.7, 0.1)) === true
-        @test_broken is_inside(sws, SVector(0.3, 0.1)) === true
-        @test_broken is_inside(sws, SVector(0.9, 0.5)) === true
-        @test_broken is_inside(sws, SVector(0.5, 0.3)) === true
-        @test_broken is_inside(sws, SVector(-0.2, -0.5)) === true
-        @test_broken is_inside(sws, SVector(0.0, -0.9)) === true
+        @test is_inside(sws, SVector(0.9, 0.2)) === true
+        @test is_inside(sws, SVector(0.7, 0.1)) === true
+        @test is_inside(sws, SVector(0.3, 0.1)) === true
+        @test is_inside(sws, SVector(0.9, 0.5)) === true
+        @test is_inside(sws, SVector(0.5, 0.3)) === true
+        @test is_inside(sws, SVector(-0.2, -0.5)) === true
+        @test is_inside(sws, SVector(0.0, -0.9)) === true
+        @test is_inside(sws, SVector(0.2, 0.9)) === true
+        @test is_inside(sws, SVector(-0.9, 0.1)) === true
     end
     @testset "array form" begin
-        @test_broken is_inside(sws, [SVector(0.9, 0.2), SVector(0.55, 0.45), SVector(0.3, 0.1)]) == [true, false, true]
+        @test is_inside(sws, [SVector(0.9, 0.2), SVector(0.55, 0.45), SVector(0.3, 0.1)]) == [true, false, true]
     end
 end
 

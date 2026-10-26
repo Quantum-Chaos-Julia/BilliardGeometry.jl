@@ -63,7 +63,7 @@ struct AntiDiagonalReflection <: AbsReflection
 end
 AntiDiagonalReflection() = AntiDiagonalReflection(0)
 
-# Layer-1 (geometric) reconstruction helpers used only by `register_symmetries`
+# Reconstruction helpers used only by `register_symmetries`
 # to tag a fresh copy of a generator with its assigned `sym_id`.
 _with_sym_id(::XAxisReflection, id::Int) = XAxisReflection(id)
 _with_sym_id(::YAxisReflection, id::Int) = YAxisReflection(id)
@@ -110,6 +110,26 @@ _sym_matrix(::XYAxisReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2
 _sym_matrix(::DiagonalReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(0, 1, 1, 0)
 _sym_matrix(::AntiDiagonalReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(0, -1, -1, 0)
 
+"""
+    apply_symmetry(sym::AbsSymmetry, pt::SVector{2,T}) → pt′::SVector{2,T}
+    apply_symmetry(sym::AbsSymmetry, pts) → pts′::Vector
+
+Apply the geometric transformation `sym` to a point, or to every point of a
+collection.
+
+## Description
+Reflections act by the exact `±1`/`0` matrix of `_sym_matrix`,
+[`NFoldRotation`](@ref) by its stored rotation. [`CompositeReflection`](@ref)
+is a generator set and has no method. Plain vectors of reals are rejected with
+an `ArgumentError`: convert them to `SVector{2}` first.
+
+## Arguments
+* `sym`: Symmetry element, for example [`XAxisReflection`](@ref) or [`NFoldRotation`](@ref).
+* `pt`, `pts`: A planar point, or an iterable of points.
+
+## Returns
+* `pt′`, `pts′`: The image point(s), with the same numeric type as the input.
+"""
 function apply_symmetry(sym::AbsReflection, pt::SVector{2,T}) where T<:Real
     return SVector{2,T}(_sym_matrix(sym, T) * pt)
 end
@@ -161,6 +181,11 @@ Registers the three non-identity elements of the `D₂` reflection group
 """
 D2_symmetry() = register_symmetries(YAxisReflection(), XYAxisReflection(), XAxisReflection())
 
+"""
+    AbsRotation <: AbsSymmetry
+
+Supertype of rotational symmetries. See [`NFoldRotation`](@ref).
+"""
 abstract type AbsRotation <: AbsSymmetry end
 
 # Counter-clockwise 2x2 rotation matrix, used instead of `LinearMap(RotZ(θ))`
@@ -182,6 +207,13 @@ rotation by `2π*m/N`.
 * `m`: Power of the fundamental rotation.
 * `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref) (purely geometric; carries no representation data — see `SymmetrySector` in `QuantumBilliards.jl` for the per-solve irrep-sector choice).
 * `T`: Numeric type of the rotation angle/matrix, matching the billiard's own `T<:Real` (defaults to `Float64`; pass explicitly for `BigFloat`/`Float32` billiards so the rotation isn't silently narrowed/widened to `Float64`).
+
+## Attributes
+* `order::Int64`: Order `N` of the rotational symmetry.
+* `m::Int64`: Rotation power, reduced modulo `N`.
+* `sym_id::Int64`: Identifier assigned by [`register_symmetries`](@ref).
+* `angle::T`: Fundamental rotation angle `2π/N`.
+* `sym_map::LinearMap`: Rotation by `m*angle`.
 """
 struct NFoldRotation{T<:Real} <: AbsRotation
     order::Int64

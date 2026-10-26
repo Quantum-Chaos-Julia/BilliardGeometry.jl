@@ -5,7 +5,7 @@
 # the coordinate s of a point is the previous boundary length plus the arc length to the point, and |p| is the sine of the angle
 # between the velocity and the boundary normal: p = 0 along the normal and |p| = 1 along the tangent. Image sectors follow
 # apply_symmetry_pb: reflection sectors run backwards (s -> (k + 1) L - s, p -> -p), XY continues the traversal (s -> k L + s).
-# Billiards with holes are not used. No eigen solves, no pinned wavefunction values. Helper functions and constants
+# Billiards with holes only enter the pb_sectors testset (fixtures from holes_fixtures.jl). No eigen solves, no pinned wavefunction values. Helper functions and constants
 # use the prefix `pb_`.
 
 using StaticArrays: SVector
@@ -142,4 +142,44 @@ end
     _, cum, Ltot = component_lengths(get_boundary_curves(tri))
     @test pb_sectors(tri) ≈ cum atol = pb_ATOL
     @test last(pb_sectors(tri)) ≈ Ltot atol = pb_ATOL
+end
+
+@testset "pb_sectors (holes)" begin
+    # Hole curves are not part of the Poincare-Birkhoff boundary: the breakpoints end at the outer perimeter.
+    # With an empty symmetry registry the outer loop of the full boundary is the fundamental outer boundary.
+    holed = (rect_hole = hf_rect_with_hole(), annulus = hf_concentric_annulus(), eccentric = hf_eccentric_annulus())
+    for (name, b) in pairs(holed)
+        @testset "$name" begin
+            @test isempty(b.symmetries)
+            outer_curves = first(full_boundary_components(b).curves)
+            Louter = sum(c -> c.length, outer_curves)
+            Lhole = sum(c -> c.length, get_hole_boundary_curves(b))
+            @test Lhole > 0                                   # the fixture really has a hole, so the old result would overshoot
+            sectors = pb_sectors(b)
+            @test issorted(sectors)
+            @test length(sectors) == length(unique(sectors))
+            @test isapprox(first(sectors), 0.0; atol = pb_ATOL)
+            @test isapprox(last(sectors), Louter; atol = pb_ATOL)
+            @test all(s -> s <= Louter + pb_ATOL, sectors)
+            @test length(sectors) == length(get_outer_boundary_curves(b)) + 1     # 0 plus one end per outer curve, no hole ends
+        end
+    end
+
+    # rectangle [0,3] x [0,2]: outer perimeter 10, hole perimeter 3
+    @test last(pb_sectors(holed.rect_hole)) ≈ 10.0 atol = pb_ATOL
+    # concentric annulus: outer circle of radius 1
+    @test last(pb_sectors(holed.annulus)) ≈ 2 * pi atol = pb_ATOL
+
+    # nonempty registry: the image sectors are built from the outer boundary only and stay within (nsym + 1) outer perimeters
+    d2 = hf_d2_with_hole()
+    nsym = length(d2.symmetries)
+    @test nsym > 0
+    Lfund = CompositeCurve(get_outer_boundary_curves(d2)).length
+    sectors = @test_nowarn pb_sectors(d2)
+    @test issorted(sectors)
+    @test length(sectors) == length(unique(sectors))
+    @test isapprox(first(sectors), 0.0; atol = pb_ATOL)
+    @test isapprox(last(sectors), (nsym + 1) * Lfund; atol = pb_ATOL)
+    # same breakpoints as the hole-free billiard with the same outer frame and registry
+    @test sectors ≈ pb_sectors(RectangleBilliard(1.0, 1.0)) atol = pb_ATOL
 end

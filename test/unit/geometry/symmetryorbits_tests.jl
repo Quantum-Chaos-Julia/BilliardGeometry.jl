@@ -8,8 +8,8 @@
 #                                     _compose_index_permutations; _build_symmetry_orbit_map; symmetry_index_orbits)
 #   src/geometry/symmetryregistry.jl (symmetry_of only)
 # Reference objects: CircleBilliard(1.0) (D2: Y, XY, X registered in this order, so the four boundary sectors of the node grid
-# are id, Y, XY, X), C3Billiard(0.2) (rotations by 2 pi/3 and 4 pi/3), SquareWithinSquareBilliard(1.0) (diagonal reflection)
-# and a circular PolarBilliard with a single registered reflection. The permutations are integer algebra on the sector
+# are id, Y, XY, X), C3Billiard(0.2) (rotations by 2 pi/3 and 4 pi/3) and circular PolarBilliards with a single registered
+# reflection (diagonal or anti-diagonal, which no shipped billiard registers). The permutations are integer algebra on the sector
 # index: on N nodes the X reflection is q -> N + 1 - q, the Y reflection is q -> N/2 + 1 - q (cyclically), the rotation by
 # 2 pi/n is q -> q + N/n (cyclically), and the diagonal and anti-diagonal reflections are q -> N + 1 - q. The orbit maps are
 # therefore checked against hand-derived integer tables on small grids; the geometric meaning of the permutations on real
@@ -353,15 +353,15 @@ end
 end
 
 @testset "symmetry_index_orbits (DiagonalReflection)" begin
-    sws = SquareWithinSquareBilliard(1.0)
-    orbits = symmetry_index_orbits(Float64, sws, so_N, DiagonalReflection())
+    circ_d = so_polar_billiard(DiagonalReflection())
+    orbits = symmetry_index_orbits(Float64, circ_d, so_N, DiagonalReflection())
     @test fundamental_size(orbits) == so_N ÷ 2
     @test length(orbits) == so_N
     @test orbit_size(orbits) == 2
     @test orbits.fund_to_full == [1 2 3 4; 8 7 6 5]
     @test all(==(2), so_member_counts(orbits))
     # the diagonal reflection needs a multiple of 8 nodes
-    @test_throws ArgumentError symmetry_index_orbits(Float64, sws, 12, DiagonalReflection())
+    @test_throws ArgumentError symmetry_index_orbits(Float64, circ_d, 12, DiagonalReflection())
     # and it has to be registered
     @test_throws ArgumentError symmetry_index_orbits(Float64, CircleBilliard(1.0), so_N, DiagonalReflection())
 end
@@ -428,7 +428,7 @@ end
     @test only(gens_c3).m == 1
 
     # single registered reflection
-    @test get_symmetries(SquareWithinSquareBilliard(1.0)) isa Tuple{DiagonalReflection}
+    @test get_symmetries(so_polar_billiard(DiagonalReflection())) isa Tuple{DiagonalReflection}
 
     # no registered symmetry: empty generating set
     @test get_symmetries(TriangleBilliard(1.0, 1.0)) == ()

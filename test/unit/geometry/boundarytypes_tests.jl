@@ -332,3 +332,175 @@ end
     @test comps[1][1].radius == 1.0
     @test comps[2][1].radius == 0.3
 end
+
+# Billiards with holes (MultiplyConnectedDomain). References are the fixtures of holes_fixtures.jl: concentric and eccentric
+# annulus, rectangle [0,3] x [0,2] with the rectangular hole [1,1.5] x [0.5,1.5] (no symmetry), and the D2 billiard whose outer
+# region is the quarter square [0,1]^2 with the circular hole of radius 0.2 about (0.3, 0.4) in the full frame.
+
+@testset "get_outer_boundary_curves" begin
+    # without holes it equals get_boundary_curves, for domains and billiards
+    circle = bt_circle()
+    @test get_outer_boundary_curves(circle) == get_boundary_curves(circle)
+    @test get_outer_boundary_curves(circle.fundamental_domain) == get_boundary_curves(circle.fundamental_domain)
+    stadium = bt_stadium()
+    @test get_outer_boundary_curves(stadium) == get_boundary_curves(stadium)
+    @test length(get_outer_boundary_curves(stadium)) == 2
+
+    # with holes only the outer physical curves of the fundamental frame are returned
+    ann = hf_concentric_annulus()
+    outer = get_outer_boundary_curves(ann)
+    @test length(outer) == 1
+    @test outer[1].radius == 1.0 && outer[1].domain_id == 1
+    @test get_outer_boundary_curves(ann.fundamental_domain) == outer
+    @test length(get_outer_boundary_curves(hf_rect_with_hole())) == 4
+    # D2: the two physical edges of the quarter square, the symmetry walls are not physical
+    d2 = get_outer_boundary_curves(hf_d2_with_hole())
+    @test length(d2) == 2
+    @test all(c -> c.domain_id == 1 && c.bc isa SpecularReflection, d2)
+end
+
+@testset "get_hole_boundary_curves" begin
+    # no holes: empty
+    @test isempty(get_hole_boundary_curves(bt_circle()))
+    @test isempty(get_hole_boundary_curves(bt_stadium().fundamental_domain))
+    @test get_hole_boundary_curves(bt_circle()) isa Vector{AbsCurve}
+
+    ann = hf_concentric_annulus()
+    holes = get_hole_boundary_curves(ann)
+    @test length(holes) == 1
+    @test holes[1].radius == 0.3 && holes[1].domain_id == 2
+    @test get_hole_boundary_curves(ann.fundamental_domain) == holes
+    # rectangular hole: four curves of the loop, counterclockwise
+    rect = get_hole_boundary_curves(hf_rect_with_hole())
+    @test length(rect) == 4
+    @test all(c -> c.domain_id == 2, rect)
+    # D2: the hole is in the full frame
+    d2 = get_hole_boundary_curves(hf_d2_with_hole())
+    @test length(d2) == 1
+    @test d2[1].center == SVector(0.3, 0.4)
+    # holes of several objects: loops one after the other
+    dom = MultiplyConnectedDomain(hf_rect_domain(0.0, 0.0, 4.0, 4.0, 1), [hf_circle_domain(0.3, 3.0, 3.0, 2), hf_two_loop_hole(5)], 1)
+    @test [c.domain_id for c in get_hole_boundary_curves(dom)] == [2, 5, 5, 5, 5, 6, 6, 6, 6]
+end
+
+@testset "get_boundary_curves (MultiplyConnectedDomain)" begin
+    # domain level: the outer curves only
+    ann = hf_concentric_annulus()
+    @test get_boundary_curves(ann.fundamental_domain) == get_outer_boundary_curves(ann)
+    @test length(get_boundary_curves(ann.fundamental_domain)) == 1
+    @test length(get_boundary_curves(hf_rect_with_hole().fundamental_domain)) == 4
+
+    # billiard level, empty registry: outer curves followed by the hole curves (the frames coincide)
+    bc = get_boundary_curves(ann)
+    @test length(bc) == 2
+    @test [c.domain_id for c in bc] == [1, 2]
+    @test bc[1] == get_outer_boundary_curves(ann)[1]
+    @test bc[2] == get_hole_boundary_curves(ann)[1]
+    rect = get_boundary_curves(hf_rect_with_hole())
+    @test length(rect) == 8
+    @test [c.domain_id for c in rect] == [1, 1, 1, 1, 2, 2, 2, 2]
+
+    # nonempty registry with a hole: the frames differ, ArgumentError pointing to full_boundary_components
+    d2 = hf_d2_with_hole()
+    @test_throws ArgumentError get_boundary_curves(d2)
+    @test_throws "full_boundary_components" get_boundary_curves(d2)
+    # with a nonempty registry but no holes the outer curves are returned
+    no_holes = hf_HoleBilliard{Float64}(MultiplyConnectedDomain(hf_quarter_square_domain(), [], 1), D2_symmetry())
+    @test length(get_boundary_curves(no_holes)) == 2
+end
+
+@testset "get_all_domains (billiards with holes)" begin
+    # outer subdomains followed by the simple domains of the holes
+    ann = hf_concentric_annulus()
+    doms = get_all_domains(ann)
+    @test [d.id for d in doms] == [1, 2]
+    @test doms[1] === ann.fundamental_domain.subdomains[1]
+    @test doms[2] === ann.fundamental_domain.holes[1].domain
+    @test get_all_domains(ann.fundamental_domain) == doms
+    @test [d.id for d in get_all_domains(hf_d2_with_hole())] == [1, 5]
+    # composite outer region and a composite hole
+    dom = MultiplyConnectedDomain(StadiumBilliard(1.0).fundamental_domain, [hf_two_loop_hole(5)], 1)
+    @test [d.id for d in get_all_domains(dom)] == [1, 2, 5, 6]
+    # holes are found by get_domain and contribute to get_all_curves
+    @test get_domain(ann, 2) === ann.fundamental_domain.holes[1].domain
+    @test get_domain(ann, 3) === nothing
+    @test length(get_all_curves(ann)) == 2
+    @test length(get_all_curves(hf_rect_with_hole())) == 8
+    # the symmetry walls of the D2 quarter are listed too: 4 outer curves and the hole circle
+    @test length(get_all_curves(hf_d2_with_hole())) == 5
+    @test get_curve(ann, 2, 1) isa CircleSegment
+    @test get_curve(ann, 2, 1).radius == 0.3
+end
+
+@testset "update_boundary_condition (billiards with holes)" begin
+    # a hole curve is found by (domain_id, segment_id) in the holes
+    ann = hf_eccentric_annulus()
+    updated = update_boundary_condition(ann, 2, 1, QuantumSolverIgnore())
+    @test updated isa AnnularBilliard{Float64}
+    @test get_curve(updated, 2, 1).bc isa QuantumSolverIgnore
+    @test get_curve(updated, 2, 1).radius == 0.2
+    @test updated.fundamental_domain.holes[1] isa DomainHole
+    @test updated.symmetries == ann.symmetries
+    # the other curve keeps its condition and the original billiard is unchanged
+    @test get_curve(updated, 1, 1).bc isa SpecularReflection
+    @test get_curve(ann, 2, 1).bc isa SpecularReflection
+    @test bt_other_bcs_unchanged(ann, updated, 2, 1)
+
+    # an outer curve of the multiply connected domain is found in the subdomains
+    updated_outer = update_boundary_condition(ann, 1, 1, QuantumSolverIgnore())
+    @test get_curve(updated_outer, 1, 1).bc isa QuantumSolverIgnore
+    @test get_curve(updated_outer, 2, 1).bc isa SpecularReflection
+    @test bt_other_bcs_unchanged(ann, updated_outer, 1, 1)
+
+    # a curve of a multi-curve hole
+    rect = hf_rect_with_hole()
+    updated_rect = update_boundary_condition(rect, 2, 3, QuantumSolverIgnore())
+    @test updated_rect isa hf_HoleBilliard{Float64}
+    @test get_curve(updated_rect, 2, 3).bc isa QuantumSolverIgnore
+    @test bt_other_bcs_unchanged(rect, updated_rect, 2, 3)
+    @test get_curve(rect, 2, 3).bc isa SpecularReflection
+
+    # unknown (domain_id, segment_id): ArgumentError
+    @test_throws ArgumentError update_boundary_condition(ann, 3, 1, QuantumSolverIgnore())
+    @test_throws ArgumentError update_boundary_condition(ann, 2, 9, QuantumSolverIgnore())
+end
+
+@testset "boundary_components (billiards with holes)" begin
+    # outer component first, then one component per hole loop
+    for (b, lens, ids) in ((hf_concentric_annulus(), [1, 1], [1, 2]), (hf_eccentric_annulus(), [1, 1], [1, 2]),
+                           (hf_rect_with_hole(), [4, 4], [1, 2]), (hf_d2_with_hole(), [2, 1], [1, 5]))
+        comps = boundary_components(b)
+        @test [length(c) for c in comps] == lens
+        @test [c[1].domain_id for c in comps] == ids
+        @test boundary_components(b.fundamental_domain) == comps
+        @test length(comps) == genus(b) + 1
+    end
+    # composite hole of two loops: two hole components
+    dom = MultiplyConnectedDomain(hf_rect_domain(0.0, 0.0, 4.0, 4.0, 1), [hf_circle_domain(0.3, 3.0, 3.0, 2), hf_two_loop_hole(5)], 1)
+    @test [length(c) for c in boundary_components(dom)] == [4, 1, 4, 4]
+    @test length(boundary_components(dom)) == genus(dom) + 1
+end
+
+@testset "boundary_component_is_hole" begin
+    @test boundary_component_is_hole(bt_circle()) == [false]
+    @test boundary_component_is_hole(bt_stadium()) == [false]
+    @test boundary_component_is_hole(bt_circle().fundamental_domain) == [false]
+    @test boundary_component_is_hole(hf_concentric_annulus()) == [false, true]
+    @test boundary_component_is_hole(hf_eccentric_annulus()) == [false, true]
+    @test boundary_component_is_hole(hf_rect_with_hole()) == [false, true]
+    @test boundary_component_is_hole(hf_d2_with_hole()) == [false, true]
+    dom = MultiplyConnectedDomain(hf_rect_domain(0.0, 0.0, 4.0, 4.0, 1), [hf_circle_domain(0.3, 3.0, 3.0, 2), hf_two_loop_hole(5)], 1)
+    @test boundary_component_is_hole(dom) == [false, true, true, true]
+    # one flag per boundary component
+    @test length(boundary_component_is_hole(dom)) == length(boundary_components(dom))
+end
+
+@testset "geometric_boundary_components (billiards with holes)" begin
+    # the outer component keeps its symmetry walls (fundamental frame), then one closed loop per hole loop
+    @test [length(c) for c in geometric_boundary_components(hf_concentric_annulus())] == [1, 1]
+    @test [length(c) for c in geometric_boundary_components(hf_rect_with_hole())] == [4, 4]
+    d2 = geometric_boundary_components(hf_d2_with_hole())
+    @test [length(c) for c in d2] == [4, 1]
+    @test count(c -> c.bc isa SymmetryWall, d2[1]) == 2
+    @test length(geometric_boundary_components(hf_d2_with_hole().fundamental_domain)) == 2
+end
