@@ -11,12 +11,14 @@
 # radial function invariant; the polar fixtures are therefore D4-symmetric (cos 4 phi) and are only mapped by the five
 # reflections and the rotations of order 4, and the C3 fundamental curve only by rotations of order 3.
 # The orientation field of line images keeps domain_fun consistent with the source curve (G13). Closure of the
-# reconstructed loop and its total length on real billiards are covered by the integration tier. No eigen solves,
+# reconstructed loop and its total length on real billiards are covered by the integration tier. Billiards with holes
+# (hole fixtures of holes_fixtures.jl): full_boundary_components, BoundaryComponentMap, the MCD method of full_boundary and the
+# split-out _reconstruct_curves; the outer loop is reconstructed by the registry, hole loops are taken in the full frame. No eigen solves,
 # no pinned wavefunction values. Helper functions and
 # constants use the prefix `fb_`.
 
 using StaticArrays: SVector
-using BilliardGeometry: _apply_symmetry_to_curve, _reverse_curve, _full_boundary_data
+using BilliardGeometry: _apply_symmetry_to_curve, _reverse_curve, _full_boundary_data, _reconstruct_curves
 
 # Absolute tolerance for pointwise comparisons of curve images (a few ulps of Float64 after one trigonometric evaluation).
 const fb_ATOL = 1e-12
@@ -291,4 +293,111 @@ end
     @test source_t == [1, 2, 3]
     @test sector_t == [1, 1, 1]
     @test !any(reversed_t)
+end
+
+@testset "_reconstruct_curves" begin
+    # the billiard method is _reconstruct_curves of the fundamental curves and the billiard registry
+    rect = RectangleBilliard(1.0, 0.6)
+    P = get_boundary_curves(rect)
+    @test all(_reconstruct_curves(P, rect.symmetries) .== _full_boundary_data(rect))
+    # empty registry: the curves themselves, sector 1, nothing reversed
+    curves, source, sector, reversed = _reconstruct_curves(P, register_symmetries())
+    @test curves == P
+    @test source == [1, 2]
+    @test sector == [1, 1]
+    @test !any(reversed)
+    # D2 registry: the same sectors as for the rectangle billiard
+    _, source_d2, sector_d2, _ = _reconstruct_curves(P, D2_symmetry())
+    @test source_d2 == [1, 2, 2, 1, 1, 2, 2, 1]
+    @test sector_d2 == [1, 1, 2, 2, 3, 3, 4, 4]
+    # for a billiard with holes only the outer boundary is reconstructed
+    d2 = hf_d2_with_hole()
+    curves_h, source_h, sector_h, _ = _full_boundary_data(d2)
+    @test length(curves_h) == 8
+    @test sector_h == [1, 1, 2, 2, 3, 3, 4, 4]
+    @test source_h == [1, 2, 2, 1, 1, 2, 2, 1]
+end
+
+@testset "BoundaryComponentMap" begin
+    @test fieldnames(BoundaryComponentMap) == (:curves, :is_hole, :group)
+    map = BoundaryComponentMap([AbsCurve[LineSegment([0.0, 0.0], [1.0, 0.0])]], [false], [0])
+    @test map.curves isa Vector{Vector{AbsCurve}}
+    @test map.is_hole == [false]
+    @test map.group == [0]
+end
+
+# True when the loop `crvs` is closed: every curve ends where the next one starts (cyclically).
+fb_is_closed_loop(crvs) = all(isapprox(curve(crvs[j], 1.0), curve(crvs[mod1(j + 1, length(crvs))], 0.0); atol = 1e-10) for j in eachindex(crvs))
+
+@testset "full_boundary_components" begin
+    # without holes: one component equal to full_boundary
+    rect = RectangleBilliard(1.0, 0.6)
+    map = full_boundary_components(rect)
+    @test map isa BoundaryComponentMap
+    @test length(map.curves) == 1
+    @test map.curves[1] == full_boundary(rect)
+    @test map.is_hole == [false]
+    @test map.group == [0]
+    @test full_boundary_components(TriangleBilliard(1.0, 1.0)).group == [0]
+
+    # concentric annulus: outer circle and hole circle
+    ann = full_boundary_components(hf_concentric_annulus())
+    @test [length(c) for c in ann.curves] == [1, 1]
+    @test ann.is_hole == [false, true]
+    @test ann.group == [0, 1]
+    @test ann.curves[1][1].radius == 1.0
+    @test ann.curves[2][1].radius == 0.3
+    @test all(fb_is_closed_loop, ann.curves)
+
+    # eccentric annulus
+    ecc = full_boundary_components(hf_eccentric_annulus())
+    @test [length(c) for c in ecc.curves] == [1, 1]
+    @test ecc.is_hole == [false, true]
+    @test ecc.group == [0, 1]
+    @test ecc.curves[2][1].center == SVector(0.3, 0.0)
+
+    # rectangle with a rectangular hole, no symmetry: two loops of four curves
+    rh = full_boundary_components(hf_rect_with_hole())
+    @test [length(c) for c in rh.curves] == [4, 4]
+    @test rh.is_hole == [false, true]
+    @test rh.group == [0, 1]
+    @test all(fb_is_closed_loop, rh.curves)
+    # outer loop counterclockwise, hole loop counterclockwise (hole on the left): Green areas 6 and 0.5
+    @test area(rh.curves[1]) ≈ 6.0 atol = 1e-12
+    @test area(rh.curves[2]) ≈ 0.5 atol = 1e-12
+
+    # D2 billiard: the outer loop is reconstructed from the quarter (8 curves), the hole stays one curve in the full frame
+    d2 = full_boundary_components(hf_d2_with_hole())
+    @test [length(c) for c in d2.curves] == [8, 1]
+    @test d2.is_hole == [false, true]
+    @test d2.group == [0, 1]
+    @test fb_is_closed_loop(d2.curves[1])
+    @test area(d2.curves[1]) ≈ 4.0 atol = 1e-12
+    @test d2.curves[2][1].center == SVector(0.3, 0.4)
+    @test d2.curves[2][1].radius == 0.2
+    # the outer loop is the first loop of the reconstruction, not a coordinate-matched reordering
+    @test d2.curves[1] == first(_full_boundary_data(hf_d2_with_hole()))
+
+    # several hole objects: groups count the hole objects, the loops of one object share its group
+    dom = MultiplyConnectedDomain(hf_rect_domain(0.0, 0.0, 4.0, 4.0, 1), [hf_circle_domain(0.3, 3.0, 3.0, 2), hf_two_loop_hole(5)], 1)
+    multi = full_boundary_components(hf_HoleBilliard{Float64}(dom, register_symmetries()))
+    @test [length(c) for c in multi.curves] == [4, 1, 4, 4]
+    @test multi.is_hole == [false, true, true, true]
+    @test multi.group == [0, 1, 2, 2]
+end
+
+@testset "full_boundary (billiards with holes)" begin
+    # the concatenation of the loops of full_boundary_components, outer loop first
+    for b in (hf_concentric_annulus(), hf_eccentric_annulus(), hf_rect_with_hole(), hf_d2_with_hole())
+        loops = full_boundary_components(b).curves
+        @test full_boundary(b) == reduce(vcat, loops)
+        @test length(full_boundary(b)) == sum(length, loops)
+    end
+    @test length(full_boundary(hf_concentric_annulus())) == 2
+    @test length(full_boundary(hf_d2_with_hole())) == 9
+    @test full_boundary(hf_d2_with_hole())[end].radius == 0.2
+    # the hole curves keep domain_fun pointing into the hole: an interior point of the hole is on the inner side of its boundary
+    ann = hf_concentric_annulus()
+    @test domain_fun(full_boundary(ann)[2], SVector(0.0, 0.0)) < 0
+    @test domain_fun(full_boundary(ann)[1], SVector(0.0, 0.0)) < 0
 end

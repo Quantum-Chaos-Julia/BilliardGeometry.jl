@@ -1,10 +1,28 @@
 function is_inside(billiard::B, pt::SVector{2,T}) where {B<:AbsBilliard, T<:Real}
-    d = [all(is_inside(domain, pt)) for domain in get_all_domains(billiard)]
-    return any(d)
+    return _is_inside_domain(billiard.fundamental_domain, pt)
 end
+
+_is_inside_domain(domain::AbsDomain, pt) = any(all(is_inside(d, pt)) for d in get_all_domains(domain))
+_is_inside_domain(domain::AbsMultiplyConnectedDomain, pt) = is_inside(domain, pt)
 
 function is_inside(billiard::B, pts::AbstractArray) where {B<:AbsBilliard}
     return [is_inside(billiard, pt) for pt in pts]
+end
+
+"""
+    is_inside(domain::AbsMultiplyConnectedDomain, pt) → flag::Bool
+
+`true` when `pt` lies in some outer subdomain and in no hole. Holes are in the
+full physical frame, so the test is valid for a fundamental-frame point and
+for its symmetry images.
+"""
+function is_inside(domain::AbsMultiplyConnectedDomain, pt::SVector{2,T}) where {T<:Real}
+    any(all(is_inside(sd, pt)) for sd in domain.subdomains) || return false
+    return !any(is_inside(h, pt) for h in domain.holes)
+end
+
+function is_inside(domain::AbsMultiplyConnectedDomain, pts::AbstractArray)
+    return [is_inside(domain, pt) for pt in pts]
 end
 
 

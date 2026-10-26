@@ -57,6 +57,26 @@ function connect_curves(curves)
     return connected_curves
 end
 
+# Splits a chain-ordered curve list (as returned by `connect_curves`) into
+# closed loops: a loop ends at the first curve whose end point coincides with
+# the start point of the loop's first curve. Throws if a chain does not close.
+function _split_closed_loops(curves)
+    loops = Vector{Vector{AbsCurve}}()
+    n = length(curves)
+    i = 1
+    while i <= n
+        start_pt = curve(curves[i], zero(curves[i].length))
+        j = i
+        while j <= n && !is_overlaping(curve(curves[j], one(curves[j].length)), start_pt)
+            j += 1
+        end
+        j > n && throw(ArgumentError("boundary curves do not form closed loops: the loop starting at curve $i does not close"))
+        push!(loops, AbsCurve[curves[i:j]...])
+        i = j + 1
+    end
+    return loops
+end
+
 function is_connected(boundary; start_initial = true)
     start_pts = CircularArray([curve(crv,0.0) for crv in boundary])
     end_pts = CircularArray([curve(crv,1.0) for crv in boundary])    

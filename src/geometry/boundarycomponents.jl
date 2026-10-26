@@ -39,6 +39,20 @@ tangent entering `cright`.
 end
 
 """
+    _signed_junction_angle(cleft, cright, ::Type{T}) where {T<:Real} → angle::T
+
+Signed turning angle in `(-π,π]` from the tangent leaving `cleft` to the
+tangent entering `cright`, positive for a left turn.
+"""
+@inline function _signed_junction_angle(cleft, cright, ::Type{T}) where {T<:Real}
+    tL = _unit_tangent_at_end(cleft, T)
+    tR = _unit_tangent_at_start(cright, T)
+    cr = tL[1]*tR[2] - tL[2]*tR[1]
+    dt = clamp(tL[1]*tR[1] + tL[2]*tR[2], -one(T), one(T))
+    return atan(cr, dt)
+end
+
+"""
     _is_true_corner(cleft, cright, ::Type{T}; angle_tol=T(1e-8)) where {T<:Real} → flag::Bool
 
 `true` when the junction between `cleft` and `cright` has a tangent
@@ -76,7 +90,8 @@ composite boundary component `comp`, in the same traversal order as
 [`_component_corner_locations`](@ref) (periodic seam between the final and
 first segment checked first, if a true corner).
 """
-function _component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real}
+function _component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8), hole::Bool=false) where {T<:Real}
+    hole && return _hole_component_corner_angles(T, comp; angle_tol=angle_tol)
     angles = T[]
     m = length(comp)
     τ0 = _junction_angle(comp[end], comp[1], T)
@@ -84,6 +99,26 @@ function _component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8)) wh
     @inbounds for j in 1:m-1
         τ = _junction_angle(comp[j], comp[j+1], T)
         τ > angle_tol && push!(angles, T(pi) - τ)
+    end
+    return angles
+end
+
+"""
+    _hole_component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real} → angles::Vector{T}
+
+Interior angles of the billiard region Ω at the corners of a hole loop
+traversed with the hole on the left: `π + τ` for the signed turning angle `τ`
+(a convex hole corner has Ω-angle larger than `π`). Same traversal order as
+[`_component_corner_angles`](@ref).
+"""
+function _hole_component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real}
+    angles = T[]
+    m = length(comp)
+    τ0 = _signed_junction_angle(comp[end], comp[1], T)
+    abs(τ0) > angle_tol && push!(angles, T(pi) + τ0)
+    @inbounds for j in 1:m-1
+        τ = _signed_junction_angle(comp[j], comp[j+1], T)
+        abs(τ) > angle_tol && push!(angles, T(pi) + τ)
     end
     return angles
 end

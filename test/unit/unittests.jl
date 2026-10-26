@@ -1,6 +1,7 @@
 # Unit tier: one explicit @testset per function or type, mirroring src/.
 # Geometric checks on real billiards (closure, perimeter, orbit maps, Poincare-Birkhoff unfolding) live in the integration tier.
 
+include("holes_fixtures.jl")   # shared hole/multiply connected fixtures (no tests), must stay before the files that use them
 include("geometry/utils_tests.jl")
 include("geometry/arclength_tests.jl")
 include("geometry/segments/linesegment_tests.jl")
@@ -15,6 +16,7 @@ include("geometry/symmetryregistry_tests.jl")
 include("geometry/domains/polygons_tests.jl")
 include("geometry/domains/circular_tests.jl")
 include("geometry/domains/compositedomains_tests.jl")
+include("geometry/domains/holes_tests.jl")
 include("geometry/domains/multiplyconnecteddomains_tests.jl")
 include("geometry/billiards/stadium_tests.jl")
 include("geometry/billiards/mushroom_tests.jl")

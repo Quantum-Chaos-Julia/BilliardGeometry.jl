@@ -7,13 +7,15 @@
 # half disk (arc of the unit circle followed by its diameter) and the full unit circle. For these the junction angles, the
 # cumulative lengths, the global parameter t = 2 pi s / L of an arc length s and the interior corner angles are known in closed
 # form. Corner angles are only tested for convex components traversed counterclockwise, where the unsigned junction angle
-# gives the interior angle pi - tau. Billiards with holes and fundamental=false are not used. No eigen solves, no pinned
+# gives the interior angle pi - tau; the signed turning angle and the hole convention (angle pi + tau on a hole loop traversed
+# with the hole on the left) are tested separately. No eigen solves, no pinned
 # wavefunction values. Helper functions and constants use the prefix `bc_`.
 
 using StaticArrays: SVector
 using LinearAlgebra: norm
 using BilliardGeometry: _is_true_corner, _junction_angle, _component_corner_locations, _component_corner_angles,
-                        _global_t_to_segment_u, _eval_composite_geom_global_t, _group_curves_by_domain_id
+                        _global_t_to_segment_u, _eval_composite_geom_global_t, _group_curves_by_domain_id,
+                        _signed_junction_angle
 
 # Absolute tolerance for closed-form comparisons of angles and trigonometric expressions (a few ulps of Float64).
 const bc_ATOL = 1e-12
@@ -127,12 +129,42 @@ end
     @test isempty(_component_corner_angles(Float64, [CircleSegment(1.0, 2 * pi, 0.0, [0.0, 0.0])]))
 end
 
+@testset "_signed_junction_angle" begin
+    line1 = LineSegment([0.0, 0.0], [1.0, 0.0])
+    up = LineSegment([1.0, 0.0], [1.0, 1.0])
+    down = LineSegment([1.0, 0.0], [1.0, -1.0])
+    straight = LineSegment([1.0, 0.0], [2.0, 0.0])
+    back = LineSegment([1.0, 0.0], [0.0, 0.0])
+    # signed turning angle: positive for a left turn, negative for a right turn, zero when straight, pi for a reversal
+    @test _signed_junction_angle(line1, up, Float64) ≈ pi / 2 atol = bc_ATOL
+    @test _signed_junction_angle(line1, down, Float64) ≈ -pi / 2 atol = bc_ATOL
+    @test _signed_junction_angle(line1, straight, Float64) == 0.0
+    @test _signed_junction_angle(line1, back, Float64) ≈ pi atol = bc_ATOL
+    # its absolute value is the unsigned _junction_angle
+    @test abs(_signed_junction_angle(line1, down, Float64)) ≈ _junction_angle(line1, down, Float64) atol = bc_ATOL
+end
+
+@testset "_component_corner_angles (hole)" begin
+    # hole = true: the angle of the region outside the loop, pi + signed turning angle, seam corner first
+    @test _component_corner_angles(Float64, bc_square(); hole = true) ≈ fill(3 * pi / 2, 4) atol = bc_ATOL
+    # right triangle (0,0), (1,0), (0,1): turning angles pi/2, 3 pi / 4, 3 pi / 4 in seam-first order
+    @test _component_corner_angles(Float64, bc_triangle(); hole = true) ≈ [3 * pi / 2, 7 * pi / 4, 7 * pi / 4] atol = bc_ATOL
+    # for a convex loop traversed counterclockwise the hole angle is 2 pi minus the interior angle
+    @test _component_corner_angles(Float64, bc_triangle(); hole = true) ≈ 2 * pi .- _component_corner_angles(Float64, bc_triangle()) atol = bc_ATOL
+    # a smooth loop has no corners, smooth joins of collinear pieces do not count
+    @test isempty(_component_corner_angles(Float64, [CircleSegment(1.0, 2 * pi, 0.0, [0.0, 0.0])]; hole = true))
+    # the angle_tol keyword is honoured
+    @test isempty(_component_corner_angles(Float64, bc_square(); angle_tol = 2.0, hole = true))
+    # hole = false is the default
+    @test _component_corner_angles(Float64, bc_square(); hole = false) == _component_corner_angles(Float64, bc_square())
+end
+
 @testset "print_component_junctions" begin
     lines = bc_captured_lines(() -> print_component_junctions(bc_square()))
     @test lines[1] == "junction diagnostics:"
     @test length(lines) == 5
-    @test count(occursin("TRUE CORNER"), lines) == 4
-    @test count(occursin("smooth join"), lines) == 0
+    @test count(l -> occursin("TRUE CORNER", l), lines) == 4
+    @test count(l -> occursin("smooth join", l), lines) == 0
     # one line per join, the last one closes the loop at the seam sigma = 0
     @test occursin("1 -> 2", lines[2])
     @test occursin("4 -> 1", lines[5])
@@ -145,11 +177,11 @@ end
     smooth = [LineSegment([0.0, 0.0], [1.0, 0.0]), LineSegment([1.0, 0.0], [2.0, 0.0])]
     smooth_lines = bc_captured_lines(() -> print_component_junctions(smooth; T=Float32))
     @test length(smooth_lines) == 3
-    @test count(occursin("smooth join"), smooth_lines) == 2
-    @test count(occursin("TRUE CORNER"), smooth_lines) == 0
+    @test count(l -> occursin("smooth join", l), smooth_lines) == 2
+    @test count(l -> occursin("TRUE CORNER", l), smooth_lines) == 0
     # a large angle_tol makes every join smooth
     tol_lines = bc_captured_lines(() -> print_component_junctions(bc_square(); angle_tol=2.0))
-    @test count(occursin("smooth join"), tol_lines) == 4
+    @test count(l -> occursin("smooth join", l), tol_lines) == 4
 end
 
 @testset "_global_t_to_segment_u" begin
@@ -167,7 +199,7 @@ end
     # unequal lengths: sides of length 1 and 3, so the second side starts at t = pi / 2 and t = pi is at u = 1/3
     uneven = [LineSegment([0.0, 0.0], [1.0, 0.0]), LineSegment([1.0, 0.0], [1.0, 3.0])]
     @test _global_t_to_segment_u(Float64, uneven, pi / 4) == (1, 0.5)
-    j2, u2 = _global_t_to_segment_u(Float64, uneven, pi)
+    j2, u2 = _global_t_to_segment_u(Float64, uneven, Float64(pi))
     @test j2 == 2
     @test u2 ≈ 1 / 3 atol = bc_ATOL
 

@@ -23,12 +23,13 @@ abstract type AbsSimpleDomain <: AbsDomain end
 abstract type AbsPolarDomain <: AbsSimpleDomain end
 abstract type AbsCompositeDomain <: AbsDomain end
 abstract type AbsMultiplyConnectedDomain <: AbsDomain end
+abstract type AbsDomainHole end
 abstract type AbsBilliard end
 
 abstract type AbsSampler end
 abstract type AbsReflection <: AbsSymmetry end
 
-export AbsCurve, AbsPolarCurve, AbsCompositeCurve, AbsCoords, AbsDomain, AbsPolarDomain, AbsCompositeDomain, AbsSimpleDomain, AbsMultiplyConnectedDomain, AbsBilliard, AbsBoundaryCondition, AbsSampler, AbsSymmetry
+export AbsCurve, AbsPolarCurve, AbsCompositeCurve, AbsCoords, AbsDomain, AbsPolarDomain, AbsCompositeDomain, AbsSimpleDomain, AbsMultiplyConnectedDomain, AbsDomainHole, AbsBilliard, AbsBoundaryCondition, AbsSampler, AbsSymmetry
 
 include("geometry/utils.jl")
 export is_overlaping, is_connected, is_closed, connect_curves, find_unique_elements, point_curve_parameter
@@ -44,6 +45,7 @@ include("geometry/segments/compositecurves.jl")
 include("geometry/domains/polygons.jl")
 include("geometry/domains/circular.jl")
 include("geometry/domains/compositedomains.jl")
+include("geometry/domains/holes.jl")
 include("geometry/domains/multiplyconnecteddomains.jl")
 include("geometry/billiards/triangle.jl")
 include("geometry/billiards/stadium.jl")
@@ -76,7 +78,8 @@ export CompositeCurve
 export Polygon
 export CircleWedge
 export SimpleDomain, CompositeDomain, reset_ids!
-export MultiplyConnectedDomain
+export MultiplyConnectedDomain, DomainHole, hole_domains, hole_loop_count, hole_leaves, hole_domain_ids, is_hole_curve, component_of_domain_id, symmetry_compatible, validate_holes
+export boundary_component_is_hole, get_outer_boundary_curves, get_hole_boundary_curves, BoundaryComponentMap, full_boundary_components
 export TriangleBilliard
 export StadiumBilliard
 export MushroomBilliard

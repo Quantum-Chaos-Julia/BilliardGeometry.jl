@@ -131,42 +131,41 @@ function _reverse_curve(c::L) where {L<:PolarSegment}
 end
 
 """
-    _full_boundary_data(billiard::Bi) where {Bi<:AbsBilliard}
+    _reconstruct_curves(P, symmetries)
 
-Reconstruct the complete physical boundary together with its exact discrete
-construction provenance.
+Reconstruct a closed curve set from its fundamental curves `P` and a
+symmetry registry, together with its exact discrete construction provenance.
 
 ## Description
-The fundamental physical curves returned by `get_boundary_curves(billiard)`
-form reconstruction sector `1`. For every registered non-identity symmetry
-`billiard.symmetries[k]`, sector `k + 1` is constructed directly from the
-same fundamental curves.
+The fundamental curves `P` form reconstruction sector `1`. For every
+non-identity symmetry `symmetries[k]`, sector `k + 1` is constructed directly
+from the same fundamental curves.
 
 For every reconstructed curve, `source` stores the corresponding fundamental
-physical-curve index, `sector` stores the reconstruction-sector index, and
-`reversed` records whether the fundamental curve parametrization was reversed
-when constructing that image.
+curve index, `sector` stores the reconstruction-sector index, and `reversed`
+records whether the fundamental curve parametrization was reversed when
+constructing that image.
 
 The provenance is derived directly from the reconstruction procedure. No
 geometric matching or floating-point inference is performed.
 
 ## Arguments
-* `billiard::Bi`: Billiard whose complete physical boundary is reconstructed.
+* `P`: Fundamental curves in traversal order.
+* `symmetries`: Registry of non-identity symmetry elements.
 
 ## Returns
-* `curves::Vector{AbsCurve}`: Complete physical boundary.
-* `source::Vector{Int}`: Fundamental physical-curve source index of each curve.
+* `curves::Vector{AbsCurve}`: Reconstructed curves.
+* `source::Vector{Int}`: Fundamental-curve source index of each curve.
 * `sector::Vector{Int}`: Reconstruction-sector index of each curve.
 * `reversed::BitVector`: Whether each reconstructed curve reverses its source parametrization.
 """
-function _full_boundary_data(billiard::Bi) where {Bi<:AbsBilliard}
-    P = get_boundary_curves(billiard)
+function _reconstruct_curves(P::AbstractVector{<:AbsCurve}, symmetries::SymmetryRegistry)
     np = length(P)
     curves = Vector{AbsCurve}(P)
     source = collect(1:np)
     sector = ones(Int, np)
     reversed = falses(np)
-    @inbounds for (k, sym) in enumerate(billiard.symmetries)
+    @inbounds for (k, sym) in enumerate(symmetries)
         if orientation_reversing(sym)
             images = [_reverse_curve(_apply_symmetry_to_curve(sym, c)) for c in P]
             append!(curves, reverse(images))
@@ -182,6 +181,20 @@ function _full_boundary_data(billiard::Bi) where {Bi<:AbsBilliard}
         end
     end
     return curves, source, sector, reversed
+end
+
+"""
+    _full_boundary_data(billiard::Bi) where {Bi<:AbsBilliard}
+
+Reconstruct the complete outer physical boundary of `billiard` together with
+its discrete construction provenance, see [`_reconstruct_curves`](@ref).
+
+For a billiard with a [`MultiplyConnectedDomain`](@ref) only the outer
+boundary is reconstructed; hole loops are handled by
+[`full_boundary_components`](@ref).
+"""
+function _full_boundary_data(billiard::Bi) where {Bi<:AbsBilliard}
+    return _reconstruct_curves(get_outer_boundary_curves(billiard), billiard.symmetries)
 end
 
 """
@@ -201,8 +214,58 @@ as required to preserve continuous boundary traversal orientation.
 
 ## Returns
 * `curves::Vector{AbsCurve}`: Complete reconstructed physical boundary.
+
+For a billiard with holes this is the concatenation of the loops of
+[`full_boundary_components`](@ref).
 """
 function full_boundary(billiard::Bi) where {Bi<:AbsBilliard}
-    curves, _, _, _ = _full_boundary_data(billiard)
-    return curves
+    return _full_boundary(billiard.fundamental_domain, billiard)
+end
+
+_full_boundary(::AbsDomain, billiard::AbsBilliard) = first(_full_boundary_data(billiard))
+_full_boundary(::AbsMultiplyConnectedDomain, billiard::AbsBilliard) = reduce(vcat, full_boundary_components(billiard).curves)
+
+"""
+    BoundaryComponentMap
+
+Closed boundary loops of a billiard together with their role.
+
+## Attributes
+* `curves::Vector{Vector{AbsCurve}}`: One closed loop per entry; the reconstructed outer boundary first, then every hole loop.
+* `is_hole::Vector{Bool}`: Whether the loop is a hole loop.
+* `group::Vector{Int}`: Solver group of the loop: `0` for the outer boundary, `i` for loops of the `i`-th hole object.
+"""
+struct BoundaryComponentMap
+    curves::Vector{Vector{AbsCurve}}
+    is_hole::Vector{Bool}
+    group::Vector{Int}
+end
+
+"""
+    full_boundary_components(billiard::AbsBilliard) → map::BoundaryComponentMap
+
+Closed physical boundary loops of the complete billiard, derived from the
+construction provenance (no coordinate matching). The outer loop is the outer
+boundary reconstructed by the billiard symmetry registry; hole loops are taken
+from the holes in the full frame, each traversed with the hole region on the
+left. For billiards without holes the single result of [`full_boundary`](@ref)
+is returned as one component.
+"""
+function full_boundary_components(billiard::B) where {B<:AbsBilliard}
+    return _full_boundary_components(billiard.fundamental_domain, billiard)
+end
+
+_full_boundary_components(::AbsDomain, billiard::AbsBilliard) = BoundaryComponentMap([full_boundary(billiard)], [false], [0])
+
+function _full_boundary_components(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard)
+    curves = Vector{Vector{AbsCurve}}()
+    push!(curves, first(_full_boundary_data(billiard)))
+    is_hole = Bool[false]
+    group = Int[0]
+    for (i, h) in enumerate(domain.holes), loop in boundary_components(h)
+        push!(curves, loop)
+        push!(is_hole, true)
+        push!(group, i)
+    end
+    return BoundaryComponentMap(curves, is_hole, group)
 end

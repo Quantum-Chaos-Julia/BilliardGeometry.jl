@@ -88,7 +88,7 @@ end
 
     # hole boundaries as stored by the hole billiards: the full circle of radius R = 0.3 has area pi R^2,
     # the quarter arc about the origin (Sinai hole) has the sector area pi R^2 / 4
-    @test area(AnnularBilliard(0.3, 0.2).fundamental_domain.boundary[2:2]) ≈ pi * 0.3^2 rtol = ar_RTOL
+    @test area(AnnularBilliard(0.3, 0.2).fundamental_domain.holes[1].domain.boundary) ≈ pi * 0.3^2 rtol = ar_RTOL
     @test area(SinaiBilliard(1.0, 0.3).fundamental_domain.boundary[4:4]) ≈ pi * 0.3^2 / 4 rtol = ar_RTOL
 end
 
@@ -117,11 +117,45 @@ end
     @test area(StadiumBilliard(0.7)) ≈ pi + 4 * 0.7 rtol = ar_RTOL
 end
 
+@testset "area (domain)" begin
+    # simple domain: Green integral over the closed boundary
+    @test area(hf_rect_domain(0.0, 0.0, 3.0, 2.0, 1)) ≈ 6.0 rtol = ar_RTOL
+    @test area(hf_circle_domain(0.5, 1.0, 2.0, 1)) ≈ pi * 0.25 rtol = ar_RTOL
+    @test area(hf_circle_domain(0.5f0, 1f0, 2f0, 1)) isa Float32
+    # the quarter-square fundamental domain of the D2 rectangle is closed by its symmetry walls: area 1
+    @test area(hf_quarter_square_domain()) ≈ 1.0 rtol = ar_RTOL
+    # composite domain: sum over the subdomains, [0,1]x[0,1] and [2,3]x[0,1]
+    comp = CompositeDomain(AbsSimpleDomain[hf_rect_domain(0.0, 0.0, 1.0, 1.0, 1), hf_rect_domain(2.0, 0.0, 3.0, 1.0, 2)])
+    @test area(comp) ≈ 2.0 rtol = ar_RTOL
+    # the rtol keyword is forwarded
+    @test area(hf_circle_domain(0.5, 1.0, 2.0, 1); rtol = 1e-6) ≈ pi * 0.25 rtol = 1e-8
+end
+
 @testset "area (billiards with holes)" begin
-    # G1: area(b) adds the area of the holes instead of subtracting it (hole curves are stored with orientation = -1 and the Green integral ignores it)
+    # area(b) = outer area minus the area of every hole
     @testset "AnnularBilliard" begin
         # AnnularBilliard(R_inner, shift): unit disk with a hole of radius R_inner centered at (shift, 0): pi (1 - R_inner^2)
-        @test_broken area(AnnularBilliard(0.3, 0.2)) ≈ pi * (1 - 0.3^2) rtol = ar_RTOL
+        @test area(AnnularBilliard(0.3, 0.2)) ≈ pi * (1 - 0.3^2) rtol = ar_RTOL
+        @test area(hf_concentric_annulus()) ≈ pi * (1 - 0.3^2) rtol = ar_RTOL
+        @test area(hf_eccentric_annulus()) ≈ pi * (1 - 0.2^2) rtol = ar_RTOL
+        @test (@inferred area(hf_concentric_annulus())) isa Float64
+    end
+    @testset "rectangle with a rectangular hole" begin
+        # [0,3] x [0,2] without [1,1.5] x [0.5,1.5]: 6 - 0.5
+        @test area(hf_rect_with_hole()) ≈ 5.5 rtol = ar_RTOL
+    end
+    @testset "D2 billiard with a DomainHole" begin
+        # the outer region is the full square [-1,1]^2 reconstructed from the quarter, the hole (radius 0.2) lives in the full frame: 4 - pi 0.2^2
+        @test area(hf_d2_with_hole()) ≈ 4 - pi * 0.2^2 rtol = ar_RTOL
+    end
+    @testset "two holes" begin
+        b = hf_HoleBilliard{Float64}(MultiplyConnectedDomain(hf_rect_domain(0.0, 0.0, 4.0, 4.0, 1), [hf_circle_domain(0.3, 1.0, 1.0, 2), hf_two_loop_hole(5)], 1), register_symmetries())
+        @test area(b) ≈ 16 - pi * 0.09 - 2.0 rtol = ar_RTOL
+    end
+    @testset "concave outer piece" begin
+        # an inverted circle (orientation -1) in the outer boundary is not a hole: the Green area of the bitten square is 1 - pi/16
+        bite = MultiplyConnectedDomain(hf_bitten_square(), [], 1)
+        @test area(hf_HoleBilliard{Float64}(bite, register_symmetries())) ≈ 1 - pi / 16 rtol = ar_RTOL
     end
     @testset "SinaiBilliard" begin
         # SinaiBilliard(a, R): square [-a, a]^2 with a disk of radius R removed: 4 a^2 - pi R^2
@@ -191,6 +225,17 @@ end
 end
 
 @testset "fundamental_area (billiards with holes)" begin
+    # empty registry: the fundamental area is the area
+    @testset "no symmetry" begin
+        @test fundamental_area(hf_concentric_annulus()) ≈ pi * (1 - 0.3^2) rtol = ar_RTOL
+        @test fundamental_area(hf_eccentric_annulus()) ≈ area(hf_eccentric_annulus()) rtol = ar_RTOL
+        @test fundamental_area(hf_rect_with_hole()) ≈ 5.5 rtol = ar_RTOL
+    end
+    # a DomainHole is compatible only with the empty registry: with D2 the fundamental area is undefined
+    @testset "DomainHole with symmetries" begin
+        @test_throws ArgumentError fundamental_area(hf_d2_with_hole())
+        @test_throws "not compatible" fundamental_area(hf_d2_with_hole())
+    end
     # G1: follows area(b), which adds the hole area
     @testset "SinaiBilliard" begin
         @test_broken fundamental_area(SinaiBilliard(1.0, 0.3)) ≈ (4 - pi * 0.3^2) / 4 rtol = ar_RTOL
@@ -250,4 +295,24 @@ end
     sinai = SinaiBilliard(1.0, 0.3)
     @test length(corner_angles(sinai)) == 5
     @test_broken corner_angles(sinai) ≈ fill(pi / 2, 5) atol = ar_ANGLE_ATOL
+end
+
+@testset "corner_angles (hole corners)" begin
+    # Omega interior angle at a hole corner is pi + the signed turning angle: 3 pi / 2 at each corner of a rectangular hole,
+    # in addition to the four pi / 2 corners of the outer rectangle (outer component first, then the hole loop)
+    rect = hf_rect_with_hole()
+    expected = vcat(fill(pi / 2, 4), fill(3pi / 2, 4))
+    @test corner_angles(rect) ≈ expected atol = ar_ANGLE_ATOL
+    @test corner_angles(rect; fundamental = false) ≈ expected atol = ar_ANGLE_ATOL
+    @test count(a -> isapprox(a, 3pi / 2; atol = ar_ANGLE_ATOL), corner_angles(rect)) == 4
+    @test eltype(corner_angles(rect)) == Float64
+    # a smooth (circular) hole has no corners
+    @test isempty(corner_angles(hf_concentric_annulus()))
+    @test isempty(corner_angles(hf_eccentric_annulus(); fundamental = false))
+    # D2 billiard: the fundamental frame is the quarter square (four pi / 2 corners incl. the walls), the full frame the full square
+    d2 = hf_d2_with_hole()
+    @test corner_angles(d2) ≈ fill(pi / 2, 4) atol = ar_ANGLE_ATOL
+    @test corner_angles(d2; fundamental = false) ≈ fill(pi / 2, 4) atol = ar_ANGLE_ATOL
+    # the angle_tol keyword also applies to hole corners
+    @test isempty(corner_angles(rect; angle_tol = 2.0))
 end

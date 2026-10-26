@@ -36,7 +36,7 @@ function pb_coords(billiard::B, subsegment::Int64, subdomain::Int64, sym_sector:
 end
 
 function pb_sectors(billiard)
-    boundary = CompositeCurve(get_boundary_curves(billiard))
+    boundary = CompositeCurve(get_outer_boundary_curves(billiard))
     L = boundary.length
     ends = boundary.end_lengths
     all_sectors = copy(boundary.end_lengths)
