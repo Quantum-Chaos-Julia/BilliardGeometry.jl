@@ -20,7 +20,6 @@ function is_overlaping(pt1, pt2)
     return x && y
 end
 
-#TODO: Let's test this function.
 """
     connect_curves(curves) → connected::Vector{AbsCurve}
 

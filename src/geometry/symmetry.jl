@@ -63,7 +63,7 @@ struct AntiDiagonalReflection <: AbsReflection
 end
 AntiDiagonalReflection() = AntiDiagonalReflection(0)
 
-# Layer-1 (geometric) reconstruction helpers used only by `register_symmetries`
+# Reconstruction helpers used only by `register_symmetries`
 # to tag a fresh copy of a generator with its assigned `sym_id`.
 _with_sym_id(::XAxisReflection, id::Int) = XAxisReflection(id)
 _with_sym_id(::YAxisReflection, id::Int) = YAxisReflection(id)

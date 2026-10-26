@@ -49,7 +49,6 @@ function TriangleBilliard(gamma, chi; bcs = [SpecularReflection(),SpecularReflec
     alpha = (T(pi)-gamma)/(1+chi)
     beta = alpha*chi
     angles = SVector(alpha, beta, gamma)
-    #println("α=$alpha, β=$beta, γ=$gamma")
     corners = triangle_corners(angles, x0, y0, h)
     domain = Polygon(corners, 1; bcs)
     symmetries = register_symmetries()
