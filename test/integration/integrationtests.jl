@@ -1,12 +1,17 @@
 # Integration tier: solver-free geometry pipelines validated against analytic
 # or cross-method references, grouped by computed quantity.
 
-# Reconstructed full boundary: closure, orientation, length, area and node permutations.
-include("boundary/fullboundary_closure.jl")
+@group "full boundary" begin
+    # Reconstructed full boundary: closure, orientation, length, area and node permutations.
+    include("boundary/fullboundary_closure.jl")
+end
 
-# Node orbits of the symmetry group against geometric point maps.
-include("symmetry/orbit_maps_billiards.jl")
+@group "symmetry orbits" begin
+    # Node orbits of the symmetry group against geometric point maps.
+    include("symmetry/orbit_maps_billiards.jl")
+end
 
-# Poincare-Birkhoff coordinate s against sector windows and full-boundary arc length.
-include("poincare_birkhoff/pb_unfolding.jl")
-
+@group "Poincare-Birkhoff" begin
+    # Poincare-Birkhoff coordinate s against sector windows and full-boundary arc length.
+    include("poincare_birkhoff/pb_unfolding.jl")
+end
