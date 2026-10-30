@@ -232,7 +232,14 @@ _full_boundary(::AbsMultiplyConnectedDomain, billiard::AbsBilliard) = reduce(vca
 """
     BoundaryComponentMap
 
-Closed boundary loops of a billiard together with their role.
+Closed boundary loops of a billiard together with their role, returned by
+[`full_boundary_components`](@ref).
+
+## Description
+The loops are derived from construction provenance, not from coordinate
+matching. Loop `1` is the outer boundary (reconstructed by the symmetry
+registry); hole loops follow in the order of the holes, loops of one hole
+object consecutive.
 
 ## Attributes
 * `curves::Vector{Vector{AbsCurve}}`: One closed loop per entry; the reconstructed outer boundary first, then every hole loop.
@@ -254,6 +261,12 @@ boundary reconstructed by the billiard symmetry registry; hole loops are taken
 from the holes in the full frame, each traversed with the hole region on the
 left. For billiards without holes the single result of [`full_boundary`](@ref)
 is returned as one component.
+
+## Arguments
+* `billiard`: Billiard whose complete physical boundary loops are requested.
+
+## Returns
+* `map`: [`BoundaryComponentMap`](@ref) with `curves`, `is_hole` and `group`.
 """
 function full_boundary_components(billiard::B) where {B<:AbsBilliard}
     return _full_boundary_components(billiard.fundamental_domain, billiard)

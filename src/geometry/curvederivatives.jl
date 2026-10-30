@@ -134,9 +134,11 @@ end
     normal_vec(crv::AbsCurve, ts::AbstractArray) → n̂::Vector
 
 Unit outward normal vectors, obtained from the unit tangent by a clockwise
-90° rotation, `(tx,ty) -> (ty,-tx)`. Valid for a CCW-oriented outer boundary;
-hole boundaries need the opposite curve orientation for the same rule to give
-the outward normal of the billiard domain.
+90° rotation, `(tx,ty) -> (ty,-tx)`. This is the outward normal of the region
+bounded by a curve traversed with that region on its left (CCW for a convex
+region). For a hole loop (traversed with the hole region on its left) it is the
+outward normal of the hole, i.e. it points into the billiard domain Ω, so
+solvers negate it (or flip the loop tangent) to obtain the outward normal of Ω.
 """
 function normal_vec(crv::AbsCurve, ts::AbstractArray{<:Real})
     ta = tangent_vec(crv, ts)

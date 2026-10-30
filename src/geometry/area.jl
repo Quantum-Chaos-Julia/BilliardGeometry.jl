@@ -86,6 +86,15 @@ Returns the area of the complete physical billiard, using
 [`full_boundary`](@ref) so the result is independent of any symmetry
 reduction represented by the billiard's fundamental domain. For a billiard
 with holes, the outer area minus the area of every hole.
+
+## Arguments
+* `billiard`: Billiard whose area is computed.
+
+## Keyword arguments
+* `rtol = 1e-10` : Relative tolerance of the Green-theorem quadrature.
+
+## Returns
+* `A`: Area of the physical region Ω.
 """
 @inline area(billiard::AbsBilliard; kwargs...) = _billiard_area(billiard.fundamental_domain, billiard; kwargs...)::_billiard_eltype(billiard)
 
@@ -134,6 +143,17 @@ the full physical [`area`](@ref) by the highest-order discrete symmetry's
 [`symmetry_reduction_factor`](@ref). For a billiard with holes it is the
 full area divided by the symmetry group order, valid only when every hole is
 [`symmetry_compatible`](@ref) with the symmetry registry (`ArgumentError` otherwise).
+Since a [`DomainHole`](@ref) is compatible only with an empty registry, this
+equals [`area`](@ref) for billiards whose only holes are `DomainHole`s.
+
+## Arguments
+* `billiard`: Billiard whose fundamental-domain area is computed.
+
+## Returns
+* `A`: Area of the fundamental domain.
+
+## Throws
+`ArgumentError` for a billiard with a hole that is not compatible with its symmetry registry.
 """
 @inline function fundamental_area(billiard::AbsBilliard)
     return _fundamental_area(billiard.fundamental_domain, billiard)

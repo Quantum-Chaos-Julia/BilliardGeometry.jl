@@ -15,13 +15,24 @@
 """
     DomainHole{D<:AbsDomain} <: AbsDomainHole
 
-Region removed from a [`MultiplyConnectedDomain`](@ref).
+`DomainHole` is the concrete [`AbsDomainHole`](@ref) wrapping one simple or composite domain that is subtracted from the outer region of a [`MultiplyConnectedDomain`](@ref).
+
+## Description
+The hole lives in the full physical frame and has no symmetry: it is never
+replicated or reduced by the billiard symmetry registry, so it is
+[`symmetry_compatible`](@ref) only with an empty registry. Every closed loop of
+its boundary is traversed with the hole region on the left (counterclockwise for
+a convex hole); the curve `orientation` field is never read to decide hole
+status.
 
 ## Attributes
 * `domain::D`: Full hole region, a simple or composite domain whose specular boundary consists of closed loops in the full physical frame, each traversed with the hole region on the left.
 
-## Interface
-Every `AbsDomainHole` provides `hole_domains`, `hole_loop_count`, `hole_leaves`, `is_inside`, `get_boundary_curves`, `get_all_domains`, `get_all_curves`, `boundary_components`, `area` and `symmetry_compatible`.
+## API
+The following functions can be evaluated for this type:
+- [`hole_domains`](@ref), [`hole_loop_count`](@ref), [`hole_leaves`](@ref)
+- [`is_inside`](@ref), [`area`](@ref), [`symmetry_compatible`](@ref)
+- [`get_boundary_curves`](@ref), [`get_all_domains`](@ref), [`get_all_curves`](@ref), [`boundary_components`](@ref)
 """
 struct DomainHole{D<:AbsDomain} <: AbsDomainHole
     domain::D

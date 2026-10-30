@@ -18,9 +18,20 @@ Planar domain `Ω = (⋃ subdomains) \\ (⋃ holes)`.
 * `id::Int64`: Integer id of the domain.
 
 ## Description
-The curve `orientation` field is never used to identify holes. Every subdomain
-and hole boundary is a closed loop traversed with that domain's own region on
-the left.
+`subdomains` describe only the outer region, in the fundamental frame of the
+billiard; they are reconstructed by the billiard symmetry registry. Every hole is
+a self-contained [`AbsDomainHole`](@ref) in the full physical frame and is never
+reconstructed. The curve `orientation` field is never used to identify holes
+(it only selects which side of one curve is inside, so inverted, concave
+subdomains stay valid). Every subdomain and hole boundary is a closed loop
+traversed with that domain's own region on the left. The domain has no `genus`
+or `corners` field: [`genus`](@ref) is computed from the holes.
+
+## API
+The following functions can be evaluated for this type:
+- [`genus`](@ref), [`hole_domain_ids`](@ref), [`is_hole_curve`](@ref), [`component_of_domain_id`](@ref), [`validate_holes`](@ref)
+- [`get_outer_boundary_curves`](@ref), [`get_hole_boundary_curves`](@ref), [`boundary_components`](@ref), [`boundary_component_is_hole`](@ref), [`geometric_boundary_components`](@ref)
+- [`is_inside`](@ref), [`area`](@ref)
 """
 struct MultiplyConnectedDomain{T<:Real} <: AbsMultiplyConnectedDomain
     subdomains::Vector{AbsSimpleDomain}
@@ -102,6 +113,12 @@ end
 
 Curve `domain_id`s contained in a hole of `domain`/`billiard`; empty when it
 has no holes.
+
+## Arguments
+* `domain`/`billiard`: Domain or billiard (its `fundamental_domain` is used).
+
+## Returns
+* `ids`: Sorted unique `domain_id`s of all curves of all holes.
 """
 hole_domain_ids(::AbsDomain) = Int[]
 hole_domain_ids(domain::MultiplyConnectedDomain) = sort!(collect(Set{Int}(crv.domain_id for h in domain.holes for crv in get_all_curves(h))))
@@ -111,7 +128,14 @@ hole_domain_ids(billiard::B) where {B<:AbsBilliard} = hole_domain_ids(billiard.f
     is_hole_curve(domain, crv::AbsCurve) → flag::Bool
 
 `true` when `crv` belongs to a hole of `domain` (a domain or billiard), decided
-by the curve's `domain_id`.
+by the curve's `domain_id` (never by its `orientation`).
+
+## Arguments
+* `domain`: Domain or billiard.
+* `crv`: Curve to test.
+
+## Returns
+* `flag`: `false` for every domain without holes.
 """
 is_hole_curve(::AbsDomain, ::AbsCurve) = false
 is_hole_curve(domain::MultiplyConnectedDomain, crv::AbsCurve) = crv.domain_id in hole_domain_ids(domain)
@@ -121,7 +145,14 @@ is_hole_curve(billiard::B, crv::AbsCurve) where {B<:AbsBilliard} = is_hole_curve
     component_of_domain_id(domain) → map::Dict{Int,Int}
 
 Maps each curve `domain_id` of `domain` (a domain or billiard) to its solver
-group: `0` for the outer region, `i` for the `i`-th hole object.
+group: `0` for the outer region, `i` for the `i`-th hole object (all loops of one
+hole object share its group). Domains without holes map every `domain_id` to `0`.
+
+## Arguments
+* `domain`: Domain or billiard.
+
+## Returns
+* `map`: Dictionary from curve `domain_id` to group index.
 """
 function component_of_domain_id(domain::MultiplyConnectedDomain)
     map = Dict{Int,Int}()
@@ -159,6 +190,13 @@ every other hole.
 
 This is not a proof that holes neither touch nor overlap each other or the
 outer boundary.
+
+## Arguments
+* `domain`: The multiply connected domain whose holes are checked.
+* `registry`: Symmetry registry of the billiard used to reconstruct the outer region.
+
+## Returns
+* `nothing` when all sample points pass.
 
 ## Throws
 `ArgumentError` naming the offending hole.
