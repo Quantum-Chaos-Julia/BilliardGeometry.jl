@@ -116,11 +116,8 @@ symmetries. [`CompositeReflection`](@ref) is not reduced and returns `1`, which
 is a conservative value for Weyl-law windows.
 """
 @inline symmetry_reduction_factor(::AbsSymmetry) = 1
-@inline symmetry_reduction_factor(::XAxisReflection) = 2
-@inline symmetry_reduction_factor(::YAxisReflection) = 2
+@inline symmetry_reduction_factor(::AxisReflection) = 2
 @inline symmetry_reduction_factor(::XYAxisReflection) = 4
-@inline symmetry_reduction_factor(::DiagonalReflection) = 2
-@inline symmetry_reduction_factor(::AntiDiagonalReflection) = 2
 @inline symmetry_reduction_factor(sym::NFoldRotation) = sym.order
 @inline symmetry_reduction_factor(::CompositeReflection) = 1
 
@@ -130,10 +127,7 @@ function maximal_symmetry(billiard::AbsBilliard)
     return billiard.symmetries[i]
 end
 
-@inline function symmetry_reduction_factor(billiard::AbsBilliard)
-    sym = maximal_symmetry(billiard)
-    return (isnothing(sym) ? 1 : symmetry_reduction_factor(sym))::Int
-end
+@inline symmetry_reduction_factor(billiard::AbsBilliard) = length(billiard.symmetries) + 1
 
 """
     fundamental_area(billiard::AbsBilliard) → A::Real

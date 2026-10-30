@@ -1,5 +1,7 @@
 # Unit tests for src/geometry/area.jl: area (curve, composite, vector, billiard), fundamental_area, corner_angles, symmetry_reduction_factor, maximal_symmetry.
-# Reference values are closed forms (circle, rectangle, right triangle, regular polygon, squares by Green's theorem); helpers use the prefix `ar_`.
+# Reference values are closed forms (circle, rectangle, right triangle, regular polygon, squares by Green's theorem); the reduction
+# factor of a billiard is the order of its registered group (registry length + 1), that of a single element is 2 for a mirror,
+# 4 for XY and the order for a rotation. Helpers use the prefix `ar_`.
 
 using StaticArrays: SVector
 using BilliardGeometry: AbsSymmetry, symmetry_reduction_factor, maximal_symmetry
@@ -25,6 +27,13 @@ end
 
 # Symmetry subtype without a method of its own, to reach the generic fallback of symmetry_reduction_factor.
 struct ar_PlainSymmetry <: AbsSymmetry end
+
+# Circular PolarBilliard whose registry holds exactly the given symmetries; the shape is irrelevant for registry-only queries.
+function ar_polar_billiard(syms::AbsSymmetry...)
+    seg = FourierCoeffPolarSegment(Float64[]; shift_angle = -pi / 4)
+    dom = PolarDomain{Float64}([seg], [curve(seg, 0.0)], 1)
+    return PolarBilliard{Float64}(dom, register_symmetries(syms...))
+end
 
 @testset "area (curve)" begin
     # a full circle of radius R has area pi R^2, wherever its center is (Green's theorem on a closed curve)
@@ -190,10 +199,19 @@ end
 end
 
 @testset "symmetry_reduction_factor (billiard)" begin
-    # the factor is that of the largest generator in the registry
+    # the factor of a billiard is the order of its registered symmetry group: registered elements plus the identity
     @test symmetry_reduction_factor(CircleBilliard(1.0)) == 4       # D2
     @test symmetry_reduction_factor(StadiumBilliard(0.7)) == 4      # D2
     @test symmetry_reduction_factor(C3Billiard(0.1)) == 3           # C3
+    # D4 (seven registered elements) has order 8, which no single element's factor reaches
+    d4 = ar_polar_billiard(collect(D4_symmetry())...)
+    @test length(d4.symmetries) == 7
+    @test symmetry_reduction_factor(d4) == 8
+    @test maximum(symmetry_reduction_factor, d4.symmetries) == 4
+    # registries holding only rotations or a single element
+    @test symmetry_reduction_factor(ar_polar_billiard((NFoldRotation(6, m) for m in 1:5)...)) == 6
+    @test symmetry_reduction_factor(ar_polar_billiard(DiagonalReflection())) == 2
+    @test symmetry_reduction_factor(ar_polar_billiard(XYAxisReflection())) == 2
     # no registered symmetry: factor 1
     @test symmetry_reduction_factor(TriangleBilliard(pi / 2, 1.0)) == 1
     @test symmetry_reduction_factor(AnnularBilliard(0.3, 0.2)) == 1
@@ -210,6 +228,10 @@ end
     @test c3.order == 3
     # the returned generator is the registered one, with its sym_id
     @test maximal_symmetry(CircleBilliard(1.0)).sym_id == 2
+    # D4: the per-element maximum (factor 4) is the first registered element reaching it, XY, not the group order 8
+    d4_max = maximal_symmetry(ar_polar_billiard(collect(D4_symmetry())...))
+    @test d4_max isa XYAxisReflection
+    @test symmetry_reduction_factor(d4_max) == 4
     # empty registry: nothing
     @test maximal_symmetry(TriangleBilliard(pi / 2, 1.0)) === nothing
     @test maximal_symmetry(AnnularBilliard(0.3, 0.2)) === nothing

@@ -1,28 +1,32 @@
 """
-    XAxisReflection(sym_id=0)
+    AxisReflection{A}(sym_id=0)
 
-Reflection across the x-axis, `(x,y) -> (x,-y)`.
+Reflection across the line through the origin at angle `π*A`, with `A::Rational{Int}`
+the mirror angle in half-turns: matrix `Rot(2π*A) * diag(1,-1)`. The four special axes
+have aliases [`XAxisReflection`](@ref) (`A=0`), [`DiagonalReflection`](@ref) (`A=1/4`),
+[`YAxisReflection`](@ref) (`A=1/2`) and [`AntiDiagonalReflection`](@ref) (`A=3/4`).
 
 ## Arguments
 * `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref) (purely geometric; carries no representation/parity data — see [`SymmetrySector`](@ref) in `QuantumBilliards.jl` for the per-solve representation choice).
 """
-struct XAxisReflection <: AbsReflection
+struct AxisReflection{A} <: AbsReflection
     sym_id::Int
 end
-XAxisReflection() = XAxisReflection(0)
+AxisReflection{A}() where {A} = AxisReflection{A}(0)
+
+"""
+    XAxisReflection(sym_id=0)
+
+Reflection across the x-axis, `(x,y) -> (x,-y)`. Alias of `AxisReflection{0//1}`.
+"""
+const XAxisReflection = AxisReflection{0//1}
 
 """
     YAxisReflection(sym_id=0)
 
-Reflection across the y-axis, `(x,y) -> (-x,y)`.
-
-## Arguments
-* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref).
+Reflection across the y-axis, `(x,y) -> (-x,y)`. Alias of `AxisReflection{1//2}`.
 """
-struct YAxisReflection <: AbsReflection
-    sym_id::Int
-end
-YAxisReflection() = YAxisReflection(0)
+const YAxisReflection = AxisReflection{1//2}
 
 """
     XYAxisReflection(sym_id=0)
@@ -40,36 +44,28 @@ XYAxisReflection() = XYAxisReflection(0)
 """
     DiagonalReflection(sym_id=0)
 
-Reflection across the `y=x` diagonal, `(x,y) -> (y,x)`.
-
-## Arguments
-* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref).
+Reflection across the `y=x` diagonal, `(x,y) -> (y,x)`. Alias of `AxisReflection{1//4}`.
 """
-struct DiagonalReflection <: AbsReflection
-    sym_id::Int
-end
-DiagonalReflection() = DiagonalReflection(0)
+const DiagonalReflection = AxisReflection{1//4}
 
 """
     AntiDiagonalReflection(sym_id=0)
 
-Reflection across the `y=-x` anti-diagonal, `(x,y) -> (-y,-x)`.
-
-## Arguments
-* `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref).
+Reflection across the `y=-x` anti-diagonal, `(x,y) -> (-y,-x)`. Alias of `AxisReflection{3//4}`.
 """
-struct AntiDiagonalReflection <: AbsReflection
-    sym_id::Int
+const AntiDiagonalReflection = AxisReflection{3//4}
+
+function Base.show(io::IO, sym::AxisReflection{A}) where {A}
+    name = A == 0 ? "XAxisReflection" : A == 1//2 ? "YAxisReflection" :
+           A == 1//4 ? "DiagonalReflection" : A == 3//4 ? "AntiDiagonalReflection" :
+           "AxisReflection{$A}"
+    print(io, name, "(", sym.sym_id, ")")
 end
-AntiDiagonalReflection() = AntiDiagonalReflection(0)
 
 # Reconstruction helpers used only by `register_symmetries`
 # to tag a fresh copy of a generator with its assigned `sym_id`.
-_with_sym_id(::XAxisReflection, id::Int) = XAxisReflection(id)
-_with_sym_id(::YAxisReflection, id::Int) = YAxisReflection(id)
+_with_sym_id(::AxisReflection{A}, id::Int) where {A} = AxisReflection{A}(id)
 _with_sym_id(::XYAxisReflection, id::Int) = XYAxisReflection(id)
-_with_sym_id(::DiagonalReflection, id::Int) = DiagonalReflection(id)
-_with_sym_id(::AntiDiagonalReflection, id::Int) = AntiDiagonalReflection(id)
 
 """
     CompositeReflection(reflections)
@@ -109,6 +105,10 @@ _sym_matrix(::YAxisReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,
 _sym_matrix(::XYAxisReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(-1, 0, 0, -1)
 _sym_matrix(::DiagonalReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(0, 1, 1, 0)
 _sym_matrix(::AntiDiagonalReflection, ::Type{T}=Float64) where {T<:Real} = SMatrix{2,2,T}(0, -1, -1, 0)
+function _sym_matrix(::AxisReflection{A}, ::Type{T}=Float64) where {A,T<:Real}
+    s, c = sincospi(T(2 * A))
+    return SMatrix{2,2,T}(c, s, s, -c)
+end
 
 """
     apply_symmetry(sym::AbsSymmetry, pt::SVector{2,T}) → pt′::SVector{2,T}
@@ -181,6 +181,22 @@ Registers the three non-identity elements of the `D₂` reflection group
 [`register_symmetries`](@ref), giving them fresh `sym_id`s `1,2,3`.
 """
 D2_symmetry() = register_symmetries(YAxisReflection(), XYAxisReflection(), XAxisReflection())
+
+"""
+    D4_symmetry() → reg::SymmetryRegistry
+
+Registers the seven non-identity elements of the `D₄` group (`DiagonalReflection`,
+`NFoldRotation(4,1)`, `YAxisReflection`, `XYAxisReflection`,
+`AntiDiagonalReflection`, `NFoldRotation(4,3)`, `XAxisReflection`, in that
+order) via [`register_symmetries`](@ref), giving them `sym_id`s `1,...,7`.
+
+The order is the reconstruction order of a fundamental piece that runs
+counterclockwise from the angle `0` to the angle `π/4` (for example the
+fundamental triangle `0 ≤ y ≤ x`): the images, in this order, form one
+contiguous closed loop (see `_reconstruct_curves`).
+"""
+D4_symmetry() = register_symmetries(DiagonalReflection(), NFoldRotation(4, 1), YAxisReflection(), XYAxisReflection(),
+    AntiDiagonalReflection(), NFoldRotation(4, 3), XAxisReflection())
 
 """
     AbsRotation <: AbsSymmetry

@@ -31,10 +31,7 @@
 and `false` for the symmetries that preserve it: [`XYAxisReflection`](@ref) (a
 π rotation) and [`NFoldRotation`](@ref).
 """
-orientation_reversing(::XAxisReflection) = true
-orientation_reversing(::YAxisReflection) = true
-orientation_reversing(::DiagonalReflection) = true
-orientation_reversing(::AntiDiagonalReflection) = true
+orientation_reversing(::AxisReflection) = true
 orientation_reversing(::XYAxisReflection) = false
 orientation_reversing(::NFoldRotation) = false
 

@@ -133,6 +133,7 @@ symmetry_node_multiple(::YAxisReflection) = 4
 symmetry_node_multiple(::XYAxisReflection) = 4
 symmetry_node_multiple(::DiagonalReflection) = 8
 symmetry_node_multiple(::AntiDiagonalReflection) = 8
+symmetry_node_multiple(::AxisReflection{A}) where {A} = throw(ArgumentError("symmetry_node_multiple is undefined for AxisReflection{$A}; only the axes 0, 1/4, 1/2, 3/4 are supported."))
 symmetry_node_multiple(sym::NFoldRotation) = sym.order
 symmetry_node_multiple(sym::CompositeReflection) = foldl(lcm, (symmetry_node_multiple(ref) for ref in sym.reflections); init = 1)
 
@@ -140,152 +141,105 @@ symmetry_node_multiple(sym::CompositeReflection) = foldl(lcm, (symmetry_node_mul
 # EXACT REGISTERED-GROUP ALGEBRA
 ################################################################################
 
-# Exact integer matrix key for the identity transformation.
-const _SYMMETRY_IDENTITY_KEY = (1, 0, 0, 1)
+# Dihedral key `(reflects, a)` of a symmetry element, `a` taken mod 1: `rot(a)` is the
+# rotation by `2πa`, `refl(a)` the mirror through the origin at angle `πa`.
+@inline symmetry_key(::AxisReflection{A}) where {A} = (true, mod(A, 1//1))
+@inline symmetry_key(::XYAxisReflection) = (false, 1//2)
+@inline symmetry_key(sym::NFoldRotation) = (false, mod(sym.m // sym.order, 1//1))
 
-# Return the exact integer matrix key of each implemented reflection.
-@inline _symmetry_key(::XAxisReflection) = (1, 0, 0, -1)
-@inline _symmetry_key(::YAxisReflection) = (-1, 0, 0, 1)
-@inline _symmetry_key(::XYAxisReflection) = (-1, 0, 0, -1)
-@inline _symmetry_key(::DiagonalReflection) = (0, 1, 1, 0)
-@inline _symmetry_key(::AntiDiagonalReflection) = (0, -1, -1, 0)
+const _DihedralKey = Tuple{Bool,Rational{Int}}
 
-# Compose two exact 2×2 integer symmetry matrices, returning the key of A ∘ B.
-@inline function _compose_symmetry_keys(A::NTuple{4, Int}, B::NTuple{4, Int})
-    a, b, c, d = A
-    e, f, g, h = B
-    return (a * e + b * g, a * f + b * h, c * e + d * g, c * f + d * h)
+# Key of the identity element.
+const _IDENTITY_KEY = (false, 0 // 1)::_DihedralKey
+
+# Key of g ∘ h. With g = (rg, a), h = (rh, b): the product reflects iff exactly
+# one factor does, and the angle is a - b if g reflects, a + b otherwise.
+@inline function _compose_keys(g::_DihedralKey, h::_DihedralKey)
+    rg, a = g
+    rh, b = h
+    return (rg ⊻ rh, mod(rg ? a - b : a + b, 1 // 1))::_DihedralKey
 end
 
-# Represent an N-fold rotation exactly by its order and reduced rotation power.
-@inline _rotation_key(sym::NFoldRotation) = (sym.order, mod(sym.m, sym.order))
-
-# Return the exact identity key for an N-fold rotation group.
-@inline _rotation_identity_key(n::Int) = (n, 0)
-
-# Compose two powers of the same cyclic rotation group.
-@inline function _compose_rotation_keys(a::Tuple{Int, Int}, b::Tuple{Int, Int})
-    a[1] == b[1] || throw(ArgumentError("Cannot compose rotations of orders $(a[1]) and $(b[1])"))
-    return (a[1], mod(a[2] + b[2], a[1]))
-end
-
-# Return the exact geometric keys of the physical reconstruction sectors in
-# the same order used by `full_boundary`: identity followed by the registry.
-function _reflection_sector_keys(billiard::Bi) where {Bi<:AbsBilliard}
-    keys = NTuple{4, Int}[_SYMMETRY_IDENTITY_KEY]
-    @inbounds for sym in billiard.symmetries
-        sym isa AbsReflection || throw(ArgumentError("Expected a reflection-group SymmetryRegistry; found $(typeof(sym))"))
-        sym isa CompositeReflection && throw(ArgumentError("CompositeReflection cannot be a physical reconstruction-sector element"))
-        push!(keys, _symmetry_key(sym))
-    end
-    length(unique(keys)) == length(keys) || throw(ArgumentError("SymmetryRegistry contains duplicate geometric actions"))
-    return keys
-end
-
-# Compute how one reflection permutes the physical reconstruction sectors by
-# exact group multiplication, without inspecting any boundary coordinates.
-function _reflection_sector_permutation(billiard::Bi, action::AbsReflection) where {Bi<:AbsBilliard}
-    action isa CompositeReflection && throw(ArgumentError("CompositeReflection is a generator set, not one geometric action"))
-    keys = _reflection_sector_keys(billiard)
-    g = _symmetry_key(action)
-    p = Vector{Int}(undef, length(keys))
-    @inbounds for s in eachindex(keys)
-        target = _compose_symmetry_keys(g, keys[s])
-        j = findfirst(==(target), keys)
-        isnothing(j) && throw(ArgumentError("$(typeof(action)) is not contained in the billiard's registered physical symmetry group"))
-        p[s] = j
-    end
-    return p
-end
-
-# Return the exact cyclic keys of the physical rotational reconstruction
-# sectors in the same order used by `full_boundary`.
-function _rotation_sector_keys(billiard::Bi) where {Bi<:AbsBilliard}
-    isempty(billiard.symmetries) && throw(ArgumentError("Billiard has no registered rotational symmetry"))
-    firstsym = first(billiard.symmetries)
-    firstsym isa NFoldRotation || throw(ArgumentError("Expected a rotational SymmetryRegistry; found $(typeof(firstsym))"))
-    n = firstsym.order
-    keys = Tuple{Int, Int}[_rotation_identity_key(n)]
-    @inbounds for sym in billiard.symmetries
-        sym isa NFoldRotation || throw(ArgumentError("SymmetryRegistry mixes rotational and reflection actions"))
-        sym.order == n || throw(ArgumentError("SymmetryRegistry mixes rotation orders"))
-        push!(keys, _rotation_key(sym))
-    end
-    length(unique(keys)) == length(keys) || throw(ArgumentError("SymmetryRegistry contains duplicate rotational actions"))
-    return keys
-end
-
-# Compute how one N-fold rotation permutes the physical reconstruction sectors
-# by exact cyclic-group addition.
-function _rotation_sector_permutation(billiard::Bi, action::NFoldRotation) where {Bi<:AbsBilliard}
-    keys = _rotation_sector_keys(billiard)
-    g = _rotation_key(action)
-    p = Vector{Int}(undef, length(keys))
-    @inbounds for s in eachindex(keys)
-        target = _compose_rotation_keys(g, keys[s])
-        j = findfirst(==(target), keys)
-        isnothing(j) && throw(ArgumentError("Rotation m = $(action.m) is not contained in the billiard's registered physical symmetry group"))
-        p[s] = j
-    end
-    return p
-end
-
-# Grow `closure` (a set of exact 2x2 integer matrix keys, already containing
-# the identity key) by repeatedly composing every element with every
-# generator key, until no new key appears.
-function _close_under_composition(closure::Set{NTuple{4, Int}}, gen_keys::Vector{NTuple{4, Int}})
-    grown = true
-    while grown
-        grown = false
-        for a in collect(closure), g in gen_keys
-            c = _compose_symmetry_keys(a, g)
-            if !(c in closure)
-                push!(closure, c)
-                grown = true
-            end
+# Grow the set of keys containing the identity under composition with the generator keys.
+function _keys_closure(gen_keys::AbstractVector{<:_DihedralKey})
+    closure = _DihedralKey[_IDENTITY_KEY]
+    head = 1
+    while head <= length(closure)
+        a = closure[head]
+        for g in gen_keys
+            c = _compose_keys(a, g)
+            c in closure || push!(closure, c)
         end
+        head += 1
     end
     return closure
 end
 
-# Exact integer determinant of a reflection's matrix key: -1 for a genuine
-# mirror-line reflection, +1 for an element that is itself already the
-# composition of two mirror-line reflections (e.g. `XYAxisReflection`,
-# geometrically a π rotation about the origin despite its `AbsReflection` type).
-@inline function _symmetry_determinant(sym::AbsReflection)
-    a, b, c, d = _symmetry_key(sym)
-    return a * d - b * c
+# Keys of the reconstruction blocks of a registry in the order used by
+# `full_boundary`: identity followed by the registry.
+function _block_keys(reg::SymmetryRegistry)
+    keys = _DihedralKey[_IDENTITY_KEY]
+    for sym in reg
+        sym isa CompositeReflection && throw(ArgumentError("CompositeReflection cannot be a physical reconstruction-sector element"))
+        push!(keys, symmetry_key(sym))
+    end
+    length(unique(keys)) == length(keys) || throw(ArgumentError("SymmetryRegistry contains duplicate geometric actions"))
+    return keys
+end
+_block_keys(billiard::AbsBilliard) = _block_keys(billiard.symmetries)
+
+# Exact permutation of the blocks under left multiplication by `g`.
+function _block_permutation(block_keys::Vector{_DihedralKey}, g::AbsSymmetry)
+    gk = symmetry_key(g)
+    p = Vector{Int}(undef, length(block_keys))
+    @inbounds for s in eachindex(block_keys)
+        j = findfirst(==(_compose_keys(gk, block_keys[s])), block_keys)
+        isnothing(j) && throw(ArgumentError("$(typeof(g)) is not contained in the billiard's registered physical symmetry group"))
+        p[s] = j
+    end
+    return p
 end
 
-# Greedily pick a minimal subset of a reflection-group registry whose
-# composition closure (together with the identity) reproduces every
-# registered element. Genuine mirror-line reflections (determinant -1) are
-# tried before composite (determinant +1) elements, so that e.g. `D₂`'s
-# `XYAxisReflection` (== `XAxisReflection` ∘ `YAxisReflection`) is only
-# picked as a generator if the true mirror-line reflections alone aren't
-# enough; ties are broken by registration order.
-function _minimal_reflection_generators(reg::SymmetryRegistry)
-    target = Set{NTuple{4, Int}}(_symmetry_key(sym) for sym in reg)
-    ngoal = length(target) + 1 # +1 for the identity
-
-    generators = AbsReflection[]
-    gen_keys = NTuple{4, Int}[]
-    closure = Set{NTuple{4, Int}}((_SYMMETRY_IDENTITY_KEY,))
-
-    ordered = vcat(filter(sym -> _symmetry_determinant(sym) == -1, collect(reg)),
-                   filter(sym -> _symmetry_determinant(sym) != -1, collect(reg)))
-
-    for sym in ordered
-        k = _symmetry_key(sym)
-        k in closure && continue
-        push!(generators, sym)
-        push!(gen_keys, k)
-        closure = _close_under_composition(closure, gen_keys)
-        length(closure) == ngoal && break
+# All size-`k` index subsets of `1:n` in lexicographic order.
+function _index_combinations(n::Int, k::Int)
+    combos = Vector{Vector{Int}}()
+    k > n && return combos
+    c = collect(1:k)
+    while true
+        push!(combos, copy(c))
+        i = k
+        while i >= 1 && c[i] == n - k + i
+            i -= 1
+        end
+        i == 0 && break
+        c[i] += 1
+        for j in i + 1:k
+            c[j] = c[j - 1] + 1
+        end
     end
+    return combos
+end
 
-    length(closure) == ngoal || throw(ArgumentError("SymmetryRegistry is not closed under composition by its own elements"))
-    return Tuple(generators)
+# Smallest set of registry elements whose closure is the whole registry
+# group. Candidates are tried by increasing size, in registration order with
+# mirror reflections before orientation-preserving elements, so that e.g. `D₂`'s
+# `XYAxisReflection` (== `XAxisReflection` ∘ `YAxisReflection`) is only
+# picked if the mirrors alone are not enough.
+function _minimal_generators(reg::SymmetryRegistry)
+    isempty(reg) && return ()
+    elements = collect(reg)
+    keys = _DihedralKey[symmetry_key(sym) for sym in elements]
+    ngoal = length(_keys_closure(keys))
+    ngoal == length(keys) + 1 || throw(ArgumentError("SymmetryRegistry is not closed under composition by its own elements"))
+    order = vcat(findall(sym -> orientation_reversing(sym), elements),
+                 findall(sym -> !orientation_reversing(sym), elements))
+    for k in 1:length(order)
+        for combo in _index_combinations(length(order), k)
+            idx = order[combo]
+            length(_keys_closure(keys[idx])) == ngoal && return Tuple(elements[idx])
+        end
+    end
+    throw(ArgumentError("SymmetryRegistry is not closed under composition by its own elements"))
 end
 
 """
@@ -306,13 +260,13 @@ per-generator irreducible-representation characters (see `SymmetrySector` in
 `XYAxisReflection = XAxisReflection ∘ YAxisReflection` is already implied by
 composing the other two.
 
-Reflection-group registries are reduced to generators by exact 2×2 integer
-matrix composition (the same `_symmetry_key`/`_compose_symmetry_keys` algebra
-used by [`symmetry_index_orbits`](@ref)), preferring genuine mirror-line
-reflections over elements that are themselves already a composition of two
-reflections (see `_minimal_reflection_generators`); rotational
-(cyclic) registries are generated by their single `sym_id=1` element, since
-`m=1` is always coprime to the rotation order.
+Generators are found by exact dihedral-key composition (the algebra used by
+[`symmetry_index_orbits`](@ref)): the smallest set of registered elements whose
+closure is the whole group is returned, trying sets of increasing size in
+registration order with mirror reflections before orientation-preserving
+elements. For `D₂` this is `(YAxisReflection, XAxisReflection)`, for `D₄`
+`(YAxisReflection, DiagonalReflection)`, and for a cyclic registry its
+`sym_id=1` element.
 
 ## Arguments
 * `billiard::AbsBilliard`: Billiard whose registered symmetry group is reduced to generators.
@@ -320,11 +274,16 @@ reflections (see `_minimal_reflection_generators`); rotational
 ## Returns
 * `gens::Tuple{Vararg{AbsSymmetry}}`: Minimal generating subset of `billiard.symmetries`.
 """
-function get_symmetries(billiard::Bi) where {Bi<:AbsBilliard}
-    reg = billiard.symmetries
-    isempty(reg) && return ()
-    return first(reg) isa AbsRotation ? (first(reg),) : _minimal_reflection_generators(reg)
-end
+get_symmetries(billiard::Bi) where {Bi<:AbsBilliard} = _minimal_generators(billiard.symmetries)
+get_symmetries(reg::SymmetryRegistry) = _minimal_generators(reg)
+
+"""
+    get_symmetry_group(billiard::AbsBilliard) → reg::SymmetryRegistry
+
+Return the registry of symmetry elements that act on the billiard's physical
+boundary, which for a billiard without holes is `billiard.symmetries`.
+"""
+get_symmetry_group(billiard::Bi) where {Bi<:AbsBilliard} = billiard.symmetries
 
 ################################################################################
 # EXACT MIDPOINT-GRID PERMUTATIONS
@@ -367,20 +326,19 @@ function _sector_node_permutation(N::Int, sector_perm::Vector{Int}, reversing::B
     return p
 end
 
-# Construct the exact midpoint-index permutation induced by one physical
-# reflection on an invariant boundary component.
-function _boundary_symmetry_permutation(billiard::Bi, N::Int, symmetry::AbsReflection) where {Bi<:AbsBilliard}
-    symmetry isa CompositeReflection && throw(ArgumentError("CompositeReflection contains several geometric generators"))
-    sectors = _reflection_sector_permutation(billiard, symmetry)
+# Exact midpoint-index permutation induced by one physical symmetry element on
+# an invariant boundary component split into the blocks of `block_keys`.
+function _block_node_permutation(N::Int, block_keys::Vector{_DihedralKey}, symmetry::AbsSymmetry)
+    sectors = _block_permutation(block_keys, symmetry)
     return _sector_node_permutation(N, sectors, orientation_reversing(symmetry))
 end
 
-# Construct the exact midpoint-index permutation induced by one physical
-# N-fold rotation on an invariant boundary component.
-function _boundary_symmetry_permutation(billiard::Bi, N::Int, symmetry::NFoldRotation) where {Bi<:AbsBilliard}
-    sectors = _rotation_sector_permutation(billiard, symmetry)
-    return _sector_node_permutation(N, sectors, false)
+function _boundary_symmetry_permutation(billiard::Bi, N::Int, symmetry::AbsSymmetry) where {Bi<:AbsBilliard}
+    return _block_node_permutation(N, _block_keys(billiard), symmetry)
 end
+
+_boundary_symmetry_permutation(::Bi, ::Int, ::CompositeReflection) where {Bi<:AbsBilliard} =
+    throw(ArgumentError("CompositeReflection contains several geometric generators"))
 
 # Compose two index permutations as a ∘ b, so the resulting image of q is
 # a[b[q]].
@@ -432,6 +390,36 @@ end
 # PUBLIC SINGLE-COMPONENT API
 ################################################################################
 
+# Orbit map of the group generated by `generators` acting on the `block_keys`
+# blocks of a component with `N` nodes. The group is built by closure under
+# composition of the exact node permutations; `characters` assigns one
+# character to each generator, and a group element reached by two different
+# words must receive the same character.
+function _orbit_map_from_generators(::Type{T}, N::Int, block_keys::Vector{_DihedralKey}, generators::AbstractVector{<:AbsSymmetry}, characters::AbstractVector{Complex{T}}) where {T<:Real}
+    length(generators) == length(characters) || throw(DimensionMismatch("Received $(length(generators)) generators but $(length(characters)) characters"))
+    genperms = Vector{Int}[_block_node_permutation(N, block_keys, g) for g in generators]
+    perms = Vector{Vector{Int}}([collect(1:N)])
+    scales = Complex{T}[one(Complex{T})]
+    head = 1
+    while head <= length(perms)
+        p = perms[head]
+        χ = scales[head]
+        for g in eachindex(genperms)
+            pref = _compose_index_permutations(genperms[g], p)
+            χnew = characters[g] * χ
+            j = findfirst(==(pref), perms)
+            if isnothing(j)
+                push!(perms, pref)
+                push!(scales, χnew)
+            elseif scales[j] != χnew
+                throw(ArgumentError("Composite reflection parities are inconsistent"))
+            end
+        end
+        head += 1
+    end
+    return _build_symmetry_orbit_map(T, N, perms, scales)
+end
+
 """
     symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::AbsSymmetry, character...) where {T<:Real,Bi<:AbsBilliard} → orbits::SymmetryOrbitMap{T}
 
@@ -457,7 +445,7 @@ are currently unsupported.
 ## Returns
 * `orbits::SymmetryOrbitMap{T}`: Exact boundary symmetry-orbit map.
 """
-function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::S, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard,S<:Union{XAxisReflection,YAxisReflection,DiagonalReflection,AntiDiagonalReflection}}
+function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::S, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard,S<:AxisReflection}
     N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("$S requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
     id = collect(1:N)
     refl = _boundary_symmetry_permutation(billiard, N, symmetry)
@@ -477,13 +465,14 @@ end
 function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::NFoldRotation, sector::Int = 0) where {T<:Real,Bi<:AbsBilliard}
     n = symmetry.order
     N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("NFoldRotation of order $n requires N divisible by $n; received N = $N"))
-    g = _boundary_symmetry_permutation(billiard, N, NFoldRotation(n, 1; T = typeof(symmetry.angle)))
-    perms = Vector{Vector{Int}}(undef, n)
+    d = n ÷ gcd(n, symmetry.m)
+    g = _boundary_symmetry_permutation(billiard, N, symmetry)
+    perms = Vector{Vector{Int}}(undef, d)
     perms[1] = collect(1:N)
-    @inbounds for l in 2:n
+    @inbounds for l in 2:d
         perms[l] = _compose_index_permutations(g, perms[l - 1])
     end
-    scales = Complex{T}[cis(T(2 * pi) * T(sector * l) / T(n)) for l in 0:n - 1]
+    scales = Complex{T}[cis(T(2 * pi) * T(sector * l) / T(d)) for l in 0:d - 1]
     return _build_symmetry_orbit_map(T, N, perms, scales)
 end
 
@@ -491,40 +480,19 @@ function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::Compos
     isempty(symmetry.reflections) && throw(ArgumentError("CompositeReflection requires at least one reflection"))
     length(characters) == length(symmetry.reflections) || throw(DimensionMismatch("Received $(length(symmetry.reflections)) reflections but $(length(characters)) characters"))
     N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("CompositeReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
-    genperms = Vector{Vector{Int}}()
+    generators = AbsSymmetry[]
     genscales = Complex{T}[]
-    @inbounds for (k, ref) in enumerate(symmetry.reflections)
+    for (k, ref) in enumerate(symmetry.reflections)
         χ = characters[k]
         if ref isa XYAxisReflection
-            push!(genperms, _boundary_symmetry_permutation(billiard, N, XAxisReflection()))
-            push!(genscales, χ)
-            push!(genperms, _boundary_symmetry_permutation(billiard, N, YAxisReflection()))
-            push!(genscales, χ)
-        elseif ref isa XAxisReflection || ref isa YAxisReflection || ref isa DiagonalReflection || ref isa AntiDiagonalReflection
-            push!(genperms, _boundary_symmetry_permutation(billiard, N, ref))
+            push!(generators, XAxisReflection(), YAxisReflection())
+            push!(genscales, χ, χ)
+        elseif ref isa AxisReflection
+            push!(generators, ref)
             push!(genscales, χ)
         else
             throw(ArgumentError("Unsupported reflection type $(typeof(ref)) in CompositeReflection"))
         end
     end
-    perms = Vector{Vector{Int}}([collect(1:N)])
-    scales = Complex{T}[one(Complex{T})]
-    head = 1
-    while head <= length(perms)
-        p = perms[head]
-        χ = scales[head]
-        @inbounds for g in eachindex(genperms)
-            pref = _compose_index_permutations(genperms[g], p)
-            χnew = genscales[g] * χ
-            j = findfirst(==(pref), perms)
-            if isnothing(j)
-                push!(perms, pref)
-                push!(scales, χnew)
-            elseif scales[j] != χnew
-                throw(ArgumentError("Composite reflection parities are inconsistent"))
-            end
-        end
-        head += 1
-    end
-    return _build_symmetry_orbit_map(T, N, perms, scales)
+    return _orbit_map_from_generators(T, N, _block_keys(billiard), generators, genscales)
 end
