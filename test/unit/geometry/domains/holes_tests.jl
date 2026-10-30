@@ -14,9 +14,16 @@
 #   piece with D2_symmetry() acting about (0.5, 0), the half disc of radius 0.2 about (0.3, 0) with a single mirror, and four discs of radius
 #   0.1 placed by D2_symmetry(). Evidence: closed-form areas, loop lengths 2 pi R, membership by radius, chain order of the arcs, positive
 #   Green signed area of every loop (hole region on the left).
+#
+# Compatibility with a registry (B4): compatible_symmetries and the generic symmetry_compatible per hole type, with the helpers
+#   _fixes_point, _is_special_axis and _hole_block_keys. A hole is mapped onto itself by g when the dihedral key of g is a key of the
+#   hole group and g fixes the hole center (SymmetricHole), or when the key of g permutes the placing keys (SymmetrizedHoles of a
+#   DomainHole); a DomainHole and a SymmetrizedHoles of a SymmetricHole have no symmetry of their own. The expected subgroups follow from
+#   the dihedral algebra (D2 = {Y, XY, X} has sym_ids 1, 2, 3 and D4_symmetry() has sym_ids 1..7 with Y = 3, XY = 4, X = 7).
 
 using StaticArrays: SVector
-using BilliardGeometry: _set_curve_bc, _hole_parts, _part_contains, _apply_symmetry_to_region, _area_integral
+using BilliardGeometry: _set_curve_bc, _hole_parts, _part_contains, _apply_symmetry_to_region, _area_integral,
+                        _fixes_point, _is_special_axis, _hole_block_keys, _block_keys, _IDENTITY_KEY, symmetry_key
 
 # Absolute tolerance for closed-form areas of the holes (Green quadrature, worst observed 4e-16, margin 1000x).
 const hl_ATOL = 1e-12
@@ -336,12 +343,185 @@ end
 end
 
 @testset "symmetry_compatible (SymmetricHole, SymmetrizedHoles)" begin
-    # the hole carries its own group and is never reduced by the billiard registry: compatible only with the empty registry
+    # the empty registry is compatible with every hole
     for h in (hf_d4_symmetric_hole(), hf_d2_symmetric_hole(), hf_half_disc_hole(), hf_symmetrized_disc())
         @test symmetry_compatible(h, register_symmetries()) === true
-        @test symmetry_compatible(h, D2_symmetry()) === false
-        @test symmetry_compatible(h, D4_symmetry()) === false
     end
+    # the D4 disc at the origin is invariant under every element of D2 and D4
+    d4 = hf_d4_symmetric_hole()
+    @test symmetry_compatible(d4, D2_symmetry()) === true
+    @test symmetry_compatible(d4, D4_symmetry()) === true
+    # the D2 disc about (0.5, 0): only the x axis mirror fixes the center, so the full D2 and D4 registries are not compatible
+    d2 = hf_d2_symmetric_hole()
+    @test symmetry_compatible(d2, D2_symmetry()) === false
+    @test symmetry_compatible(d2, D4_symmetry()) === false
+    @test symmetry_compatible(d2, register_symmetries(XAxisReflection())) === true
+    @test symmetry_compatible(d2, register_symmetries(YAxisReflection())) === false
+    # the half disc keeps only the x axis mirror
+    half = hf_half_disc_hole()
+    @test symmetry_compatible(half, register_symmetries(XAxisReflection())) === true
+    @test symmetry_compatible(half, D2_symmetry()) === false
+    @test symmetry_compatible(half, D4_symmetry()) === false
+    # four discs placed by D2 are invariant under D2 but not under D4 (the diagonal moves the pattern)
+    sh = hf_symmetrized_disc()
+    @test symmetry_compatible(sh, D2_symmetry()) === true
+    @test symmetry_compatible(sh, D4_symmetry()) === false
+    @test symmetry_compatible(sh, register_symmetries(DiagonalReflection())) === false
+end
+
+@testset "compatible_symmetries (DomainHole)" begin
+    # a hole without symmetry is only mapped to itself by the identity: no registered element is compatible
+    for h in (hl_circle_hole(), hl_rect_hole(), hl_two_loop_hole())
+        for reg in (register_symmetries(), D2_symmetry(), D4_symmetry(), register_symmetries(XAxisReflection()))
+            c = compatible_symmetries(h, reg)
+            @test c isa SymmetryRegistry
+            @test length(c) == 0
+        end
+    end
+end
+
+@testset "compatible_symmetries (SymmetricHole)" begin
+    ids(c) = [g.sym_id for g in c]
+    # D4 disc at the origin: every element of a registry inside D4 is compatible, with its original sym_id and registry order
+    d4 = hf_d4_symmetric_hole()
+    full = compatible_symmetries(d4, D4_symmetry())
+    @test full isa SymmetryRegistry
+    @test length(full) == 7
+    @test ids(full) == collect(1:7)
+    @test typeof.(collect(full)) == typeof.(collect(D4_symmetry()))
+    @test ids(compatible_symmetries(d4, D2_symmetry())) == [1, 2, 3]
+    @test length(compatible_symmetries(d4, register_symmetries())) == 0
+    # a group element outside the hole group (rotation by 2 pi/3 against D4) is dropped
+    @test length(compatible_symmetries(d4, register_symmetries(NFoldRotation(3, 1)))) == 0
+
+    # D2 disc about (0.5, 0): the key of Y and XY are in the hole group but do not fix the center, only X does
+    d2 = hf_d2_symmetric_hole()
+    @test ids(compatible_symmetries(d2, D2_symmetry())) == [3]
+    @test typeof(only(collect(compatible_symmetries(d2, D2_symmetry())))) == XAxisReflection
+    @test ids(compatible_symmetries(d2, D4_symmetry())) == [7]       # the X element of D4
+    @test length(compatible_symmetries(d2, register_symmetries(YAxisReflection()))) == 0
+    @test length(compatible_symmetries(d2, register_symmetries(XYAxisReflection()))) == 0
+
+    # half disc about (0.3, 0): the hole group is {X}, so the keys of Y and XY are not in it
+    half = hf_half_disc_hole()
+    @test ids(compatible_symmetries(half, D2_symmetry())) == [3]
+    @test ids(compatible_symmetries(half, D4_symmetry())) == [7]
+    @test length(compatible_symmetries(half, register_symmetries(YAxisReflection()))) == 0
+
+    # the hole group contains X but the center lies off the x axis: X does not fix the center
+    off_axis_piece = CircleWedge(0.2, pi, 0.0, 0.3, 0.1, 3; bcs = AbsBoundaryCondition[SpecularReflection(), SymmetryWall(1, 2), SymmetryWall(1, 2)])
+    off_axis = SymmetricHole(off_axis_piece, register_symmetries(XAxisReflection()), SVector(0.3, 0.1))
+    @test length(compatible_symmetries(off_axis, register_symmetries(XAxisReflection()))) == 0
+    @test symmetry_compatible(off_axis, register_symmetries(XAxisReflection())) === false
+
+    # a mirror at a generic angle is not in the key set of the {X} hole group
+    generic = AxisReflection{1 // 6}()
+    @test length(compatible_symmetries(half, register_symmetries(generic))) == 0
+    @test symmetry_compatible(half, register_symmetries(generic)) === false
+    @test ids(compatible_symmetries(half, register_symmetries(XAxisReflection()))) == [1]
+end
+
+@testset "compatible_symmetries (SymmetrizedHoles)" begin
+    ids(c) = [g.sym_id for g in c]
+    # base DomainHole placed by D2: the pattern is invariant under the elements of D2 and no others of D4
+    sh = hf_symmetrized_disc()
+    @test ids(compatible_symmetries(sh, D2_symmetry())) == [1, 2, 3]
+    @test ids(compatible_symmetries(sh, D4_symmetry())) == [3, 4, 7]    # Y, XY, X of D4
+    @test length(compatible_symmetries(sh, register_symmetries())) == 0
+    @test length(compatible_symmetries(sh, register_symmetries(DiagonalReflection()))) == 0
+    @test length(compatible_symmetries(sh, register_symmetries(NFoldRotation(4, 1)))) == 0
+    # placed by the x mirror alone: a pair of discs, invariant under X and not under Y
+    pair_x = SymmetrizedHoles(DomainHole(hf_circle_domain(0.1, 0.4, 0.2, 5)), register_symmetries(XAxisReflection()))
+    @test ids(compatible_symmetries(pair_x, D2_symmetry())) == [3]
+    # placed by the y mirror alone: invariant under Y only
+    pair_y = SymmetrizedHoles(DomainHole(hf_circle_domain(0.1, 0.4, 0.2, 5)), register_symmetries(YAxisReflection()))
+    @test ids(compatible_symmetries(pair_y, D2_symmetry())) == [1]
+    # empty placing registry: one disc without symmetry of its own, nothing but the empty registry is compatible
+    single = SymmetrizedHoles(DomainHole(hf_circle_domain(0.1, 0.4, 0.2, 5)), register_symmetries())
+    @test length(compatible_symmetries(single, D2_symmetry())) == 0
+    @test symmetry_compatible(single, register_symmetries()) === true
+
+    # base SymmetricHole: the copies are placed only, the object has no symmetry of its own
+    placed = SymmetrizedHoles(hf_d2_symmetric_hole(), register_symmetries(YAxisReflection()))
+    @test length(compatible_symmetries(placed, D2_symmetry())) == 0
+    @test length(compatible_symmetries(placed, register_symmetries(YAxisReflection()))) == 0
+    @test symmetry_compatible(placed, register_symmetries()) === true
+    @test symmetry_compatible(placed, register_symmetries(YAxisReflection())) === false
+end
+
+@testset "symmetry_compatible (generic via compatible_symmetries)" begin
+    # compatible exactly when the compatible subgroup is the whole registry
+    holes = (hl_circle_hole(), hl_two_loop_hole(), hf_d4_symmetric_hole(), hf_d2_symmetric_hole(), hf_half_disc_hole(), hf_symmetrized_disc())
+    regs = (register_symmetries(), D2_symmetry(), D4_symmetry(), register_symmetries(XAxisReflection()), register_symmetries(DiagonalReflection()))
+    for h in holes, reg in regs
+        @test symmetry_compatible(h, reg) == (length(compatible_symmetries(h, reg)) == length(reg))
+        @test symmetry_compatible(h, reg) isa Bool
+    end
+end
+
+@testset "_is_special_axis" begin
+    # the four special axes 0, 1/4, 1/2, 3/4 (as mirror angle pi a)
+    @test _is_special_axis(XAxisReflection())
+    @test _is_special_axis(DiagonalReflection())
+    @test _is_special_axis(YAxisReflection())
+    @test _is_special_axis(AntiDiagonalReflection())
+    # the angle is taken mod 1
+    @test _is_special_axis(AxisReflection{5 // 4}())
+    @test _is_special_axis(AxisReflection{1 // 1}())
+    @test _is_special_axis(AxisReflection{-1 // 4}())
+    # other angles are generic
+    @test !_is_special_axis(AxisReflection{1 // 6}())
+    @test !_is_special_axis(AxisReflection{1 // 3}())
+    @test !_is_special_axis(AxisReflection{1 // 8}())
+    @test !_is_special_axis(AxisReflection{5 // 6}())
+end
+
+@testset "_fixes_point" begin
+    # special axes are exact: the point must lie on the line, any offset (even 1e-12) breaks it
+    @test _fixes_point(XAxisReflection(), SVector(0.3, 0.0))
+    @test !_fixes_point(XAxisReflection(), SVector(0.3, 1e-12))
+    @test _fixes_point(YAxisReflection(), SVector(0.0, 0.7))
+    @test !_fixes_point(YAxisReflection(), SVector(1e-12, 0.7))
+    @test _fixes_point(DiagonalReflection(), SVector(0.4, 0.4))
+    @test !_fixes_point(DiagonalReflection(), SVector(0.4, 0.4 + 1e-12))
+    @test _fixes_point(AntiDiagonalReflection(), SVector(0.4, -0.4))
+    @test !_fixes_point(AntiDiagonalReflection(), SVector(0.4, 0.4))
+    # the pi rotation and the quarter turn fix the origin only
+    @test _fixes_point(XYAxisReflection(), SVector(0.0, 0.0))
+    @test !_fixes_point(XYAxisReflection(), SVector(0.3, 0.0))
+    @test _fixes_point(NFoldRotation(4, 1), SVector(0.0, 0.0))
+    @test !_fixes_point(NFoldRotation(4, 1), SVector(0.5, 0.0))
+    @test _fixes_point(NFoldRotation(3, 2), SVector(0.0, 0.0))
+    # a generic axis uses the tolerance sqrt(eps): points on the line at angle pi/6 and tiny offsets are fixed, a visible offset is not
+    gen = AxisReflection{1 // 6}()
+    on_line = 0.5 * SVector(cos(pi / 6), sin(pi / 6))
+    normal = SVector(-sin(pi / 6), cos(pi / 6))
+    @test _fixes_point(gen, SVector(0.0, 0.0))
+    @test _fixes_point(gen, on_line)
+    @test _fixes_point(gen, on_line + 1e-10 * normal)
+    @test !_fixes_point(gen, on_line + 1e-6 * normal)
+    @test !_fixes_point(gen, SVector(0.3, 0.0))
+    # Float32 points: exact for special axes
+    @test _fixes_point(XAxisReflection(), SVector(0.3f0, 0.0f0))
+    @test !_fixes_point(XAxisReflection(), SVector(0.3f0, 1f-6))
+end
+
+@testset "_hole_block_keys" begin
+    # a DomainHole is one block, the identity
+    @test _hole_block_keys(hl_circle_hole()) == [_IDENTITY_KEY]
+    @test _hole_block_keys(hl_two_loop_hole()) == [_IDENTITY_KEY]
+    # SymmetricHole: the keys of its group in chain order, identity first
+    d4 = hf_d4_symmetric_hole()
+    @test _hole_block_keys(d4) == _block_keys(D4_symmetry())
+    @test length(_hole_block_keys(d4)) == 8
+    @test _hole_block_keys(d4)[1] == _IDENTITY_KEY
+    @test length(_hole_block_keys(hf_d2_symmetric_hole())) == 4
+    @test _hole_block_keys(hf_half_disc_hole()) == [_IDENTITY_KEY, symmetry_key(XAxisReflection())]
+    # SymmetrizedHoles: the identity and the placing operations, for both base kinds
+    @test _hole_block_keys(hf_symmetrized_disc()) == _block_keys(D2_symmetry())
+    @test length(_hole_block_keys(hf_symmetrized_disc())) == hole_loop_count(hf_symmetrized_disc())
+    @test _hole_block_keys(SymmetrizedHoles(hf_d2_symmetric_hole(), register_symmetries(YAxisReflection()))) ==
+          [_IDENTITY_KEY, symmetry_key(YAxisReflection())]
 end
 
 @testset "_set_curve_bc (SymmetricHole)" begin

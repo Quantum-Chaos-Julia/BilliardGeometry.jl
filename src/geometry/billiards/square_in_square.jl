@@ -56,7 +56,9 @@ function SquareWithinSquareBilliard(a::T=one(T); positions::AbstractVector{<:Rea
     symmetries = register_symmetries()
     fundamental_domain = MultiplyConnectedDomain(outer_domain, holes, 1)
     validate_holes(fundamental_domain, symmetries)
-    return SquareWithinSquareBilliard{T}(fundamental_domain, symmetries)
+    billiard = SquareWithinSquareBilliard{T}(fundamental_domain, symmetries)
+    _log_symmetry_group("SquareWithinSquareBilliard", billiard)
+    return billiard
 end
 
 # Counterclockwise square of half side `h` about `c` as a closed SimpleDomain.

@@ -252,7 +252,7 @@ export CompositeCurve
 export Polygon
 export CircleWedge
 export SimpleDomain, CompositeDomain, reset_ids!
-export MultiplyConnectedDomain, DomainHole, SymmetricHole, SymmetrizedHoles, hole_domains, hole_loop_count, hole_leaves, hole_domain_ids, is_hole_curve, component_of_domain_id, symmetry_compatible, validate_holes
+export MultiplyConnectedDomain, DomainHole, SymmetricHole, SymmetrizedHoles, hole_domains, hole_loop_count, hole_leaves, hole_domain_ids, is_hole_curve, component_of_domain_id, symmetry_compatible, compatible_symmetries, validate_holes
 export boundary_component_is_hole, get_outer_boundary_curves, get_hole_boundary_curves, BoundaryComponentMap, full_boundary_components
 export TriangleBilliard
 export StadiumBilliard

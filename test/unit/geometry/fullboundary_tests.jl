@@ -14,12 +14,15 @@
 # The orientation field of line images keeps domain_fun consistent with the source curve (G13). Closure of the
 # reconstructed loop and its total length on real billiards are covered by the integration tier. Billiards with holes
 # (hole fixtures of holes_fixtures.jl): full_boundary_components, BoundaryComponentMap, the MCD method of full_boundary and the
-# split-out _reconstruct_curves; the outer loop is reconstructed by the registry, hole loops are taken in the full frame. No eigen solves,
+# split-out _reconstruct_curves; the outer loop is reconstructed by the registry, hole loops are taken in the full frame. The `blocks` field of
+# BoundaryComponentMap (one vector of dihedral keys per group, identity first) is the registry keys for the outer group, the hole-group keys
+# of a SymmetricHole or SymmetrizedHoles and the identity alone for a DomainHole. No eigen solves,
 # no pinned wavefunction values. Helper functions and
 # constants use the prefix `fb_`.
 
 using StaticArrays: SVector
-using BilliardGeometry: _apply_symmetry_to_curve, _reverse_curve, _full_boundary_data, _reconstruct_curves
+using BilliardGeometry: _apply_symmetry_to_curve, _reverse_curve, _full_boundary_data, _reconstruct_curves,
+                        _block_keys, _IDENTITY_KEY, symmetry_key
 
 # Absolute tolerance for pointwise comparisons of curve images (a few ulps of Float64 after one trigonometric evaluation).
 const fb_ATOL = 1e-12
@@ -320,11 +323,15 @@ end
 end
 
 @testset "BoundaryComponentMap" begin
-    @test fieldnames(BoundaryComponentMap) == (:curves, :is_hole, :group)
-    map = BoundaryComponentMap([AbsCurve[LineSegment([0.0, 0.0], [1.0, 0.0])]], [false], [0])
+    @test fieldnames(BoundaryComponentMap) == (:curves, :is_hole, :group, :blocks)
+    map = BoundaryComponentMap([AbsCurve[LineSegment([0.0, 0.0], [1.0, 0.0])]], [false], [0], [[(false, 0 // 1)]])
     @test map.curves isa Vector{Vector{AbsCurve}}
     @test map.is_hole == [false]
     @test map.group == [0]
+    @test map.blocks isa Vector{Vector{Tuple{Bool,Rational{Int}}}}
+    @test map.blocks == [[(false, 0 // 1)]]
+    # the constructor takes four arguments, the old three-argument form no longer exists
+    @test_throws MethodError BoundaryComponentMap([AbsCurve[LineSegment([0.0, 0.0], [1.0, 0.0])]], [false], [0])
 end
 
 # True when the loop `crvs` is closed: every curve ends where the next one starts (cyclically).
@@ -385,6 +392,55 @@ fb_is_closed_loop(crvs) = all(isapprox(curve(crvs[j], 1.0), curve(crvs[mod1(j + 
     @test [length(c) for c in multi.curves] == [4, 1, 4, 4]
     @test multi.is_hole == [false, true, true, true]
     @test multi.group == [0, 1, 2, 2]
+end
+
+@testset "full_boundary_components (blocks)" begin
+    ID = _IDENTITY_KEY
+    # without holes: one group whose blocks are the identity followed by the registry, as _block_keys of the billiard
+    for b in (RectangleBilliard(1.0, 0.6), CircleBilliard(1.0), C3Billiard(0.2))
+        map = full_boundary_components(b)
+        @test map.blocks == [_block_keys(b)]
+        @test map.blocks[1][1] == ID
+        @test length(map.blocks) == length(unique(map.group))
+    end
+    @test full_boundary_components(TriangleBilliard(1.0, 1.0)).blocks == [[ID]]
+
+    # DomainHole groups carry the identity block alone, one entry per group (outer first)
+    @test full_boundary_components(hf_concentric_annulus()).blocks == [[ID], [ID]]
+    @test full_boundary_components(hf_rect_with_hole()).blocks == [[ID], [ID]]
+    dom = MultiplyConnectedDomain(hf_rect_domain(0.0, 0.0, 4.0, 4.0, 1), [hf_circle_domain(0.3, 3.0, 3.0, 2), hf_two_loop_hole(5)], 1)
+    multi = full_boundary_components(hf_HoleBilliard{Float64}(dom, register_symmetries()))
+    @test multi.blocks == [[ID], [ID], [ID]]       # outer, hole 1, hole 2 (two loops share the group of hole 2)
+    @test multi.group == [0, 1, 2, 2]
+    d2dom = full_boundary_components(hf_d2_with_hole())
+    @test d2dom.blocks == [_block_keys(hf_d2_with_hole()), [ID]]
+    @test d2dom.blocks == [[ID, symmetry_key(YAxisReflection()), symmetry_key(XYAxisReflection()), symmetry_key(XAxisReflection())], [ID]]
+
+    # symmetric holes: the keys of the hole group, in chain order, identity first
+    mk(hole) = hf_HoleBilliard{Float64}(MultiplyConnectedDomain(hf_quarter_square_domain(), [hole], 1), D2_symmetry())
+    d4 = full_boundary_components(mk(hf_d4_symmetric_hole()))
+    @test d4.group == [0, 1]
+    @test length.(d4.blocks) == [4, 8]
+    @test d4.blocks[2] == _block_keys(D4_symmetry())
+    @test d4.blocks[2][1] == ID
+    @test d4.blocks[1] == _block_keys(D2_symmetry())
+    half = full_boundary_components(mk(hf_half_disc_hole()))
+    @test half.blocks[2] == [ID, symmetry_key(XAxisReflection())]
+
+    # copies of a SymmetrizedHoles: one loop per block, all in group 1
+    sym = full_boundary_components(mk(hf_symmetrized_disc()))
+    @test sym.group == [0, 1, 1, 1, 1]
+    @test length.(sym.blocks) == [4, 4]
+    @test sym.blocks[2] == _block_keys(D2_symmetry())
+    # the number of loops of a group is the number of its blocks for symmetric holes
+    @test count(==(1), sym.group) == length(sym.blocks[2])
+    @test count(==(1), d4.group) == 1               # one loop of 8 curves: the blocks are contiguous curve ranges of that loop
+    @test length(d4.curves[2]) == length(d4.blocks[2])
+
+    # DomainHole in a D2 billiard: its group has the identity block alone
+    dh = full_boundary_components(hf_d2_with_hole())
+    @test dh.blocks[2] == [ID]
+    @test length(dh.blocks) == 2
 end
 
 @testset "full_boundary (billiards with holes)" begin

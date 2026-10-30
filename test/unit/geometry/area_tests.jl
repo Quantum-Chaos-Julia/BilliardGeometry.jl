@@ -263,10 +263,36 @@ end
         @test fundamental_area(hf_eccentric_annulus()) ≈ area(hf_eccentric_annulus()) rtol = ar_RTOL
         @test fundamental_area(hf_rect_with_hole()) ≈ 5.5 rtol = ar_RTOL
     end
-    # a DomainHole is compatible only with the empty registry: with D2 the fundamental area is undefined
+    # a DomainHole has no symmetry, so G' = {e} in a D2 billiard: the fundamental area is the area (no division by |G|)
     @testset "DomainHole with symmetries" begin
-        @test_throws ArgumentError fundamental_area(hf_d2_with_hole())
-        @test_throws "not compatible" fundamental_area(hf_d2_with_hole())
+        b = hf_d2_with_hole()
+        @test fundamental_area(b) ≈ 4 - pi * 0.2^2 rtol = ar_RTOL
+        @test fundamental_area(b) ≈ area(b) rtol = ar_RTOL
+        @test length(get_symmetry_group(b)) == 0
+    end
+    # symmetric holes in the D2 quarter-square billiard: fundamental_area = area / |G'| with |G'| = length(get_symmetry_group) + 1
+    @testset "symmetric holes with G' != {e}" begin
+        mk(hole) = hf_HoleBilliard{Float64}(MultiplyConnectedDomain(hf_quarter_square_domain(), [hole], 1), D2_symmetry())
+        # D4 disc of radius 0.3 at the origin: G' = D2, order 4
+        b4 = mk(hf_d4_symmetric_hole())
+        @test fundamental_area(b4) ≈ (4 - pi * 0.09) / 4 rtol = ar_RTOL
+        @test fundamental_area(b4) / area(b4) ≈ 0.25 rtol = ar_RTOL
+        # D2 disc of radius 0.1 about (0.5, 0): G' = {X}, order 2
+        b2 = mk(hf_d2_symmetric_hole())
+        @test fundamental_area(b2) ≈ (4 - pi * 0.01) / 2 rtol = ar_RTOL
+        # half disc of radius 0.2 about (0.3, 0): G' = {X}
+        bh = mk(hf_half_disc_hole())
+        @test fundamental_area(bh) ≈ (4 - pi * 0.04) / 2 rtol = ar_RTOL
+        # four discs of radius 0.1 placed by D2: G' = D2
+        bs = mk(hf_symmetrized_disc())
+        @test fundamental_area(bs) ≈ (4 - 4 * pi * 0.01) / 4 rtol = ar_RTOL
+        # fundamental area times the order of G' gives the physical area
+        for b in (b4, b2, bh, bs)
+            @test fundamental_area(b) * (length(get_symmetry_group(b)) + 1) ≈ area(b) rtol = ar_RTOL
+        end
+        # the outer registry order |G| = 4 is not what divides the area when G' is smaller
+        @test symmetry_reduction_factor(b2) == 4
+        @test fundamental_area(b2) > area(b2) / symmetry_reduction_factor(b2)
     end
     # the registry of the Sinai and square-within-square billiards is empty: the fundamental area is the area
     @testset "SinaiBilliard" begin

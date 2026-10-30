@@ -309,11 +309,13 @@ object consecutive.
 * `curves::Vector{Vector{AbsCurve}}`: One closed loop per entry; the reconstructed outer boundary first, then every hole loop.
 * `is_hole::Vector{Bool}`: Whether the loop is a hole loop.
 * `group::Vector{Int}`: Solver group of the loop: `0` for the outer boundary, `i` for loops of the `i`-th hole object.
+* `blocks::Vector{Vector{Tuple{Bool,Rational{Int}}}}`: Dihedral keys `(reflects, a)` of the reconstruction blocks of each group, `blocks[i+1]` for group `i`, identity first. The nodes of a group are the concatenation of its loops, one contiguous block per key in this order: the registry of the billiard for the outer boundary, the hole group for a [`SymmetricHole`](@ref), the identity and the placing operations for [`SymmetrizedHoles`](@ref), the identity alone for a [`DomainHole`](@ref).
 """
 struct BoundaryComponentMap
     curves::Vector{Vector{AbsCurve}}
     is_hole::Vector{Bool}
     group::Vector{Int}
+    blocks::Vector{Vector{Tuple{Bool,Rational{Int}}}}
 end
 
 """
@@ -336,17 +338,21 @@ function full_boundary_components(billiard::B) where {B<:AbsBilliard}
     return _full_boundary_components(billiard.fundamental_domain, billiard)
 end
 
-_full_boundary_components(::AbsDomain, billiard::AbsBilliard) = BoundaryComponentMap([full_boundary(billiard)], [false], [0])
+_full_boundary_components(::AbsDomain, billiard::AbsBilliard) = BoundaryComponentMap([full_boundary(billiard)], [false], [0], [_block_keys(billiard)])
 
 function _full_boundary_components(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard)
     curves = Vector{Vector{AbsCurve}}()
     push!(curves, first(_full_boundary_data(billiard)))
     is_hole = Bool[false]
     group = Int[0]
-    for (i, h) in enumerate(domain.holes), loop in boundary_components(h)
-        push!(curves, loop)
-        push!(is_hole, true)
-        push!(group, i)
+    blocks = Vector{Vector{Tuple{Bool,Rational{Int}}}}([_block_keys(billiard)])
+    for (i, h) in enumerate(domain.holes)
+        for loop in boundary_components(h)
+            push!(curves, loop)
+            push!(is_hole, true)
+            push!(group, i)
+        end
+        push!(blocks, _hole_block_keys(h))
     end
-    return BoundaryComponentMap(curves, is_hole, group)
+    return BoundaryComponentMap(curves, is_hole, group, blocks)
 end

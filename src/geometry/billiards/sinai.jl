@@ -53,5 +53,7 @@ function SinaiBilliard(a::T, R::T; center=SVector{2,T}(zero(T),zero(T))) where T
     symmetries = register_symmetries()
     fundamental_domain = MultiplyConnectedDomain(outer_domain, [DomainHole(hole_domain)], 1)
     validate_holes(fundamental_domain, symmetries)
-    return SinaiBilliard{T}(fundamental_domain, symmetries)
+    billiard = SinaiBilliard{T}(fundamental_domain, symmetries)
+    _log_symmetry_group("SinaiBilliard", billiard)
+    return billiard
 end

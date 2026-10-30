@@ -135,31 +135,23 @@ end
 Returns the area of the billiard's fundamental domain, obtained by dividing
 the full physical [`area`](@ref) by the highest-order discrete symmetry's
 [`symmetry_reduction_factor`](@ref). For a billiard with holes it is the
-full area divided by the symmetry group order, valid only when every hole is
-[`symmetry_compatible`](@ref) with the symmetry registry (`ArgumentError` otherwise).
-Since a [`DomainHole`](@ref) is compatible only with an empty registry, this
-equals [`area`](@ref) for billiards whose only holes are `DomainHole`s.
+full area divided by the order of the symmetry group
+[`get_symmetry_group`](@ref) (the outer group restricted to the elements that
+leave every hole invariant), so it equals [`area`](@ref) when that group is
+trivial, in particular for billiards whose only holes are `DomainHole`s.
 
 ## Arguments
 * `billiard`: Billiard whose fundamental-domain area is computed.
 
 ## Returns
 * `A`: Area of the fundamental domain.
-
-## Throws
-`ArgumentError` for a billiard with a hole that is not compatible with its symmetry registry.
 """
 @inline function fundamental_area(billiard::AbsBilliard)
     return _fundamental_area(billiard.fundamental_domain, billiard)
 end
 
 @inline _fundamental_area(::AbsDomain, billiard::AbsBilliard) = area(billiard)/symmetry_reduction_factor(billiard)
-function _fundamental_area(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard)
-    for (i, h) in enumerate(domain.holes)
-        symmetry_compatible(h, billiard.symmetries) || throw(ArgumentError("fundamental_area is undefined: hole $i is not compatible with the billiard symmetry registry"))
-    end
-    return area(billiard)/(length(billiard.symmetries) + 1)
-end
+_fundamental_area(::AbsMultiplyConnectedDomain, billiard::AbsBilliard) = area(billiard)/(length(get_symmetry_group(billiard)) + 1)
 
 ################################################################################
 ######################## CORNER ANGLES (WEYL LAW INPUT) #######################

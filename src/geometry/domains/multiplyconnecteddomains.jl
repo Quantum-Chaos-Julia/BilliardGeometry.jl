@@ -226,3 +226,47 @@ function validate_holes(domain::AbsMultiplyConnectedDomain, registry::SymmetryRe
     end
     return nothing
 end
+
+function _symmetry_group(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard)
+    keep = Set(g.sym_id for g in billiard.symmetries)
+    for h in domain.holes
+        intersect!(keep, Set(g.sym_id for g in compatible_symmetries(h, billiard.symmetries)))
+    end
+    return SymmetryRegistry(AbsSymmetry[g for g in billiard.symmetries if g.sym_id in keep])
+end
+
+# First `(hole index, element)` of the registry that is not a symmetry of the hole, or `nothing`.
+function _first_incompatibility(domain::AbsMultiplyConnectedDomain, registry::SymmetryRegistry)
+    for (i, h) in enumerate(domain.holes)
+        ids = Set(g.sym_id for g in compatible_symmetries(h, registry))
+        for g in registry
+            g.sym_id in ids || return (i, g)
+        end
+    end
+    return nothing
+end
+_first_incompatibility(::AbsDomain, ::SymmetryRegistry) = nothing
+
+"""
+    _log_symmetry_group(name, billiard::AbsBilliard) → nothing
+
+Log one `@info` line with the outer symmetry group `G` and the symmetry group
+`G'` of the physical billiard (see [`get_symmetry_group`](@ref)); when
+`G' ≠ G` it names the first hole and registry element that break the symmetry.
+Nothing is logged for a billiard with an empty registry.
+
+## Arguments
+* `name`: Name of the billiard printed in the message.
+* `billiard`: Billiard whose symmetry groups are reported.
+"""
+function _log_symmetry_group(name, billiard::AbsBilliard)
+    isempty(billiard.symmetries) && return nothing
+    group = get_symmetry_group(billiard)
+    msg = "$name: outer symmetry group G has order $(length(billiard.symmetries) + 1), symmetry group G' has order $(length(group) + 1)"
+    if length(group) != length(billiard.symmetries)
+        i, g = _first_incompatibility(billiard.fundamental_domain, billiard.symmetries)
+        msg *= "; hole $i is not invariant under $g"
+    end
+    @info msg
+    return nothing
+end

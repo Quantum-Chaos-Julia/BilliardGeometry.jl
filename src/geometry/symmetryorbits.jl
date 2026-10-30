@@ -274,16 +274,34 @@ elements. For `D₂` this is `(YAxisReflection, XAxisReflection)`, for `D₄`
 ## Returns
 * `gens::Tuple{Vararg{AbsSymmetry}}`: Minimal generating subset of `billiard.symmetries`.
 """
-get_symmetries(billiard::Bi) where {Bi<:AbsBilliard} = _minimal_generators(billiard.symmetries)
+get_symmetries(billiard::Bi) where {Bi<:AbsBilliard} = _minimal_generators(get_symmetry_group(billiard))
 get_symmetries(reg::SymmetryRegistry) = _minimal_generators(reg)
 
 """
     get_symmetry_group(billiard::AbsBilliard) → reg::SymmetryRegistry
 
-Return the registry of symmetry elements that act on the billiard's physical
-boundary, which for a billiard without holes is `billiard.symmetries`.
+Return the registry of the symmetry elements of the physical billiard, the
+group whose irreps label the eigenstates.
+
+## Description
+For a billiard without holes this is `billiard.symmetries`. For a billiard with
+holes it is the stabilizer `G' = {g ∈ G : g(holes) = holes}` of the registered
+outer group `G`, the intersection over the holes of
+[`compatible_symmetries`](@ref); `G' = {e}` (an empty registry) is the
+unreduced case. The returned elements are those of `billiard.symmetries`
+(same `sym_id`s, registry order); `billiard.symmetries` itself keeps
+describing `G`, from which [`full_boundary`](@ref) reconstructs the outer
+boundary.
+
+## Arguments
+* `billiard::AbsBilliard`: Billiard whose symmetry group is requested.
+
+## Returns
+* `reg`: Registry of the non-identity elements of the symmetry group.
 """
-get_symmetry_group(billiard::Bi) where {Bi<:AbsBilliard} = billiard.symmetries
+get_symmetry_group(billiard::Bi) where {Bi<:AbsBilliard} = _symmetry_group(billiard.fundamental_domain, billiard)
+
+_symmetry_group(::AbsDomain, billiard::AbsBilliard) = billiard.symmetries
 
 ################################################################################
 # EXACT MIDPOINT-GRID PERMUTATIONS
