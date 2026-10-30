@@ -13,8 +13,8 @@
 # No eigen solves, no pinned wavefunction values. Helper constants use the prefix `sy_`.
 
 using StaticArrays: SVector, SMatrix
-using LinearAlgebra: det, I
-using BilliardGeometry: AbsReflection, _sym_matrix, _with_sym_id, symmetry_key
+using LinearAlgebra: det, I, norm
+using BilliardGeometry: AbsReflection, _sym_matrix, _with_sym_id, symmetry_key, _reconstruct_curves
 
 # Absolute tolerance for rotation images (cos(pi/2) is 6e-17 in floating point).
 const sy_ATOL = 1e-12
@@ -80,9 +80,9 @@ end
     @test symmetry_key(AxisReflection{-1 // 4}()) == (true, 3 // 4)
     # the sym_id does not enter the key
     @test symmetry_key(XAxisReflection(5)) == symmetry_key(XAxisReflection())
-    # D4 registry: keys in registration order
+    # D4 registry: keys in registration (chain) order Diag, R1, Y, XY, Anti, R3, X
     @test [symmetry_key(s) for s in D4_symmetry()] ==
-          [(true, 1 // 2), (false, 1 // 2), (true, 0 // 1), (true, 1 // 4), (true, 3 // 4), (false, 1 // 4), (false, 3 // 4)]
+          [(true, 1 // 4), (false, 1 // 4), (true, 1 // 2), (false, 1 // 2), (true, 3 // 4), (false, 3 // 4), (true, 0 // 1)]
 end
 
 @testset "CompositeReflection equality and hash" begin
@@ -290,20 +290,41 @@ end
     reg = D4_symmetry()
     @test reg isa SymmetryRegistry
     @test length(reg) == 7
-    # order Y, XY, X, Diagonal, AntiDiagonal, rotation by pi/2, rotation by 3 pi/2 with ids 1..7
-    @test [typeof(s) for s in reg][1:5] == [YAxisReflection, XYAxisReflection, XAxisReflection, DiagonalReflection, AntiDiagonalReflection]
-    @test all(s -> s isa NFoldRotation, [reg[6], reg[7]])
-    @test (reg[6].order, reg[6].m) == (4, 1)
-    @test (reg[7].order, reg[7].m) == (4, 3)
+    # chain order Diagonal, rotation by pi/2, Y, XY, AntiDiagonal, rotation by 3 pi/2, X with ids 1..7
+    @test [typeof(s) for s in reg][[1, 3, 4, 5, 7]] ==
+          [DiagonalReflection, YAxisReflection, XYAxisReflection, AntiDiagonalReflection, XAxisReflection]
+    @test all(s -> s isa NFoldRotation, [reg[2], reg[6]])
+    @test (reg[2].order, reg[2].m) == (4, 1)
+    @test (reg[6].order, reg[6].m) == (4, 3)
     @test [s.sym_id for s in reg] == collect(1:7)
     # the seven elements and the identity are eight distinct geometric actions
     @test length(unique(vcat([(false, 0 // 1)], [symmetry_key(s) for s in reg]))) == 8
     # the registered elements act like their untagged counterparts
     pt = SVector(1.0, 2.0)
-    @test apply_symmetry(reg[4], pt) == SVector(2.0, 1.0)
+    @test apply_symmetry(reg[1], pt) == SVector(2.0, 1.0)
     @test apply_symmetry(reg[5], pt) == SVector(-2.0, -1.0)
-    @test apply_symmetry(reg[6], pt) ≈ SVector(-2.0, 1.0) atol = sy_ATOL
-    @test apply_symmetry(reg[7], pt) ≈ SVector(2.0, -1.0) atol = sy_ATOL
+    @test apply_symmetry(reg[2], pt) ≈ SVector(-2.0, 1.0) atol = sy_ATOL
+    @test apply_symmetry(reg[6], pt) ≈ SVector(2.0, -1.0) atol = sy_ATOL
+end
+
+# Largest distance between the end of curve j and the start of curve j + 1 (cyclically) of a loop of curves.
+sy_max_chain_gap(crvs) = maximum(norm(curve(crvs[j], 1.0) - curve(crvs[mod1(j + 1, length(crvs))], 0.0)) for j in eachindex(crvs))
+
+@testset "D4_symmetry (chain order)" begin
+    # one piece spanning the angles 0..pi/4 counter-clockwise; block 1 is the piece, block j + 1 the image under the j-th element
+    piece = CircleSegment(1.0, pi / 4, 0.0, SVector(0.0, 0.0))
+    keys = vcat([(false, 0 // 1)], [symmetry_key(s) for s in D4_symmetry()])
+    @test length(unique(keys)) == 8
+    curves, _, sector, _ = _reconstruct_curves([piece], D4_symmetry())
+    @test length(curves) == 8
+    @test sector == collect(1:8)
+    # in registration order block j + 1 is entered where block j ends, so the eight images form a closed loop
+    @test sy_max_chain_gap(curves) < 1e-12
+    # the previous order (Y, XY, X, Diagonal, AntiDiagonal, R1, R3) does not chain
+    old_order = register_symmetries(YAxisReflection(), XYAxisReflection(), XAxisReflection(), DiagonalReflection(),
+                                    AntiDiagonalReflection(), NFoldRotation(4, 1), NFoldRotation(4, 3))
+    old_curves, = _reconstruct_curves([piece], old_order)
+    @test sy_max_chain_gap(old_curves) > 1
 end
 
 @testset "NFoldRotation" begin

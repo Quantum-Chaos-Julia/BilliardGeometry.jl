@@ -228,9 +228,11 @@ end
     @test c3.order == 3
     # the returned generator is the registered one, with its sym_id
     @test maximal_symmetry(CircleBilliard(1.0)).sym_id == 2
-    # D4: the per-element maximum (factor 4) is the first registered element reaching it, XY, not the group order 8
+    # D4: the per-element maximum (factor 4) is the first registered element reaching it, the rotation by pi/2, not the group order 8
     d4_max = maximal_symmetry(ar_polar_billiard(collect(D4_symmetry())...))
-    @test d4_max isa XYAxisReflection
+    @test d4_max isa NFoldRotation
+    @test (d4_max.order, d4_max.m) == (4, 1)
+    @test d4_max.sym_id == 2
     @test symmetry_reduction_factor(d4_max) == 4
     # empty registry: nothing
     @test maximal_symmetry(TriangleBilliard(pi / 2, 1.0)) === nothing

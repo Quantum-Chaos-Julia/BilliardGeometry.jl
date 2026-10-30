@@ -95,7 +95,7 @@ function _validate_hole_structure(subdomains::Vector{AbsSimpleDomain}, holes::Ve
             d isa AbsMultiplyConnectedDomain && throw(ArgumentError("hole $i contains a MultiplyConnectedDomain; holes must be simple or composite domains"))
         end
         try
-            _split_closed_loops(_connected_geometric_curves(AbsCurve[crv for crv in get_all_curves(h)]))
+            _split_closed_loops(_connected_geometric_curves(AbsCurve[crv for crv in _hole_geometric_curves(h)]))
         catch err
             err isa ArgumentError || rethrow()
             throw(ArgumentError("boundary of hole $i is not a union of closed loops: " * err.msg))
@@ -204,6 +204,7 @@ outer boundary.
 function validate_holes(domain::AbsMultiplyConnectedDomain, registry::SymmetryRegistry)
     outer_contains(pt) = any(all(is_inside(sd, pt)) for sd in domain.subdomains)
     for (i, h) in enumerate(domain.holes)
+        parts = _hole_parts(h)
         for loop in boundary_components(h)
             pt = SVector{2}(curve(first(loop), 0.5))
             in_outer = outer_contains(pt) || any(outer_contains(SVector{2}(apply_symmetry(sym, pt))) for sym in registry)
@@ -211,6 +212,15 @@ function validate_holes(domain::AbsMultiplyConnectedDomain, registry::SymmetryRe
             for (j, other) in enumerate(domain.holes)
                 j == i && continue
                 is_inside(other, pt) && throw(ArgumentError("hole $i overlaps hole $j"))
+            end
+        end
+        length(parts) > 1 || continue
+        for (a, pa) in enumerate(parts), loop in boundary_components(pa)
+            pt = SVector{2}(curve(first(loop), 0.5))
+            atol = sqrt(eps(float(eltype(pt))))
+            for (b, pb) in enumerate(parts)
+                b == a && continue
+                _part_contains(pb, pt, atol) && throw(ArgumentError("copies $a and $b of hole $i overlap"))
             end
         end
     end

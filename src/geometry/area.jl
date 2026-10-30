@@ -73,7 +73,7 @@ area(domain::AbsCompositeDomain; kwargs...) = sum(area(sd; kwargs...) for sd in 
 
 Positive area of a hole: the sum over its loops of the absolute Green-theorem area.
 """
-area(hole::DomainHole; kwargs...) = sum(area(loop; kwargs...) for loop in boundary_components(hole))
+area(hole::AbsDomainHole; kwargs...) = sum(area(loop; kwargs...) for loop in boundary_components(hole))
 
 # Floating-point type `T` of a `Billiard{T}`; read from the type so that it is
 # inferable even though the boundary is stored as `Vector{AbsCurve}`.

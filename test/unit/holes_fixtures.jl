@@ -9,6 +9,16 @@
 #   hf_bitten_square()       outer-only SimpleDomain: [0,1]^2 without the quarter disk of radius 0.5 about 0 (inverted circle, orientation -1), area 1 - pi/16
 #   hf_d2_with_hole()        D2 billiard: fundamental frame is the quarter [0,1]^2 (full frame [-1,1]^2) with the asymmetric circular
 #                            DomainHole of radius 0.2 about (0.3, 0.4) (domain_id 5), area 4 - pi 0.04
+# Symmetric hole fixtures (B3), pieces closed by SymmetryWalls whose sym_ids refer to the registry of the hole group:
+#   hf_d4_eighth_disc()      CircleWedge of radius 0.3 about the origin from angle 0 to pi/4 (domain id 2): SymmetryWall(1, 2) on the diagonal
+#                            (Diagonal is sym_id 1 of D4_symmetry()) and SymmetryWall(7, 8) on the x axis (X is sym_id 7)
+#   hf_d4_symmetric_hole()   SymmetricHole(hf_d4_eighth_disc(), D4_symmetry()): disc of radius 0.3 about the origin, 8 pieces, area pi 0.09
+#   hf_d2_quarter_disc()     CircleWedge of radius 0.1 about (0.5, 0) from angle 0 to pi/2 (domain id 2): SymmetryWall(1, 2) (Y, sym_id 1) and
+#                            SymmetryWall(3, 4) (X, sym_id 3) of D2_symmetry()
+#   hf_d2_symmetric_hole()   SymmetricHole(hf_d2_quarter_disc(), D2_symmetry(), (0.5, 0)): disc of radius 0.1 about (0.5, 0), 4 pieces, area pi 0.01
+#   hf_half_disc_hole()      SymmetricHole of the upper half of the disc of radius 0.2 about (0.3, 0) (domain id 3), registry of XAxisReflection only,
+#                            2 pieces, area pi 0.04
+#   hf_symmetrized_disc()    SymmetrizedHoles(DomainHole(disc of radius 0.1 about (0.4, 0.2), domain id 5), D2_symmetry()): 4 discs, area 4 pi 0.01
 
 using StaticArrays: SVector
 
@@ -64,3 +74,17 @@ function hf_bitten_square()
     arc = CircleSegment(0.5, -pi / 2, pi / 2, [0.0, 0.0]; orientation = -1, domain_id = 1, segment_id = 5)
     return SimpleDomain{Float64}(AbsCurve[l1, l2, l3, l4, arc], SVector{2,Float64}[[0.5, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.5]], 1)
 end
+
+# Symmetric hole pieces and holes (see the header).
+hf_d4_eighth_disc() = CircleWedge(0.3, pi / 4, 0.0, 0.0, 0.0, 2; bcs = AbsBoundaryCondition[SpecularReflection(), SymmetryWall(1, 2), SymmetryWall(7, 8)])
+hf_d4_symmetric_hole() = SymmetricHole(hf_d4_eighth_disc(), D4_symmetry())
+
+hf_d2_quarter_disc() = CircleWedge(0.1, pi / 2, 0.0, 0.5, 0.0, 2; bcs = AbsBoundaryCondition[SpecularReflection(), SymmetryWall(1, 2), SymmetryWall(3, 4)])
+hf_d2_symmetric_hole() = SymmetricHole(hf_d2_quarter_disc(), D2_symmetry(), SVector(0.5, 0.0))
+
+function hf_half_disc_hole()
+    half = CircleWedge(0.2, pi, 0.0, 0.3, 0.0, 3; bcs = AbsBoundaryCondition[SpecularReflection(), SymmetryWall(1, 2), SymmetryWall(1, 2)])
+    return SymmetricHole(half, register_symmetries(XAxisReflection()), SVector(0.3, 0.0))
+end
+
+hf_symmetrized_disc() = SymmetrizedHoles(DomainHole(hf_circle_domain(0.1, 0.4, 0.2, 5)), D2_symmetry())

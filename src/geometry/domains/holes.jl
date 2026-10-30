@@ -88,3 +88,233 @@ its orbit structure. A [`DomainHole`](@ref) has no symmetry and is compatible
 only with an empty registry.
 """
 symmetry_compatible(::DomainHole, registry::SymmetryRegistry) = isempty(registry)
+
+# Closed curves whose chain is checked when a hole is added to a `MultiplyConnectedDomain`.
+_hole_geometric_curves(h::AbsDomainHole) = get_all_curves(h)
+
+# Region membership of a point within the tolerance `atol` of the boundary.
+_region_contains(domain::AbsSimpleDomain, pt, atol) = all(domain_fun(crv, pt) <= atol for crv in domain.boundary)
+_region_contains(domain::AbsCompositeDomain, pt, atol) = any(_region_contains(sd, pt, atol) for sd in domain.subdomains)
+
+_apply_symmetry_to_region(sym::AbsSymmetry, domain::AbsSimpleDomain, id_offset::Integer) = _apply_symmetry_to_domain(sym, domain, id_offset)
+function _apply_symmetry_to_region(sym::AbsSymmetry, domain::AbsCompositeDomain, id_offset::Integer)
+    return CompositeDomain(AbsSimpleDomain[_apply_symmetry_to_domain(sym, sd, id_offset) for sd in domain.subdomains])
+end
+
+# Physical boundary of the union of the pieces of a hole, the physical arcs of the pieces in piece order.
+function _pieces_loop(pieces::AbstractVector{<:AbsSimpleDomain})
+    loop = AbsCurve[]
+    for p in pieces
+        append!(loop, get_boundary_curves(p))
+    end
+    return loop
+end
+
+"""
+    SymmetricHole{T<:Real} <: AbsDomainHole
+
+`SymmetricHole` is the concrete [`AbsDomainHole`](@ref) of a hole that carries its own discrete symmetry group, stored as one fundamental piece.
+
+## Description
+The hole region is the union of the images of `piece` under the elements of
+`symmetries` acting about `center`. The images are materialized at construction,
+in the order of the registry: `pieces[1]` is the piece itself and `pieces[k+1]`
+is its image under `symmetries[k]`, built like [`full_boundary`](@ref) builds
+the outer boundary (translate by `-center`, apply the element, translate back;
+orientation-reversing elements also reverse each curve and the curve list).
+
+The `piece` is closed by [`SymmetryWall`](@ref) edges on the mirror lines and
+the cuts of the group. They are not physical, so the physical boundary of the
+hole is the chain of the physical arcs of all pieces, one closed loop
+traversed with the hole region on its left. The registry order is the chain
+order: the physical arcs of consecutive pieces must meet end to start
+(for [`D4_symmetry`](@ref) the piece runs counterclockwise from the angle `0`
+to `π/4` about `center`).
+
+## Attributes
+* `piece::AbsDomain`: Fundamental piece of the hole, a simple or composite domain.
+* `symmetries::SymmetryRegistry`: Non-identity elements of the hole group `H`, independent of the registry of the billiard; they act about `center`.
+* `center::SVector{2,T}`: Point about which the elements of `symmetries` act.
+* `pieces::Vector{AbsSimpleDomain}`: The materialized pieces, the identity piece first, then the images in registry order. A composite `piece` is flattened.
+* `id_stride::Int`: The image under `symmetries[k]` has its domain ids shifted by `k*id_stride`.
+
+## API
+The following functions can be evaluated for this type:
+- [`hole_domains`](@ref), [`hole_loop_count`](@ref), [`hole_leaves`](@ref)
+- [`is_inside`](@ref), [`area`](@ref), [`symmetry_compatible`](@ref)
+- [`get_boundary_curves`](@ref), [`get_all_domains`](@ref), [`get_all_curves`](@ref), [`boundary_components`](@ref)
+"""
+struct SymmetricHole{T<:Real} <: AbsDomainHole
+    piece::AbsDomain
+    symmetries::SymmetryRegistry
+    center::SVector{2,T}
+    pieces::Vector{AbsSimpleDomain}
+    id_stride::Int
+end
+
+"""
+    SymmetricHole(piece, symmetries, center = nothing; id_stride = 100) → hole::SymmetricHole
+
+Construct a [`SymmetricHole`](@ref) from its fundamental `piece` and the registry of its symmetry group.
+
+## Arguments
+* `piece`: Simple or composite domain; its physical boundary is the arcs of the hole, its [`SymmetryWall`](@ref) edges close it.
+* `symmetries`: [`SymmetryRegistry`](@ref) of the non-identity elements of the hole group, in chain order.
+* `center`: Point about which `symmetries` act; the origin when `nothing`.
+
+## Keyword arguments
+* `id_stride::Int = 100` : Domain ids of the image of `piece` under `symmetries[k]` are those of `piece` plus `k*id_stride`. They must not collide with ids of other parts of the domain.
+
+## Throws
+`ArgumentError` when `symmetries` is not a group (not closed under composition) or has duplicate elements, when a `SymmetryWall` of `piece` refers to a `sym_id` absent from `symmetries`, or when the physical arcs of the pieces do not chain into one closed loop in registry order.
+"""
+function SymmetricHole(piece::AbsDomain, symmetries::SymmetryRegistry, center=nothing; id_stride::Integer=100)
+    subdomains = _outer_subdomains(piece)
+    isempty(subdomains) && throw(ArgumentError("SymmetricHole requires a nonempty piece"))
+    T = eltype(eltype(first(subdomains).corners))
+    c = isnothing(center) ? zero(SVector{2,T}) : SVector{2,promote_type(T, eltype(center))}(center)
+    T = eltype(c)
+    block_keys = _block_keys(symmetries)
+    Set(_keys_closure(block_keys[2:end])) == Set(block_keys) || throw(ArgumentError("SymmetricHole symmetries are not closed under composition, so they do not form a group"))
+    ids = Set(sym.sym_id for sym in symmetries)
+    for sd in subdomains, crv in sd.boundary
+        crv.bc isa SymmetryWall && !(crv.bc.sym_id in ids) && throw(ArgumentError("SymmetricHole piece has a SymmetryWall with sym_id=$(crv.bc.sym_id) that is not in its symmetries"))
+    end
+    pieces = AbsSimpleDomain[subdomains...]
+    for (k, sym) in enumerate(symmetries)
+        images = AbsSimpleDomain[_apply_symmetry_to_domain(sym, sd, c, k * id_stride) for sd in subdomains]
+        append!(pieces, orientation_reversing(sym) ? reverse(images) : images)
+    end
+    loop = _pieces_loop(pieces)
+    (!isempty(loop) && all(is_connected(loop))) || throw(ArgumentError("the physical arcs of the pieces of a SymmetricHole do not chain into one closed loop in registry order; the registry order must be the order of the images around the hole"))
+    return SymmetricHole{T}(piece, symmetries, c, pieces, Int(id_stride))
+end
+
+_domain_eltype(h::SymmetricHole{T}) where {T} = T
+hole_domains(h::SymmetricHole) = AbsDomain[h.pieces...]
+hole_leaves(h::SymmetricHole) = AbsDomainHole[h]
+get_all_domains(h::SymmetricHole) = copy(h.pieces)
+get_all_curves(h::SymmetricHole) = AbsCurve[crv for d in h.pieces for crv in d.boundary]
+get_boundary_curves(h::SymmetricHole) = _pieces_loop(h.pieces)
+boundary_components(h::SymmetricHole) = Vector{AbsCurve}[get_boundary_curves(h)]
+hole_loop_count(::SymmetricHole) = 1
+_hole_geometric_curves(h::SymmetricHole) = get_boundary_curves(h)
+
+function _set_curve_bc(h::SymmetricHole, domain_id, segment_id, bc::AbsBoundaryCondition)
+    for k in 0:length(h.symmetries)
+        new_piece = _set_curve_bc(h.piece, domain_id - k * h.id_stride, segment_id, bc)
+        isnothing(new_piece) && continue
+        return SymmetricHole(new_piece, h.symmetries, h.center; id_stride=h.id_stride)
+    end
+    return nothing
+end
+
+is_inside(h::SymmetricHole, pt::SVector{2,T}) where {T<:Real} = any(_region_contains(p, pt) for p in h.pieces)
+is_inside(h::SymmetricHole, pts::AbstractArray) = [is_inside(h, pt) for pt in pts]
+_part_contains(h::SymmetricHole, pt, atol) = any(_region_contains(p, pt, atol) for p in h.pieces)
+
+symmetry_compatible(::SymmetricHole, registry::SymmetryRegistry) = isempty(registry)
+
+# Offset of the domain ids between the base and the first copy of a `SymmetrizedHoles`; larger than the id span of the base.
+_default_copy_stride(::DomainHole) = 100
+_default_copy_stride(h::SymmetricHole) = h.id_stride * (length(h.symmetries) + 1)
+
+_image_hole(sym::AbsSymmetry, h::DomainHole, id_offset::Integer) = DomainHole(_apply_symmetry_to_region(sym, h.domain, id_offset))
+function _image_hole(sym::AbsSymmetry, h::SymmetricHole, id_offset::Integer)
+    return DomainHole(CompositeDomain(AbsSimpleDomain[_apply_symmetry_to_domain(sym, p, id_offset) for p in h.pieces]))
+end
+
+"""
+    SymmetrizedHoles{H<:AbsDomainHole} <: AbsDomainHole
+
+`SymmetrizedHoles` is the concrete [`AbsDomainHole`](@ref) placing congruent copies of one base hole by the elements of a symmetry registry.
+
+## Description
+The hole object consists of the copies `holes[1] = base` and `holes[k+1]`, the
+image of `base` under `symmetries[k]` acting about the origin. Every copy has
+one boundary loop, so the object has `length(symmetries) + 1` loops, consecutive
+in the order of `holes`. The images of a [`DomainHole`](@ref) base are
+`DomainHole`s; the images of a [`SymmetricHole`](@ref) base are `DomainHole`s of
+the union of its mapped pieces (the copies are placed, they carry no symmetry
+of their own). A base whose own symmetry makes two copies coincide (a disk on a
+mirror line) is rejected by [`validate_holes`](@ref) as an overlap; use a
+[`SymmetricHole`](@ref) on the mirror line instead.
+
+## Attributes
+* `base::H`: The base hole, a [`DomainHole`](@ref) or a [`SymmetricHole`](@ref) with one loop.
+* `symmetries::SymmetryRegistry`: Non-identity operations that place the copies, acting about the origin.
+* `holes::Vector{AbsDomainHole}`: The copies, the base first, then the images in registry order.
+* `id_stride::Int`: The copy under `symmetries[k]` has its domain ids shifted by `k*id_stride`.
+
+## API
+The following functions can be evaluated for this type:
+- [`hole_domains`](@ref), [`hole_loop_count`](@ref), [`hole_leaves`](@ref)
+- [`is_inside`](@ref), [`area`](@ref), [`symmetry_compatible`](@ref)
+- [`get_boundary_curves`](@ref), [`get_all_domains`](@ref), [`get_all_curves`](@ref), [`boundary_components`](@ref)
+"""
+struct SymmetrizedHoles{H<:AbsDomainHole} <: AbsDomainHole
+    base::H
+    symmetries::SymmetryRegistry
+    holes::Vector{AbsDomainHole}
+    id_stride::Int
+end
+
+"""
+    SymmetrizedHoles(base, symmetries; id_stride) → holes::SymmetrizedHoles
+
+Construct a [`SymmetrizedHoles`](@ref) from a base hole and the registry of the operations that place its copies.
+
+## Arguments
+* `base`: [`DomainHole`](@ref) or [`SymmetricHole`](@ref) with exactly one boundary loop.
+* `symmetries`: [`SymmetryRegistry`](@ref) of the non-identity operations, acting about the origin.
+
+## Keyword arguments
+* `id_stride` : Domain ids of the copy under `symmetries[k]` are those of `base` plus `k*id_stride`. Default `100` for a `DomainHole` base and `base.id_stride*(length(base.symmetries)+1)` for a `SymmetricHole` base, so that the ids of all pieces stay distinct.
+
+## Throws
+`ArgumentError` when `symmetries` has duplicate elements or contains the identity, or when `base` does not have exactly one loop.
+"""
+function SymmetrizedHoles(base::Union{DomainHole,SymmetricHole}, symmetries::SymmetryRegistry; id_stride::Integer=_default_copy_stride(base))
+    _block_keys(symmetries)
+    hole_loop_count(base) == 1 || throw(ArgumentError("the base of SymmetrizedHoles must have exactly one boundary loop; got $(hole_loop_count(base))"))
+    holes = AbsDomainHole[base]
+    for (k, sym) in enumerate(symmetries)
+        push!(holes, _image_hole(sym, base, k * id_stride))
+    end
+    return SymmetrizedHoles{typeof(base)}(base, symmetries, holes, Int(id_stride))
+end
+
+_domain_eltype(h::SymmetrizedHoles) = _domain_eltype(h.base)
+hole_domains(h::SymmetrizedHoles) = AbsDomain[d for c in h.holes for d in hole_domains(c)]
+hole_leaves(h::SymmetrizedHoles) = AbsDomainHole[h]
+get_all_domains(h::SymmetrizedHoles) = AbsSimpleDomain[d for c in h.holes for d in get_all_domains(c)]
+get_all_curves(h::SymmetrizedHoles) = AbsCurve[crv for c in h.holes for crv in get_all_curves(c)]
+get_boundary_curves(h::SymmetrizedHoles) = AbsCurve[crv for c in h.holes for crv in get_boundary_curves(c)]
+function boundary_components(h::SymmetrizedHoles)
+    loops = Vector{AbsCurve}[]
+    for c in h.holes
+        append!(loops, boundary_components(c))
+    end
+    return loops
+end
+hole_loop_count(h::SymmetrizedHoles) = length(h.holes)
+_hole_geometric_curves(h::SymmetrizedHoles) = get_boundary_curves(h)
+
+function _set_curve_bc(h::SymmetrizedHoles, domain_id, segment_id, bc::AbsBoundaryCondition)
+    for k in 0:length(h.symmetries)
+        new_base = _set_curve_bc(h.base, domain_id - k * h.id_stride, segment_id, bc)
+        isnothing(new_base) && continue
+        return SymmetrizedHoles(new_base, h.symmetries; id_stride=h.id_stride)
+    end
+    return nothing
+end
+
+is_inside(h::SymmetrizedHoles, pt::SVector{2,T}) where {T<:Real} = any(is_inside(c, pt) for c in h.holes)
+is_inside(h::SymmetrizedHoles, pts::AbstractArray) = [is_inside(h, pt) for pt in pts]
+_part_contains(h::DomainHole, pt, atol) = _region_contains(h.domain, pt, atol)
+
+symmetry_compatible(::SymmetrizedHoles, registry::SymmetryRegistry) = isempty(registry)
+
+# Independent parts of a hole object whose mutual overlap `validate_holes` checks.
+_hole_parts(h::AbsDomainHole) = AbsDomainHole[h]
+_hole_parts(h::SymmetrizedHoles) = h.holes

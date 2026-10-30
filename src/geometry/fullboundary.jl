@@ -131,6 +131,73 @@ function _reverse_curve(c::L) where {L<:PolarSegment}
     return PolarSegment(c.r_func; R=c.R, arc_angle=new_arc, shift_angle=new_shift, center=c.center, orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
 end
 
+# Translation of a curve by the vector `v`; the radial function of a polar curve is unchanged, only its center moves.
+function _translate_curve(c::LineSegment{T}, v::SVector{2}) where {T<:Real}
+    w = SVector{2,T}(v)
+    return LineSegment(c.pt0 + w, c.pt1 + w; bc=c.bc, orientation=c.orientation, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+function _translate_curve(c::CircleSegment{T}, v::SVector{2}) where {T<:Real}
+    return CircleSegment(c.radius, c.arc_angle, c.shift_angle, c.center + SVector{2,T}(v); bc=c.bc, orientation=c.orientation, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+function _translate_curve(c::L, v::SVector{2}) where {L<:FourierCoeffPolarSegment}
+    return FourierCoeffPolarSegment(c.coef; R=c.R, arc_angle=c.arc_angle, shift_angle=c.shift_angle, center=c.center + SVector{2,eltype(c.center)}(v), orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+function _translate_curve(c::L, v::SVector{2}) where {L<:PolarSegment}
+    return PolarSegment(c.r_func; R=c.R, arc_angle=c.arc_angle, shift_angle=c.shift_angle, center=c.center + SVector{2,eltype(c.center)}(v), orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+
+# Translation of a simple domain; the result is a `SimpleDomain` whatever the input concrete type.
+function _translate_domain(domain::AbsSimpleDomain, v::SVector{2})
+    T = eltype(eltype(domain.corners))
+    boundary = AbsCurve[_translate_curve(c, v) for c in domain.boundary]
+    corners = SVector{2,T}[c + SVector{2,T}(v) for c in domain.corners]
+    return SimpleDomain{T}(boundary, corners, domain.id)
+end
+
+_shift_bc(bc::AbsBoundaryCondition, ::Integer) = bc
+_shift_bc(bc::Transparent, off::Integer) = Transparent(bc.next_id + off)
+_shift_bc(bc::PeriodicX, off::Integer) = PeriodicX(bc.next_id + off)
+
+# Adds `off` to the `domain_id` of a curve and to the neighbour ids stored in its boundary condition.
+function _shift_curve_ids(c::AbsCurve, off::Integer)
+    iszero(off) && return c
+    c = @set c.domain_id = c.domain_id + off
+    return @set c.bc = _shift_bc(c.bc, off)
+end
+
+"""
+    _apply_symmetry_to_domain(sym, domain::AbsSimpleDomain, id_offset=0) → image::SimpleDomain
+
+Image of a simple domain under the symmetry `sym` about the origin.
+
+## Description
+Every curve is mapped by `_apply_symmetry_to_curve`. Orientation-reversing
+elements additionally reverse each curve and the curve list, so the image
+keeps the region on the left of its boundary traversal. Segment ids and
+boundary conditions are kept (a `SymmetryWall` keeps its `sym_id` and
+`sector_id`); the `id` of the domain, the `domain_id` of every curve and the
+neighbour ids of `Transparent`/`PeriodicX` conditions are shifted by `id_offset`,
+which gives the image fresh ids. The result is always a `SimpleDomain`.
+"""
+function _apply_symmetry_to_domain(sym::AbsSymmetry, domain::AbsSimpleDomain, id_offset::Integer=0)
+    T = eltype(eltype(domain.corners))
+    if orientation_reversing(sym)
+        boundary = AbsCurve[_shift_curve_ids(_reverse_curve(_apply_symmetry_to_curve(sym, c)), id_offset) for c in Iterators.reverse(domain.boundary)]
+        corners = SVector{2,T}[SVector{2,T}(apply_symmetry(sym, p)) for p in Iterators.reverse(domain.corners)]
+    else
+        boundary = AbsCurve[_shift_curve_ids(_apply_symmetry_to_curve(sym, c), id_offset) for c in domain.boundary]
+        corners = SVector{2,T}[SVector{2,T}(apply_symmetry(sym, p)) for p in domain.corners]
+    end
+    return SimpleDomain{T}(boundary, corners, domain.id + id_offset)
+end
+
+# Image of a simple domain under `sym` acting about `center` instead of the origin.
+function _apply_symmetry_to_domain(sym::AbsSymmetry, domain::AbsSimpleDomain, center::SVector{2}, id_offset::Integer)
+    iszero(center) && return _apply_symmetry_to_domain(sym, domain, id_offset)
+    image = _apply_symmetry_to_domain(sym, _translate_domain(domain, -center), id_offset)
+    return _translate_domain(image, center)
+end
+
 """
     _reconstruct_curves(P, symmetries)
 

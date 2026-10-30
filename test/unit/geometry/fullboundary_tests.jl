@@ -1,6 +1,7 @@
 # Unit tests for the reconstruction of the complete physical boundary from the fundamental domain and its symmetries:
 #   src/geometry/fullboundary.jl   (full_boundary, _full_boundary_data, _apply_symmetry_to_curve, _polar_symmetry_image,
-#                                   _reverse_curve)
+#                                   _reverse_curve, _translate_curve, _translate_domain, _shift_bc, _shift_curve_ids,
+#                                   _apply_symmetry_to_domain)
 # Reference objects: one LineSegment, one CircleSegment, one FourierCoeffPolarSegment and one PolarSegment, each placed off
 # the origin and off the axes so that no symmetry maps the curve onto itself. The defining identity of an image is
 #   curve(_apply_symmetry_to_curve(sym, c), t) == apply_symmetry(sym, curve(c, t)),
@@ -400,4 +401,296 @@ end
     ann = hf_concentric_annulus()
     @test domain_fun(full_boundary(ann)[2], SVector(0.0, 0.0)) < 0
     @test domain_fun(full_boundary(ann)[1], SVector(0.0, 0.0)) < 0
+end
+
+################################################################################
+##################### translation and domain images (B3) #######################
+################################################################################
+# _translate_curve, _translate_domain, _shift_bc, _shift_curve_ids, _apply_symmetry_to_domain (src/geometry/fullboundary.jl).
+# Evidence: the translated curve is the old one plus the vector at every parameter, with unchanged length, tangent and metadata; the
+# image of a domain under g is g applied pointwise (reflections: curves and corners in reverse order, each curve reversed, so that
+# curve(img_k, t) = g(curve(c_{n+1-k}, 1-t))); the unit square keeps its signed Green area 1 (region on the left) under every
+# element; a rotation by pi/2 about the center of a unit square maps the k-th side onto the (k+1)-th; an offset shifts domain ids
+# and the neighbour ids of Transparent/PeriodicX only.
+
+using BilliardGeometry: _translate_curve, _translate_domain, _shift_bc, _shift_curve_ids, _apply_symmetry_to_domain, _area_integral
+
+const fb_V = SVector(1.0, 2.0)
+
+# Curves with a non-default boundary condition and orientation, off the origin.
+fb_line_bc() = LineSegment([0.3, 0.1], [1.2, 0.7]; bc = SymmetryWall(3, 4), orientation = -1, domain_id = 2, segment_id = 5)
+fb_arc_bc() = CircleSegment(0.8, 1.1, 0.4, [0.5, 0.2]; bc = SymmetryWall(3, 4), orientation = -1, domain_id = 2, segment_id = 5)
+fb_fourier_bc() = FourierCoeffPolarSegment([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3]; arc_angle = 1.3, shift_angle = 0.4, center = [0.3, -0.2],
+                                           bc = SymmetryWall(3, 4), orientation = -1, domain_id = 2, segment_id = 5)
+fb_polar_bc() = PolarSegment(φ -> 1.0 + 0.2 * cos(4 * φ); arc_angle = 1.3, shift_angle = 0.4, center = [0.3, -0.2],
+                             bc = SymmetryWall(3, 4), orientation = -1, domain_id = 2, segment_id = 5)
+
+# Unit square [1,2] x [0.5,1.5] counterclockwise (segment ids 1..4, domain id 3), signed Green area 1.
+fb_unit_square() = hf_rect_domain(1.0, 0.5, 2.0, 1.5, 3)
+
+# The same square with a different boundary condition on each side, domain id `id`.
+function fb_bc_square(id)
+    p = (SVector(1.0, 0.5), SVector(2.0, 0.5), SVector(2.0, 1.5), SVector(1.0, 1.5))
+    bcs = AbsBoundaryCondition[SpecularReflection(), Transparent(7), SymmetryWall(3, 4), PeriodicX(9)]
+    curves = AbsCurve[LineSegment(p[k], p[mod1(k + 1, 4)]; bc = bcs[k], domain_id = id, segment_id = k) for k in 1:4]
+    return SimpleDomain{Float64}(curves, collect(p), id)
+end
+
+# Signed Green area of the whole boundary of a simple domain.
+fb_signed_area(domain) = sum(_area_integral(c) for c in domain.boundary) / 2
+
+# Pointwise approximate equality of two equally long point lists.
+fb_points_match(a, b) = length(a) == length(b) && all(isapprox(x, y; atol = fb_ATOL) for (x, y) in zip(a, b))
+
+# Every curve ends where the next one starts, the last one where the first one starts.
+fb_chain_closed(curves) = all(k -> isapprox(curve(curves[k], 1.0), curve(curves[mod1(k + 1, length(curves))], 0.0); atol = fb_ATOL), eachindex(curves))
+
+# Same trace and parametrization as the vector-shifted source at the grid `fb_TS`, and the same metadata.
+function fb_translated_matches(c, tc, v)
+    pts = all(t -> isapprox(curve(tc, t), curve(c, t) + v; atol = fb_ATOL), fb_TS)
+    tans = all(t -> isapprox(tangent(tc, t), tangent(c, t); atol = fb_ATOL), fb_TS)
+    meta = tc.bc == c.bc && tc.orientation == c.orientation && tc.domain_id == c.domain_id && tc.segment_id == c.segment_id
+    return pts && tans && meta && isapprox(tc.length, c.length; atol = fb_ATOL)
+end
+
+@testset "_translate_curve (LineSegment)" begin
+    c = fb_line_bc()
+    tc = _translate_curve(c, fb_V)
+    @test tc isa LineSegment{Float64}
+    @test fb_translated_matches(c, tc, fb_V)
+    @test tc.pt0 ≈ c.pt0 + fb_V atol = fb_ATOL
+    @test tc.pt1 ≈ c.pt1 + fb_V atol = fb_ATOL
+    # the source is not modified and the inverse translation gives the source back
+    @test c.pt0 == [0.3, 0.1]
+    @test fb_translated_matches(c, _translate_curve(tc, -fb_V), SVector(0.0, 0.0))
+    @test fb_translated_matches(c, _translate_curve(c, SVector(0.0, 0.0)), SVector(0.0, 0.0))
+end
+
+@testset "_translate_curve (CircleSegment)" begin
+    c = fb_arc_bc()
+    tc = _translate_curve(c, fb_V)
+    @test tc isa CircleSegment{Float64}
+    @test fb_translated_matches(c, tc, fb_V)
+    @test tc.center ≈ c.center + fb_V atol = fb_ATOL
+    @test tc.radius == c.radius && tc.arc_angle == c.arc_angle && tc.shift_angle == c.shift_angle
+    @test fb_translated_matches(c, _translate_curve(tc, -fb_V), SVector(0.0, 0.0))
+end
+
+@testset "_translate_curve (FourierCoeffPolarSegment)" begin
+    c = fb_fourier_bc()
+    tc = _translate_curve(c, fb_V)
+    @test tc isa FourierCoeffPolarSegment
+    @test fb_translated_matches(c, tc, fb_V)
+    @test tc.center ≈ c.center + fb_V atol = fb_ATOL
+    # only the center moves: coefficients, scale and angles are kept
+    @test tc.coef == c.coef && tc.R == c.R && tc.arc_angle == c.arc_angle && tc.shift_angle == c.shift_angle
+    @test fb_translated_matches(c, _translate_curve(tc, -fb_V), SVector(0.0, 0.0))
+end
+
+@testset "_translate_curve (PolarSegment)" begin
+    c = fb_polar_bc()
+    tc = _translate_curve(c, fb_V)
+    @test tc isa PolarSegment
+    @test fb_translated_matches(c, tc, fb_V)
+    @test tc.center ≈ c.center + fb_V atol = fb_ATOL
+    @test tc.r_func === c.r_func && tc.R == c.R && tc.arc_angle == c.arc_angle && tc.shift_angle == c.shift_angle
+    @test fb_translated_matches(c, _translate_curve(tc, -fb_V), SVector(0.0, 0.0))
+end
+
+@testset "_translate_domain" begin
+    dom = fb_unit_square()
+    td = _translate_domain(dom, fb_V)
+    @test td isa SimpleDomain{Float64}
+    @test td.id == dom.id
+    @test length(td.boundary) == 4
+    @test [c.segment_id for c in td.boundary] == [1, 2, 3, 4]
+    @test all(k -> fb_translated_matches(dom.boundary[k], td.boundary[k], fb_V), 1:4)
+    @test fb_points_match(td.corners, [p + fb_V for p in dom.corners])
+    @test fb_chain_closed(td.boundary)
+    @test fb_signed_area(td) ≈ 1.0 atol = fb_ATOL
+    # the source is untouched and the inverse translation returns the corners
+    @test dom.corners[1] == SVector(1.0, 0.5)
+    @test fb_points_match(_translate_domain(td, -fb_V).corners, dom.corners)
+    # any simple domain type gives a SimpleDomain, here a CircleWedge with an arc
+    wedge = hf_d2_quarter_disc()
+    tw = _translate_domain(wedge, fb_V)
+    @test tw isa SimpleDomain{Float64}
+    @test tw.id == wedge.id
+    @test tw.boundary[1].center ≈ wedge.center + fb_V atol = fb_ATOL
+    @test [c.bc for c in tw.boundary] == [c.bc for c in wedge.boundary]
+    @test fb_chain_closed(tw.boundary)
+end
+
+@testset "_shift_bc" begin
+    @test _shift_bc(Transparent(7), 10) == Transparent(17)
+    @test _shift_bc(PeriodicX(9), 10) == PeriodicX(19)
+    @test _shift_bc(Transparent(7), 0) == Transparent(7)
+    @test _shift_bc(Transparent(7), -3) == Transparent(4)
+    # every other condition has no neighbour id and is returned unchanged
+    @test _shift_bc(SpecularReflection(), 10) == SpecularReflection()
+    @test _shift_bc(SymmetryWall(3, 4), 10) == SymmetryWall(3, 4)
+    @test _shift_bc(QuantumSolverIgnore(), 10) == QuantumSolverIgnore()
+end
+
+@testset "_shift_curve_ids" begin
+    for c in (fb_line_bc(), fb_arc_bc(), fb_fourier_bc(), fb_polar_bc())
+        shifted = _shift_curve_ids(c, 10)
+        @test typeof(shifted) == typeof(c)
+        @test shifted.domain_id == c.domain_id + 10
+        @test shifted.segment_id == c.segment_id
+        @test shifted.bc == SymmetryWall(3, 4)          # a SymmetryWall keeps sym_id and sector_id
+        @test c.domain_id == 2                           # the source is untouched
+        # zero offset returns the curve itself
+        @test _shift_curve_ids(c, 0) === c
+    end
+    # the neighbour ids of Transparent and PeriodicX shift together with the domain id
+    tr = LineSegment([0.0, 0.0], [1.0, 0.0]; bc = Transparent(7), domain_id = 2, segment_id = 1)
+    @test _shift_curve_ids(tr, 10).bc == Transparent(17)
+    @test _shift_curve_ids(tr, 10).domain_id == 12
+    pr = LineSegment([0.0, 0.0], [1.0, 0.0]; bc = PeriodicX(9), domain_id = 2, segment_id = 1)
+    @test _shift_curve_ids(pr, 10).bc == PeriodicX(19)
+    @test _shift_curve_ids(CircleSegment(0.5, pi, 0.0, [0.0, 0.0]; bc = Transparent(7), domain_id = 2), 10).bc == Transparent(17)
+end
+
+@testset "_apply_symmetry_to_domain (reflections)" begin
+    dom = fb_unit_square()
+    inside = SVector(1.5, 1.0)
+    outside_pts = (SVector(0.5, 1.0), SVector(2.5, 1.0), SVector(1.5, 0.2), SVector(1.5, 1.8))
+    for sym in fb_REFLECTIONS
+        img = _apply_symmetry_to_domain(sym, dom)
+        @test img isa SimpleDomain{Float64}
+        @test img.id == dom.id
+        # the curve list is reversed, every curve reversed and mapped: curve(img_k, t) = g(curve(c_{n+1-k}, 1-t))
+        @test [c.segment_id for c in img.boundary] == [4, 3, 2, 1]
+        @test all(c -> c.domain_id == 3, img.boundary)
+        for k in 1:4, t in fb_TS
+            @test isapprox(curve(img.boundary[k], t), apply_symmetry(sym, curve(dom.boundary[5 - k], 1 - t)); atol = fb_ATOL)
+        end
+        @test fb_points_match(img.corners, [SVector{2}(apply_symmetry(sym, p)) for p in Iterators.reverse(dom.corners)])
+        # one closed loop with the region on the left, the same signed area as the source
+        @test fb_chain_closed(img.boundary)
+        @test fb_signed_area(img) ≈ 1.0 atol = fb_ATOL
+        # region: p is inside the source iff g(p) is inside the image
+        @test all(is_inside(img, SVector{2}(apply_symmetry(sym, inside))))
+        @test all(p -> !all(is_inside(img, SVector{2}(apply_symmetry(sym, p)))), outside_pts)
+        # the domain function keeps its sign (negative inside) on the reversed curves
+        for k in 1:4
+            @test domain_fun(img.boundary[k], SVector{2}(apply_symmetry(sym, inside))) ≈ domain_fun(dom.boundary[5 - k], inside) atol = fb_ATOL
+        end
+    end
+    # the image under X is the mirror image about the x axis, the square [1,2] x [-1.5,-0.5], corners in reverse order
+    img = _apply_symmetry_to_domain(XAxisReflection(), dom)
+    @test fb_points_match(img.corners, [SVector(1.0, -1.5), SVector(2.0, -1.5), SVector(2.0, -0.5), SVector(1.0, -0.5)])
+end
+
+@testset "_apply_symmetry_to_domain (rotations and the pi rotation)" begin
+    dom = fb_unit_square()
+    inside = SVector(1.5, 1.0)
+    outside_pts = (SVector(0.5, 1.0), SVector(2.5, 1.0), SVector(1.5, 0.2), SVector(1.5, 1.8))
+    for sym in (NFoldRotation(4, 1), NFoldRotation(3, 1), NFoldRotation(4, 3), XYAxisReflection())
+        img = _apply_symmetry_to_domain(sym, dom)
+        @test img isa SimpleDomain{Float64}
+        @test img.id == dom.id
+        # orientation-preserving: the order of the curves and corners is kept
+        @test [c.segment_id for c in img.boundary] == [1, 2, 3, 4]
+        @test all(c -> c.domain_id == 3, img.boundary)
+        for k in 1:4, t in fb_TS
+            @test isapprox(curve(img.boundary[k], t), apply_symmetry(sym, curve(dom.boundary[k], t)); atol = fb_ATOL)
+        end
+        @test fb_points_match(img.corners, [SVector{2}(apply_symmetry(sym, p)) for p in dom.corners])
+        @test fb_chain_closed(img.boundary)
+        @test fb_signed_area(img) ≈ 1.0 atol = fb_ATOL
+        @test all(is_inside(img, SVector{2}(apply_symmetry(sym, inside))))
+        @test all(p -> !all(is_inside(img, SVector{2}(apply_symmetry(sym, p)))), outside_pts)
+    end
+    # the pi rotation about the origin: the square [-2,-1] x [-1.5,-0.5]
+    img = _apply_symmetry_to_domain(XYAxisReflection(), dom)
+    @test fb_points_match(img.corners, [SVector(-1.0, -0.5), SVector(-2.0, -0.5), SVector(-2.0, -1.5), SVector(-1.0, -1.5)])
+    # a wedge with an arc and symmetry walls: rotation by pi/2 maps the wedge [0, pi/4] onto [pi/2, 3pi/4]
+    wedge = hf_d4_eighth_disc()
+    img = _apply_symmetry_to_domain(NFoldRotation(4, 1), wedge)
+    @test fb_chain_closed(img.boundary)
+    @test all(is_inside(img, SVector(-0.05, 0.1)))
+    @test !all(is_inside(img, SVector(0.1, 0.05)))
+end
+
+@testset "_apply_symmetry_to_domain (id_offset)" begin
+    dom = fb_bc_square(3)
+    # a rotation keeps the order: ids and neighbour ids shift, segment ids and SymmetryWall conditions stay
+    img = _apply_symmetry_to_domain(NFoldRotation(4, 1), dom, 10)
+    @test img.id == 13
+    @test all(c -> c.domain_id == 13, img.boundary)
+    @test [c.segment_id for c in img.boundary] == [1, 2, 3, 4]
+    @test [c.bc for c in img.boundary] == AbsBoundaryCondition[SpecularReflection(), Transparent(17), SymmetryWall(3, 4), PeriodicX(19)]
+    # a reflection reverses the list, the conditions travel with their curves
+    img = _apply_symmetry_to_domain(YAxisReflection(), dom, 10)
+    @test img.id == 13
+    @test all(c -> c.domain_id == 13, img.boundary)
+    @test [c.segment_id for c in img.boundary] == [4, 3, 2, 1]
+    @test [c.bc for c in img.boundary] == AbsBoundaryCondition[PeriodicX(19), SymmetryWall(3, 4), Transparent(17), SpecularReflection()]
+    # offset zero (also the default) changes no id
+    for img0 in (_apply_symmetry_to_domain(NFoldRotation(4, 1), dom, 0), _apply_symmetry_to_domain(NFoldRotation(4, 1), dom))
+        @test img0.id == 3
+        @test all(c -> c.domain_id == 3, img0.boundary)
+        @test [c.bc for c in img0.boundary] == [c.bc for c in dom.boundary]
+    end
+    # the source is untouched
+    @test all(c -> c.domain_id == 3, dom.boundary)
+    @test dom.boundary[2].bc == Transparent(7)
+    # the wedge piece of a symmetric hole keeps the sym_id and sector_id of its walls
+    wedge = hf_d4_eighth_disc()
+    img = _apply_symmetry_to_domain(NFoldRotation(4, 1), wedge, 10)
+    @test img.id == 12
+    @test all(c -> c.domain_id == 12, img.boundary)
+    @test [c.bc for c in img.boundary] == [c.bc for c in wedge.boundary]
+    @test [c.segment_id for c in img.boundary] == [1, 2, 3]
+    @test all(is_inside(img, SVector(-0.05, 0.1)))
+end
+
+@testset "_apply_symmetry_to_domain (with center)" begin
+    dom = fb_unit_square()
+    center = SVector(0.3, 0.1)
+    # reflection about the horizontal line y = 0.1 through `center`: p -> center + g(p - center)
+    sym = XAxisReflection()
+    img = _apply_symmetry_to_domain(sym, dom, center, 0)
+    @test img isa SimpleDomain{Float64}
+    @test [c.segment_id for c in img.boundary] == [4, 3, 2, 1]
+    for k in 1:4, t in fb_TS
+        @test isapprox(curve(img.boundary[k], t), center + apply_symmetry(sym, curve(dom.boundary[5 - k], 1 - t) - center); atol = fb_ATOL)
+    end
+    @test fb_points_match(img.corners, [SVector(1.0, -1.3), SVector(2.0, -1.3), SVector(2.0, -0.3), SVector(1.0, -0.3)])
+    @test fb_chain_closed(img.boundary)
+    @test fb_signed_area(img) ≈ 1.0 atol = fb_ATOL
+    # applying the reflection twice about the same center gives the source back
+    back = _apply_symmetry_to_domain(sym, img, center, 0)
+    @test [c.segment_id for c in back.boundary] == [1, 2, 3, 4]
+    @test fb_points_match(back.corners, dom.corners)
+    @test all(k -> all(t -> isapprox(curve(back.boundary[k], t), curve(dom.boundary[k], t); atol = fb_ATOL), fb_TS), 1:4)
+    # ids shift with the offset and the center is not an id
+    shifted = _apply_symmetry_to_domain(sym, dom, center, 100)
+    @test shifted.id == 103
+    @test all(c -> c.domain_id == 103, shifted.boundary)
+
+    # a rotation by pi/2 about the center of the unit square maps the k-th side onto the (k+1)-th
+    sq_center = SVector(1.5, 1.0)
+    rot = _apply_symmetry_to_domain(NFoldRotation(4, 1), dom, sq_center, 0)
+    for k in 1:4, t in fb_TS
+        @test isapprox(curve(rot.boundary[k], t), curve(dom.boundary[mod1(k + 1, 4)], t); atol = fb_ATOL)
+    end
+    @test fb_points_match(rot.corners, [dom.corners[mod1(k + 1, 4)] for k in 1:4])
+
+    # the zero center is the same as the method about the origin
+    zero_center = _apply_symmetry_to_domain(sym, dom, SVector(0.0, 0.0), 5)
+    origin = _apply_symmetry_to_domain(sym, dom, 5)
+    @test zero_center.id == origin.id
+    @test fb_points_match(zero_center.corners, origin.corners)
+    @test [c.domain_id for c in zero_center.boundary] == [c.domain_id for c in origin.boundary]
+
+    # an arc about its own center: the Y reflection through the center (0.5, 0) of the quarter disc maps [0, pi/2] onto [pi/2, pi]
+    quarter = hf_d2_quarter_disc()
+    img = _apply_symmetry_to_domain(YAxisReflection(), quarter, SVector(0.5, 0.0), 0)
+    @test all(is_inside(img, SVector(0.45, 0.05)))
+    @test !all(is_inside(img, SVector(0.55, 0.05)))
+    @test fb_chain_closed(img.boundary)
+    @test curve(img.boundary[3], 0.5) ≈ [0.5 - 0.1 * cos(pi / 4), 0.1 * sin(pi / 4)] atol = fb_ATOL
 end

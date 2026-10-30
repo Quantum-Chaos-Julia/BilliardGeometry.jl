@@ -44,7 +44,8 @@ function so_polar_billiard(syms::AbsSymmetry...; shift = -pi / 4)
     return PolarBilliard{Float64}(dom, register_symmetries(syms...))
 end
 
-# PolarBilliard whose registry is the D4 group (YAxis, XY, XAxis, Diagonal, AntiDiagonal, rotations by pi/2 and 3 pi/2).
+# PolarBilliard whose registry is the D4 group in chain order (Diagonal, rotation by pi/2, YAxis, XY, AntiDiagonal, rotation by
+# 3 pi/2, XAxis).
 so_d4_billiard() = so_polar_billiard(collect(D4_symmetry())...)
 
 # Dihedral keys: rotation by 2 pi a and mirror at angle pi a.
@@ -558,7 +559,8 @@ end
     @test fundamental_size(orbits) == 2
     @test length(orbits) == 16
     # observed values on the polar D4 registry (shift -pi/4), members listed in the closure order of the generators
-    @test orbits.fund_to_full[:, 1] == [1, 4, 10, 15, 13, 12, 8, 5]
+    # (re-observed after D4_symmetry() moved to chain order Diag, R1, Y, XY, Anti, R3, X)
+    @test orbits.fund_to_full[:, 1] == [1, 8, 4, 13, 5, 12, 16, 9]
     @test orbits.fund_to_scale[:, 1] == ComplexF64[1, 1, -1, -1, -1, -1, 1, 1]
     # the orbits cover every node exactly once
     @test sort(vec(orbits.fund_to_full)) == 1:16
@@ -657,10 +659,10 @@ end
     @test typeof.(_minimal_generators(D2_symmetry())) == typeof.(gens)
     @test [g.sym_id for g in _minimal_generators(D2_symmetry())] == [1, 3]
 
-    # D4 registry: the y axis mirror and the diagonal mirror generate all eight elements
+    # D4 registry (chain order Diag, R1, Y, ...): the diagonal mirror and the y axis mirror generate all eight elements
     d4gens = _minimal_generators(D4_symmetry())
-    @test typeof.(d4gens) == (YAxisReflection, DiagonalReflection)
-    @test [g.sym_id for g in d4gens] == [1, 4]
+    @test typeof.(d4gens) == (DiagonalReflection, YAxisReflection)
+    @test [g.sym_id for g in d4gens] == [1, 3]
     @test length(_keys_closure([symmetry_key(g) for g in d4gens])) == 8
 
     # cyclic registry: the rotation m = 1 alone, a rotation is only used when no mirror is registered
@@ -705,12 +707,12 @@ end
 
     # D4 billiard: the same generators as the registry
     d4 = so_d4_billiard()
-    @test typeof.(get_symmetries(d4)) == (YAxisReflection, DiagonalReflection)
+    @test typeof.(get_symmetries(d4)) == (DiagonalReflection, YAxisReflection)
 
     # a registry is accepted directly and gives the same generators as the billiard that holds it
     @test typeof.(get_symmetries(D2_symmetry())) == typeof.(get_symmetries(RectangleBilliard(1.0, 0.6)))
     @test [g.sym_id for g in get_symmetries(D2_symmetry())] == [1, 3]
-    @test [g.sym_id for g in get_symmetries(D4_symmetry())] == [1, 4]
+    @test [g.sym_id for g in get_symmetries(D4_symmetry())] == [1, 3]
     @test get_symmetries(Cn_symmetry(1)) == ()
     c3 = C3Billiard(0.2)
     @test [g.m for g in get_symmetries(c3.symmetries)] == [g.m for g in get_symmetries(c3)] == [1]
