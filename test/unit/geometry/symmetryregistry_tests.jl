@@ -93,7 +93,7 @@ end
     @test (@inferred register_symmetries(XAxisReflection(), YAxisReflection())) isa SymmetryRegistry
 
     # CompositeReflection is a generator set for orbit bookkeeping, not a taggable generator
-    @test_throws MethodError register_symmetries(CompositeReflection(XAxisReflection(), YAxisReflection()))
+    @test_throws ArgumentError register_symmetries(CompositeReflection(XAxisReflection(), YAxisReflection()))
 end
 
 @testset "symmetry_of" begin

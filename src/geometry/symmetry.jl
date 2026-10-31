@@ -66,6 +66,7 @@ end
 # to tag a fresh copy of a generator with its assigned `sym_id`.
 _with_sym_id(::AxisReflection{A}, id::Int) where {A} = AxisReflection{A}(id)
 _with_sym_id(::XYAxisReflection, id::Int) = XYAxisReflection(id)
+_with_sym_id(sym::AbsSymmetry, ::Int) = throw(ArgumentError("$(typeof(sym)) cannot be registered as a billiard symmetry element"))
 
 """
     CompositeReflection(reflections)

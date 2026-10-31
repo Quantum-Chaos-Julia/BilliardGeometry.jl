@@ -427,7 +427,7 @@ function _orbit_map_from_generators(::Type{T}, N::Int, block_keys::Vector{_Dihed
                 push!(perms, pref)
                 push!(scales, χnew)
             elseif scales[j] != χnew
-                throw(ArgumentError("Composite reflection parities are inconsistent"))
+                throw(ArgumentError("Characters of the generators are inconsistent: one group element is reached by different words with different character products"))
             end
         end
         head += 1
