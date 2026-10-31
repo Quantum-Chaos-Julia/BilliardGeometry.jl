@@ -3,8 +3,12 @@
 # file after it may use the `hf_` helpers. All fixtures are cheap (no eigen solves, no quadrature beyond Green-theorem areas).
 #
 # Reference billiards (all in the full physical frame unless stated):
-#   hf_concentric_annulus()  AnnularBilliard(0.3, 0.0): unit disk without the disk of radius 0.3 about the origin, area pi (1 - 0.09)
-#   hf_eccentric_annulus()   AnnularBilliard(0.2, 0.3): unit disk without the disk of radius 0.2 about (0.3, 0), area pi (1 - 0.04)
+#   hf_concentric_annulus()  AnnularBilliard(0.3, 0.0): unit disk without the disk of radius 0.3 about the origin, area pi (1 - 0.09).
+#                            Centered at the origin, so since B7 it is symmetric: upper half disc outer region (arc + SymmetryWall(1, 2)) and a
+#                            SymmetricHole of two half-disc pieces, registry {XAxisReflection}, G' of order 2
+#   hf_eccentric_annulus()   AnnularBilliard(0.2, 0.3): unit disk without the disk of radius 0.2 about (0.3, 0), area pi (1 - 0.04); symmetric like the above
+#   hf_shifted_annulus()     AnnularBilliard(0.3, 0.2; center = (0.5, 0.1)): nonzero center keeps the unreduced construction (full outer circle, DomainHole
+#                            with one full circle, empty registry), area pi (1 - 0.09)
 #   hf_rect_with_hole()      rectangle [0,3] x [0,2] without the rectangle [1,1.5] x [0.5,1.5] (off center), no symmetry, area 6 - 0.5
 #   hf_bitten_square()       outer-only SimpleDomain: [0,1]^2 without the quarter disk of radius 0.5 about 0 (inverted circle, orientation -1), area 1 - pi/16
 #   hf_d2_with_hole()        D2 billiard: fundamental frame is the quarter [0,1]^2 (full frame [-1,1]^2) with the asymmetric circular
@@ -48,6 +52,7 @@ hf_two_loop_hole(id = 3) = DomainHole(CompositeDomain(AbsSimpleDomain[hf_rect_do
 
 hf_concentric_annulus() = AnnularBilliard(0.3, 0.0)
 hf_eccentric_annulus() = AnnularBilliard(0.2, 0.3)
+hf_shifted_annulus() = AnnularBilliard(0.3, 0.2; center = [0.5, 0.1])
 
 function hf_rect_with_hole()
     outer = hf_rect_domain(0.0, 0.0, 3.0, 2.0, 1)

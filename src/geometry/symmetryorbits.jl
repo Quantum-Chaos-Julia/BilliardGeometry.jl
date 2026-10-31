@@ -6,14 +6,11 @@
 # determined exactly from the same registered symmetry group used by
 # `full_boundary`; it is never inferred from floating-point coordinates.
 #
-# Current restriction:
-#
-#   Every physical boundary component must be individually invariant under the
-#   active symmetry. Symmetries that exchange distinct `domain_id` components
-#   are not supported.
-#
-# Thus the same construction applies independently to the outer boundary and,
-# for multiply connected billiards, to every invariant hole boundary.
+# Boundary loops are grouped by the source that reconstructs them (outer
+# boundary, one group per hole object). A group is split into one contiguous
+# block of nodes per reconstruction block; an element of the symmetry group
+# permutes the blocks by exact key multiplication, so loops exchanged by a
+# symmetry (copies of a `SymmetrizedHoles`) are handled as blocks of one group.
 ################################################################################
 
 """
@@ -438,53 +435,26 @@ function _orbit_map_from_generators(::Type{T}, N::Int, block_keys::Vector{_Dihed
     return _build_symmetry_orbit_map(T, N, perms, scales)
 end
 
-"""
-    symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::AbsSymmetry, character...) where {T<:Real,Bi<:AbsBilliard} → orbits::SymmetryOrbitMap{T}
 
-Construct the exact symmetry-orbit map for one complete invariant physical
-boundary component.
-
-## Description
-The node permutation is derived from the billiard's registered physical
-symmetry reconstruction and the integer midpoint-grid index. Boundary
-coordinates are never inspected and no floating-point matching is performed.
-
-The physical boundary component must be individually invariant under the
-requested symmetry. Symmetries that exchange distinct physical components
-are currently unsupported.
-
-## Arguments
-* `T::Type{<:Real}`: Real scalar type of the boundary discretization.
-* `billiard::Bi`: Billiard defining the registered physical symmetry group.
-* `N::Int`: Number of nodes on the complete invariant physical component.
-* `symmetry::AbsSymmetry`: Active symmetry reduction.
-* `character`: Requested irreducible-representation character or rotational sector.
-
-## Returns
-* `orbits::SymmetryOrbitMap{T}`: Exact boundary symmetry-orbit map.
-"""
-function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::S, character::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard,S<:AxisReflection}
-    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("$S requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
-    id = collect(1:N)
-    refl = _boundary_symmetry_permutation(billiard, N, symmetry)
-    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, refl]), Complex{T}[one(Complex{T}), character])
+# Orbit maps on a component split into the blocks of `block_keys`. Methods
+# dispatch on the symmetry type; the node count must be a multiple of the
+# number of blocks (checked by the block permutation).
+function _symmetry_orbits(::Type{T}, block_keys::Vector{_DihedralKey}, N::Int, symmetry::AxisReflection, character::Complex{T} = one(Complex{T})) where {T<:Real}
+    refl = _block_node_permutation(N, block_keys, symmetry)
+    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([collect(1:N), refl]), Complex{T}[one(Complex{T}), character])
 end
 
-function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::XYAxisReflection, character_x::Complex{T} = one(Complex{T}), character_y::Complex{T} = one(Complex{T})) where {T<:Real,Bi<:AbsBilliard}
-    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("XYAxisReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
-    id = collect(1:N)
-    rx = _boundary_symmetry_permutation(billiard, N, XAxisReflection())
-    ry = _boundary_symmetry_permutation(billiard, N, YAxisReflection())
+function _symmetry_orbits(::Type{T}, block_keys::Vector{_DihedralKey}, N::Int, ::XYAxisReflection, character_x::Complex{T} = one(Complex{T}), character_y::Complex{T} = one(Complex{T})) where {T<:Real}
+    rx = _block_node_permutation(N, block_keys, XAxisReflection())
+    ry = _block_node_permutation(N, block_keys, YAxisReflection())
     rxy = _compose_index_permutations(rx, ry)
     χxy = character_x * character_y
-    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([id, rx, ry, rxy]), Complex{T}[one(Complex{T}), character_x, character_y, χxy])
+    return _build_symmetry_orbit_map(T, N, Vector{Vector{Int}}([collect(1:N), rx, ry, rxy]), Complex{T}[one(Complex{T}), character_x, character_y, χxy])
 end
 
-function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::NFoldRotation, sector::Int = 0) where {T<:Real,Bi<:AbsBilliard}
-    n = symmetry.order
-    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("NFoldRotation of order $n requires N divisible by $n; received N = $N"))
-    d = n ÷ gcd(n, symmetry.m)
-    g = _boundary_symmetry_permutation(billiard, N, symmetry)
+function _symmetry_orbits(::Type{T}, block_keys::Vector{_DihedralKey}, N::Int, symmetry::NFoldRotation, sector::Int = 0) where {T<:Real}
+    d = symmetry.order ÷ gcd(symmetry.order, symmetry.m)
+    g = _block_node_permutation(N, block_keys, symmetry)
     perms = Vector{Vector{Int}}(undef, d)
     perms[1] = collect(1:N)
     @inbounds for l in 2:d
@@ -494,10 +464,9 @@ function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::NFoldR
     return _build_symmetry_orbit_map(T, N, perms, scales)
 end
 
-function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::CompositeReflection, characters::Vector{Complex{T}} = ones(Complex{T}, length(symmetry.reflections))) where {T<:Real,Bi<:AbsBilliard}
+function _symmetry_orbits(::Type{T}, block_keys::Vector{_DihedralKey}, N::Int, symmetry::CompositeReflection, characters::Vector{Complex{T}} = ones(Complex{T}, length(symmetry.reflections))) where {T<:Real}
     isempty(symmetry.reflections) && throw(ArgumentError("CompositeReflection requires at least one reflection"))
     length(characters) == length(symmetry.reflections) || throw(DimensionMismatch("Received $(length(symmetry.reflections)) reflections but $(length(characters)) characters"))
-    N % symmetry_node_multiple(symmetry) == 0 || throw(ArgumentError("CompositeReflection requires N divisible by $(symmetry_node_multiple(symmetry)); received N = $N"))
     generators = AbsSymmetry[]
     genscales = Complex{T}[]
     for (k, ref) in enumerate(symmetry.reflections)
@@ -512,5 +481,116 @@ function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::Compos
             throw(ArgumentError("Unsupported reflection type $(typeof(ref)) in CompositeReflection"))
         end
     end
-    return _orbit_map_from_generators(T, N, _block_keys(billiard), generators, genscales)
+    return _orbit_map_from_generators(T, N, block_keys, generators, genscales)
+end
+
+"""
+    symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::AbsSymmetry, character...) where {T<:Real,Bi<:AbsBilliard} → orbits::SymmetryOrbitMap{T}
+
+Construct the exact symmetry-orbit map for the complete outer physical
+boundary component.
+
+## Description
+The node permutation is derived from the billiard's registered physical
+symmetry reconstruction and the integer midpoint-grid index. Boundary
+coordinates are never inspected and no floating-point matching is performed.
+For a billiard with holes use [`group_symmetry_orbits`](@ref), which also
+addresses the hole groups and checks the symmetry against the group `G'`.
+
+## Arguments
+* `T::Type{<:Real}`: Real scalar type of the boundary discretization.
+* `billiard::Bi`: Billiard defining the registered physical symmetry group.
+* `N::Int`: Number of nodes on the complete outer physical component.
+* `symmetry::AbsSymmetry`: Active symmetry reduction.
+* `character`: Requested irreducible-representation character or rotational sector.
+
+## Returns
+* `orbits::SymmetryOrbitMap{T}`: Exact boundary symmetry-orbit map.
+"""
+function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::AbsSymmetry, character...) where {T<:Real,Bi<:AbsBilliard}
+    multiple = symmetry_node_multiple(symmetry)
+    N % multiple == 0 || throw(ArgumentError("$(typeof(symmetry)) requires N divisible by $multiple; received N = $N"))
+    return _symmetry_orbits(T, _block_keys(billiard), N, symmetry, character...)
+end
+
+################################################################################
+# GROUP ORBITS (BILLIARDS WITH HOLES)
+################################################################################
+
+# Symmetry elements whose characters the orbit map of `symmetry` assigns.
+_acting_generators(symmetry::AbsSymmetry) = AbsSymmetry[symmetry]
+_acting_generators(::XYAxisReflection) = AbsSymmetry[XAxisReflection(), YAxisReflection()]
+_acting_generators(symmetry::CompositeReflection) = reduce(vcat, (_acting_generators(ref) for ref in symmetry.reflections); init = AbsSymmetry[])
+
+# Block keys of a solver group: outer boundary `0`, `i`-th hole object `i`.
+function _group_block_keys(::AbsDomain, billiard::AbsBilliard, group::Int)
+    group == 0 || throw(ArgumentError("billiard has no holes; the only boundary group is 0, received $group"))
+    return _block_keys(billiard)
+end
+
+function _group_block_keys(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard, group::Int)
+    group == 0 && return _block_keys(billiard)
+    1 <= group <= length(domain.holes) || throw(ArgumentError("boundary group must be in 0:$(length(domain.holes)); received $group"))
+    return _hole_block_keys(domain.holes[group])
+end
+
+# Index of the first hole not invariant under `g` although `g` belongs to the registry, else `nothing`.
+_blocking_hole(::AbsDomain, ::SymmetryRegistry, ::AbsSymmetry) = nothing
+
+function _blocking_hole(domain::AbsMultiplyConnectedDomain, registry::SymmetryRegistry, g::AbsSymmetry)
+    k = symmetry_key(g)
+    any(s -> symmetry_key(s) == k, registry) || return nothing
+    for (i, h) in enumerate(domain.holes)
+        any(s -> symmetry_key(s) == k, compatible_symmetries(h, registry)) || return i
+    end
+    return nothing
+end
+
+function _require_symmetry_in_group(billiard::AbsBilliard, symmetry::AbsSymmetry)
+    group = get_symmetry_group(billiard)
+    group_keys = _DihedralKey[symmetry_key(g) for g in group]
+    for g in _acting_generators(symmetry)
+        symmetry_key(g) in group_keys && continue
+        description = isempty(group) ? "{e}" : "{e, " * join(string.(group), ", ") * "}"
+        msg = "$g is not in the symmetry group G' = $description of the billiard"
+        hole = _blocking_hole(billiard.fundamental_domain, billiard.symmetries, g)
+        isnothing(hole) || (msg *= "; hole $hole is not invariant under it")
+        throw(ArgumentError(msg * ". Use symmetry = nothing or a subgroup of G'."))
+    end
+    return nothing
+end
+
+"""
+    group_symmetry_orbits(::Type{T}, billiard::Bi, group::Int, N::Int, symmetry::AbsSymmetry, character...) where {T<:Real,Bi<:AbsBilliard} → orbits::SymmetryOrbitMap{T}
+
+Construct the exact symmetry-orbit map of one boundary group of a billiard,
+acted on by elements of the symmetry group `G'`.
+
+## Description
+A group is the set of loops reconstructed from one source: `group = 0` is the
+outer boundary (blocks of the registry `G`), `group = i` the `i`-th hole object
+(blocks of the hole group, the placing operations of a [`SymmetrizedHoles`](@ref),
+or the identity alone for a [`DomainHole`](@ref)). The nodes of a group are the
+concatenation of its loops, one contiguous block of `N / n_blocks` nodes per
+block. An element of `G'` permutes the blocks by left multiplication of its
+dihedral key and reverses the index inside a block when it reverses
+orientation, so every orbit has `|G'|` nodes.
+
+## Arguments
+* `T::Type{<:Real}`: Real scalar type of the boundary discretization.
+* `billiard::Bi`: Billiard defining the symmetry groups.
+* `group::Int`: Boundary group, `0` for the outer boundary, `i` for the `i`-th hole object.
+* `N::Int`: Number of nodes of the group; a multiple of its number of blocks.
+* `symmetry::AbsSymmetry`: Acting symmetry reduction; every generator must belong to `G'` (see [`get_symmetry_group`](@ref)).
+* `character`: Requested irreducible-representation character or rotational sector.
+
+## Returns
+* `orbits::SymmetryOrbitMap{T}`: Exact boundary symmetry-orbit map of the group.
+
+Throws `ArgumentError` naming `G'` (and the first hole that breaks the
+symmetry) when a generator is outside `G'`.
+"""
+function group_symmetry_orbits(::Type{T}, billiard::Bi, group::Int, N::Int, symmetry::AbsSymmetry, character...) where {T<:Real,Bi<:AbsBilliard}
+    _require_symmetry_in_group(billiard, symmetry)
+    return _symmetry_orbits(T, _group_block_keys(billiard.fundamental_domain, billiard, group), N, symmetry, character...)
 end

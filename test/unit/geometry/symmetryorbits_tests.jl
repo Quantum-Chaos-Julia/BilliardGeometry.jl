@@ -4,7 +4,9 @@
 #                                     _compose_keys, _keys_closure, _block_keys, _block_permutation, _index_combinations,
 #                                     _minimal_generators; get_symmetries, get_symmetry_group; _sector_node_permutation,
 #                                     _block_node_permutation, _boundary_symmetry_permutation, _compose_index_permutations;
-#                                     _build_symmetry_orbit_map, _orbit_map_from_generators; symmetry_index_orbits)
+#                                     _build_symmetry_orbit_map, _orbit_map_from_generators; symmetry_index_orbits;
+#                                     group_symmetry_orbits, _acting_generators, _group_block_keys, _blocking_hole,
+#                                     _require_symmetry_in_group for billiards with holes, see the last section)
 #   src/geometry/symmetry.jl         (symmetry_key, used as the label of each registered element)
 #   src/geometry/symmetryregistry.jl (symmetry_of only)
 # Reference objects: CircleBilliard(1.0) (D2: Y, XY, X registered in this order, so the four boundary sectors of the node grid
@@ -741,4 +743,300 @@ end
     # an unknown sym_id raises instead of returning nothing or a wrong generator
     @test_throws ArgumentError symmetry_of(reg, 999)
     @test_throws ArgumentError symmetry_of(reg, 0)
+end
+
+################################################################################
+######################## group orbits (billiards with holes) ###################
+################################################################################
+
+# B5: group_symmetry_orbits and its helpers _acting_generators, _group_block_keys, _blocking_hole, _require_symmetry_in_group.
+# Reference billiards: the D2 quarter-square billiard (registry Y, XY, X = sym_ids 1, 2, 3) holding one hole (hf_HoleBilliard does not run
+# validate_holes). G' follows from the hole: the symmetrized disc keeps D2, the D2 disc about (0.5, 0) and the half disc about (0.3, 0)
+# keep {X}, a DomainHole keeps {e}. The block count of a hole group is the number of keys of its group (4 for the D2 disc and the
+# symmetrized disc, 2 for the half disc). Expected values are integer permutation algebra or the geometric check below.
+using BilliardGeometry: group_symmetry_orbits, _acting_generators, _group_block_keys, _blocking_hole, _require_symmetry_in_group
+
+go_billiard(holes...; reg = D2_symmetry()) =
+    hf_HoleBilliard{Float64}(MultiplyConnectedDomain(hf_quarter_square_domain(), collect(AbsDomainHole, holes), 1), reg)
+
+# Midpoint nodes of a loop made of one closed curve, u = 0, ..., M - 1 at the parameter (u + 1/2)/M.
+go_loop_nodes(loop, M) = [SVector{2,Float64}(curve(only(loop), (u + 0.5) / M)) for u in 0:M-1]
+
+# Same orbit-map content (every field).
+go_same_orbits(a, b) = a.fundamental_indices == b.fundamental_indices && a.orbit_of == b.orbit_of && a.phase == b.phase &&
+                       a.fund_to_full == b.fund_to_full && a.fund_to_scale == b.fund_to_scale &&
+                       a.full_size == b.full_size && a.fundamental_size == b.fundamental_size
+
+@testset "_acting_generators" begin
+    # a single element acts as itself
+    for sym in (XAxisReflection(), YAxisReflection(), DiagonalReflection(), NFoldRotation(4, 1), AxisReflection{1 // 6}())
+        @test _acting_generators(sym) == AbsSymmetry[sym]
+    end
+    # the pi rotation XY carries the characters of its two axis generators
+    xy = _acting_generators(XYAxisReflection())
+    @test typeof.(xy) == [XAxisReflection, YAxisReflection]
+    # a composite flattens its entries in order, expanding XY
+    comp = _acting_generators(CompositeReflection(YAxisReflection(), XAxisReflection()))
+    @test typeof.(comp) == [YAxisReflection, XAxisReflection]
+    mixed = _acting_generators(CompositeReflection(YAxisReflection(), XYAxisReflection()))
+    @test typeof.(mixed) == [YAxisReflection, XAxisReflection, YAxisReflection]
+    @test _acting_generators(CompositeReflection(AbsReflection[])) == AbsSymmetry[]
+end
+
+@testset "_group_block_keys" begin
+    sh = go_billiard(hf_symmetrized_disc())
+    # group 0 is the registry of the billiard, group i the i-th hole object
+    @test _group_block_keys(sh.fundamental_domain, sh, 0) == _block_keys(sh)
+    @test _group_block_keys(sh.fundamental_domain, sh, 1) == _block_keys(D2_symmetry())
+    half = go_billiard(hf_half_disc_hole())
+    @test _group_block_keys(half.fundamental_domain, half, 1) == [_IDENTITY_KEY, symmetry_key(XAxisReflection())]
+    plain = go_billiard(DomainHole(hf_circle_domain(0.2, 0.3, 0.4, 5)))
+    @test _group_block_keys(plain.fundamental_domain, plain, 1) == [_IDENTITY_KEY]
+    two = go_billiard(hf_d2_symmetric_hole(), hf_symmetrized_disc())
+    @test length(_group_block_keys(two.fundamental_domain, two, 2)) == 4
+    # a billiard without holes only has group 0
+    rect = RectangleBilliard(1.0, 0.6)
+    @test _group_block_keys(rect.fundamental_domain, rect, 0) == _block_keys(rect)
+    @test_throws ArgumentError _group_block_keys(rect.fundamental_domain, rect, 1)
+    # out of range
+    @test_throws ArgumentError _group_block_keys(sh.fundamental_domain, sh, 2)
+    @test_throws ArgumentError _group_block_keys(sh.fundamental_domain, sh, -1)
+end
+
+@testset "_blocking_hole" begin
+    half = go_billiard(hf_half_disc_hole())
+    reg = half.symmetries
+    dom = half.fundamental_domain
+    # Y is registered but the half disc is not invariant under it: hole 1 blocks it; X is kept
+    @test _blocking_hole(dom, reg, YAxisReflection()) == 1
+    @test _blocking_hole(dom, reg, XYAxisReflection()) == 1
+    @test _blocking_hole(dom, reg, XAxisReflection()) === nothing
+    # an element that is not registered at all is not blamed on a hole
+    @test _blocking_hole(dom, reg, DiagonalReflection()) === nothing
+    @test _blocking_hole(dom, reg, NFoldRotation(3, 1)) === nothing
+    # the first blocking hole is reported
+    two = go_billiard(hf_d4_symmetric_hole(), hf_half_disc_hole())
+    @test _blocking_hole(two.fundamental_domain, two.symmetries, YAxisReflection()) == 2
+    @test _blocking_hole(two.fundamental_domain, two.symmetries, XAxisReflection()) === nothing
+    # a DomainHole breaks everything registered
+    @test _blocking_hole(hf_d2_with_hole().fundamental_domain, D2_symmetry(), XAxisReflection()) == 1
+    # a domain without holes
+    @test _blocking_hole(RectangleBilliard(1.0, 0.6).fundamental_domain, D2_symmetry(), XAxisReflection()) === nothing
+end
+
+@testset "_require_symmetry_in_group" begin
+    sh = go_billiard(hf_symmetrized_disc())
+    # every generator in G' = D2: silent
+    @test _require_symmetry_in_group(sh, XAxisReflection()) === nothing
+    @test _require_symmetry_in_group(sh, CompositeReflection(YAxisReflection(), XAxisReflection())) === nothing
+    @test _require_symmetry_in_group(sh, XYAxisReflection()) === nothing
+    # billiards without holes check against their registry
+    @test _require_symmetry_in_group(RectangleBilliard(1.0, 0.6), YAxisReflection()) === nothing
+    @test_throws ArgumentError _require_symmetry_in_group(RectangleBilliard(1.0, 0.6), DiagonalReflection())
+    # a generic axis is not in a D2 group
+    @test_throws ArgumentError _require_symmetry_in_group(sh, AxisReflection{1 // 6}())
+end
+
+@testset "group_symmetry_orbits (outer group)" begin
+    # group 0 is the outer boundary acted on by G': same map as symmetry_index_orbits for billiards without holes
+    rect = RectangleBilliard(1.0, 0.6)
+    for sym in (XAxisReflection(), YAxisReflection(), XYAxisReflection(), CompositeReflection(YAxisReflection(), XAxisReflection()))
+        @test go_same_orbits(group_symmetry_orbits(Float64, rect, 0, so_N, sym), symmetry_index_orbits(Float64, rect, so_N, sym))
+    end
+    @test go_same_orbits(group_symmetry_orbits(Float64, rect, 0, so_N, XYAxisReflection(), ComplexF64(-1), ComplexF64(1)),
+                         symmetry_index_orbits(Float64, rect, so_N, XYAxisReflection(), ComplexF64(-1), ComplexF64(1)))
+    @test group_symmetry_orbits(Float64, rect, 0, so_N, XAxisReflection()) isa SymmetryOrbitMap{Float64}
+    @test group_symmetry_orbits(Float32, rect, 0, so_N, XAxisReflection()) isa SymmetryOrbitMap{Float32}
+    # rotations
+    c3 = C3Billiard(0.2)
+    @test go_same_orbits(group_symmetry_orbits(Float64, c3, 0, so_N3, NFoldRotation(3, 1), 1), symmetry_index_orbits(Float64, c3, so_N3, NFoldRotation(3, 1), 1))
+    # billiard with holes whose G' = D2: the outer group is still reconstructed by the registry G, blocks of G
+    sh = go_billiard(hf_symmetrized_disc())
+    comp = CompositeReflection(YAxisReflection(), XAxisReflection())
+    @test go_same_orbits(group_symmetry_orbits(Float64, sh, 0, 16, comp, ComplexF64[-1, 1]), symmetry_index_orbits(Float64, sh, 16, comp, ComplexF64[-1, 1]))
+    outer = group_symmetry_orbits(Float64, sh, 0, 16, comp)
+    @test orbit_size(outer) == 4
+    @test sort(vec(outer.fund_to_full)) == 1:16
+    # a subgroup of G' acts on the outer blocks of G (blocks 4, acting elements 2): orbit size |acting group|
+    half = go_billiard(hf_half_disc_hole())
+    outer_x = group_symmetry_orbits(Float64, half, 0, 8, XAxisReflection())
+    @test orbit_size(outer_x) == 2
+    @test outer_x.fund_to_full == [1 2 3 4; 8 7 6 5]
+end
+
+@testset "group_symmetry_orbits (SymmetrizedHoles group, composite Y and X)" begin
+    sh = go_billiard(hf_symmetrized_disc())
+    comp = CompositeReflection(YAxisReflection(), XAxisReflection())
+    keys = _group_block_keys(sh.fundamental_domain, sh, 1)
+    N = 24                                  # 4 loops of M = 6 nodes
+    for (χy, χx) in ((1, 1), (1, -1), (-1, 1), (-1, -1))
+        orbits = group_symmetry_orbits(Float64, sh, 1, N, comp, ComplexF64[χy, χx])
+        @test orbits isa SymmetryOrbitMap{Float64}
+        @test full_size(orbits) == N
+        @test orbit_size(orbits) == 4                       # |G'|, the action on the blocks is free
+        @test fundamental_size(orbits) == N ÷ 4
+        # every node is covered exactly once and every orbit is free
+        @test sort(vec(orbits.fund_to_full)) == 1:N
+        @test all(==(4), so_member_counts(orbits))
+        for b in 1:fundamental_size(orbits)
+            qs, χs = symmetry_orbit(orbits, b)
+            @test all(q -> orbits.orbit_of[q] == b, qs)
+            @test orbits.phase[qs] == χs
+        end
+        # the generators are involutions that commute, and their images carry the character products
+        py = _block_node_permutation(N, keys, YAxisReflection())
+        px = _block_node_permutation(N, keys, XAxisReflection())
+        @test all(q -> py[py[q]] == q && px[px[q]] == q, 1:N)
+        @test all(q -> py[px[q]] == px[py[q]], 1:N)
+        for r in orbits.fundamental_indices
+            @test orbits.phase[r] == 1
+            @test orbits.phase[py[r]] == χy
+            @test orbits.phase[px[r]] == χx
+            @test orbits.phase[py[px[r]]] == χy * χx
+            @test Set(orbits.fund_to_full[:, orbits.orbit_of[r]]) == Set([r, py[r], px[r], py[px[r]]])
+        end
+    end
+    # XY expands into the same two generators with one character
+    xy = group_symmetry_orbits(Float64, sh, 1, N, XYAxisReflection(), ComplexF64(-1), ComplexF64(1))
+    @test orbit_size(xy) == 4
+    @test xy.fund_to_scale[:, 1] == ComplexF64[1, -1, 1, -1]
+    # the non-composite elements of G' give orbits of size 2
+    @test orbit_size(group_symmetry_orbits(Float64, sh, 1, N, XAxisReflection())) == 2
+    # N must be a multiple of the 4 blocks
+    @test_throws ArgumentError group_symmetry_orbits(Float64, sh, 1, 22, comp)
+    # the outer group of the same billiard is independent of the node count of the hole group
+    @test orbit_size(group_symmetry_orbits(Float64, sh, 0, 8, comp)) == 4
+end
+
+@testset "group_symmetry_orbits (SymmetricHole groups)" begin
+    # D2 disc about (0.5, 0): G' = {e, X}; the hole group has 4 blocks, X acts with orbits of size 2
+    d2 = go_billiard(hf_d2_symmetric_hole())
+    keys = _group_block_keys(d2.fundamental_domain, d2, 1)
+    N = 8                                   # M = 2
+    orbits = group_symmetry_orbits(Float64, d2, 1, N, XAxisReflection())
+    @test orbit_size(orbits) == 2
+    @test fundamental_size(orbits) == 4
+    px = _block_node_permutation(N, keys, XAxisReflection())
+    @test orbits.fund_to_full[2, :] == px[orbits.fundamental_indices]
+    @test sort(vec(orbits.fund_to_full)) == 1:N
+    odd = group_symmetry_orbits(Float64, d2, 1, N, XAxisReflection(), ComplexF64(-1))
+    @test odd.fund_to_scale[:, 1] == ComplexF64[1, -1]
+    @test odd.fund_to_full == orbits.fund_to_full
+    # the half disc: two blocks (identity, X), X swaps them and reverses the index inside a block (N = 6, M = 3)
+    half = go_billiard(hf_half_disc_hole())
+    hx = group_symmetry_orbits(Float64, half, 1, 6, XAxisReflection())
+    @test hx.fund_to_full == [1 2 3; 6 5 4]
+    @test orbit_size(hx) == 2
+    # a billiard whose D4 disc keeps D2 in a D2 registry: composite (Y, X) acts on the 8 blocks with orbits of size 4
+    d4 = go_billiard(hf_d4_symmetric_hole())
+    d4_orbits = group_symmetry_orbits(Float64, d4, 1, 16, CompositeReflection(YAxisReflection(), XAxisReflection()))
+    @test orbit_size(d4_orbits) == 4
+    @test fundamental_size(d4_orbits) == 4
+    @test sort(vec(d4_orbits.fund_to_full)) == 1:16
+end
+
+@testset "group_symmetry_orbits (generic axes via the block count)" begin
+    # a mirror at a generic angle has no node multiple, but the block count of the group is enough on the group path
+    gen = AxisReflection{1 // 6}()
+    b = so_polar_billiard(gen)
+    @test_throws ArgumentError symmetry_index_orbits(Float64, b, 6, gen)
+    orbits = group_symmetry_orbits(Float64, b, 0, 6, gen)
+    @test orbit_size(orbits) == 2
+    @test sort(vec(orbits.fund_to_full)) == 1:6
+    @test orbits.fund_to_full == [1 2 3; 6 5 4]
+    # N must be a multiple of the 2 blocks
+    @test_throws ArgumentError group_symmetry_orbits(Float64, b, 0, 5, gen)
+end
+
+@testset "group_symmetry_orbits errors" begin
+    sh = go_billiard(hf_symmetrized_disc())
+    # group out of range
+    @test_throws ArgumentError group_symmetry_orbits(Float64, sh, 2, 8, XAxisReflection())
+    @test_throws ArgumentError group_symmetry_orbits(Float64, sh, -1, 8, XAxisReflection())
+    # a group above 0 on a billiard without holes
+    @test_throws ArgumentError group_symmetry_orbits(Float64, RectangleBilliard(1.0, 0.6), 1, so_N, XAxisReflection())
+    @test_throws ArgumentError group_symmetry_orbits(Float64, TriangleBilliard(1.0, 1.0), 1, 6, XAxisReflection())
+
+    # a generator outside G' names G', the first non-invariant hole and the unreduced alternative (evidence: half disc, Y)
+    half = go_billiard(hf_half_disc_hole())
+    err = try
+        group_symmetry_orbits(Float64, half, 0, 8, YAxisReflection())
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test err.msg == "YAxisReflection(0) is not in the symmetry group G' = {e, XAxisReflection(3)} of the billiard; " *
+                     "hole 1 is not invariant under it. Use symmetry = nothing or a subgroup of G'."
+    @test_throws "G'" group_symmetry_orbits(Float64, half, 1, 4, YAxisReflection())
+    @test_throws "hole 1" group_symmetry_orbits(Float64, half, 1, 4, YAxisReflection())
+    @test_throws "symmetry = nothing" group_symmetry_orbits(Float64, half, 1, 4, YAxisReflection())
+    # the error is raised for the outer group too, and for composites and XY (any generator outside G')
+    @test_throws "hole 1" group_symmetry_orbits(Float64, half, 0, 8, CompositeReflection(YAxisReflection(), XAxisReflection()))
+    @test_throws ArgumentError group_symmetry_orbits(Float64, half, 0, 8, XYAxisReflection())
+    # the second hole is named when it is the one that breaks the symmetry
+    two = go_billiard(hf_d4_symmetric_hole(), hf_half_disc_hole())
+    @test_throws "hole 2" group_symmetry_orbits(Float64, two, 0, 8, YAxisReflection())
+    # a DomainHole gives G' = {e}
+    plain = hf_d2_with_hole()
+    @test_throws "G' = {e}" group_symmetry_orbits(Float64, plain, 0, 8, YAxisReflection())
+    @test_throws "hole 1" group_symmetry_orbits(Float64, plain, 0, 8, XAxisReflection())
+    # an element not registered at all is outside G' without blaming a hole
+    err2 = try
+        group_symmetry_orbits(Float64, sh, 0, 8, DiagonalReflection())
+        nothing
+    catch e
+        e
+    end
+    @test err2 isa ArgumentError
+    @test occursin("G'", err2.msg) && !occursin("hole", err2.msg)
+    # nothing is checked against G for a billiard without holes: a non-registered element still throws
+    @test_throws ArgumentError group_symmetry_orbits(Float64, RectangleBilliard(1.0, 0.6), 0, so_N, DiagonalReflection())
+end
+
+@testset "symmetry_index_orbits (generic wrapper errors)" begin
+    circ = CircleBilliard(1.0)
+    d4 = so_d4_billiard()
+    # wrong node count: not a multiple of the node multiple of the symmetry
+    @test_throws ArgumentError symmetry_index_orbits(Float64, circ, 6, XAxisReflection())
+    @test_throws ArgumentError symmetry_index_orbits(Float64, d4, 12, DiagonalReflection())
+    @test_throws ArgumentError symmetry_index_orbits(Float64, d4, 12, CompositeReflection(YAxisReflection(), DiagonalReflection()))
+    @test_throws "divisible by 8" symmetry_index_orbits(Float64, d4, 12, DiagonalReflection())
+    # a non-special axis has no node multiple
+    generic = so_polar_billiard(AxisReflection{1 // 6}())
+    @test_throws ArgumentError symmetry_index_orbits(Float64, generic, 12, AxisReflection{1 // 6}())
+    # a valid call still works through the generic method
+    @test orbit_size(symmetry_index_orbits(Float64, d4, 16, DiagonalReflection())) == 2
+end
+
+@testset "group_symmetry_orbits (geometric check, symmetrized disc)" begin
+    # the discs of SymmetrizedHoles(disc, D2) are the images of the base disc under id, Y, XY, X (registry chain order); the loops of
+    # the hole are traversed with the region on the left, so the mirror images run backwards. Nodes are the midpoint grids of the loops.
+    sh = go_billiard(hf_symmetrized_disc())
+    comp = full_boundary_components(sh)
+    loops = [comp.curves[i] for i in eachindex(comp.curves) if comp.group[i] == 1]
+    @test length(loops) == 4
+    M = 6
+    N = 4 * M
+    nodes = reduce(vcat, [go_loop_nodes(loop, M) for loop in loops])
+    @test length(nodes) == N
+    keys = comp.blocks[2]
+    tol = 1e-12
+    # the integer permutation of every group element is the geometric action on the nodes
+    for g in (YAxisReflection(), XAxisReflection(), XYAxisReflection())
+        p = g isa XYAxisReflection ? _compose_index_permutations(_block_node_permutation(N, keys, XAxisReflection()), _block_node_permutation(N, keys, YAxisReflection())) :
+            _block_node_permutation(N, keys, g)
+        @test all(q -> isapprox(apply_symmetry(g, nodes[q]), nodes[p[q]]; atol = tol), 1:N)
+    end
+    # every member of an orbit is a geometric image of its representative, and the four images are distinct
+    orbits = group_symmetry_orbits(Float64, sh, 1, N, CompositeReflection(YAxisReflection(), XAxisReflection()), ComplexF64[-1, 1])
+    for b in 1:fundamental_size(orbits)
+        r = nodes[orbits.fundamental_indices[b]]
+        images = [r, apply_symmetry(YAxisReflection(), r), apply_symmetry(XAxisReflection(), r), apply_symmetry(XYAxisReflection(), r)]
+        members = [nodes[q] for q in orbits.fund_to_full[:, b]]
+        for m in members
+            @test count(im -> isapprox(im, m; atol = tol), images) == 1
+        end
+        @test all(isapprox(members[i], members[j]; atol = tol) == (i == j) for i in 1:4, j in 1:4)
+    end
 end

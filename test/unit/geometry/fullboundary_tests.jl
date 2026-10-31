@@ -348,21 +348,36 @@ fb_is_closed_loop(crvs) = all(isapprox(curve(crvs[j], 1.0), curve(crvs[mod1(j + 
     @test map.group == [0]
     @test full_boundary_components(TriangleBilliard(1.0, 1.0)).group == [0]
 
-    # concentric annulus: outer circle and hole circle
+    # shifted annulus (nonzero center, unreduced): outer circle and hole circle, one curve per loop
+    sh = full_boundary_components(hf_shifted_annulus())
+    @test [length(c) for c in sh.curves] == [1, 1]
+    @test sh.is_hole == [false, true]
+    @test sh.group == [0, 1]
+    @test sh.curves[1][1].radius == 1.0
+    @test sh.curves[1][1].center == SVector(0.5, 0.1)
+    @test sh.curves[2][1].radius == 0.3
+    @test all(fb_is_closed_loop, sh.curves)
+
+    # concentric annulus (symmetric since B7): the reduced upper half is mirrored, two loops of two half circles each
     ann = full_boundary_components(hf_concentric_annulus())
-    @test [length(c) for c in ann.curves] == [1, 1]
+    @test [length(c) for c in ann.curves] == [2, 2]
     @test ann.is_hole == [false, true]
     @test ann.group == [0, 1]
-    @test ann.curves[1][1].radius == 1.0
-    @test ann.curves[2][1].radius == 0.3
+    @test all(c.radius == 1.0 for c in ann.curves[1])
+    @test all(c.radius == 0.3 for c in ann.curves[2])
+    @test all(c.center == SVector(0.0, 0.0) for l in ann.curves for c in l)
     @test all(fb_is_closed_loop, ann.curves)
+    @test area(ann.curves[1]) ≈ pi atol = 1e-10
+    @test area(ann.curves[2]) ≈ pi * 0.3^2 atol = 1e-10
 
-    # eccentric annulus
+    # eccentric annulus (hole center on the x axis, still symmetric): hole loop about (0.3, 0) with radius 0.2
     ecc = full_boundary_components(hf_eccentric_annulus())
-    @test [length(c) for c in ecc.curves] == [1, 1]
+    @test [length(c) for c in ecc.curves] == [2, 2]
     @test ecc.is_hole == [false, true]
     @test ecc.group == [0, 1]
-    @test ecc.curves[2][1].center == SVector(0.3, 0.0)
+    @test all(c.radius == 1.0 && c.center == SVector(0.0, 0.0) for c in ecc.curves[1])
+    @test all(c.radius == 0.2 && c.center == SVector(0.3, 0.0) for c in ecc.curves[2])
+    @test all(fb_is_closed_loop, ecc.curves)
 
     # rectangle with a rectangular hole, no symmetry: two loops of four curves
     rh = full_boundary_components(hf_rect_with_hole())
@@ -406,7 +421,11 @@ end
     @test full_boundary_components(TriangleBilliard(1.0, 1.0)).blocks == [[ID]]
 
     # DomainHole groups carry the identity block alone, one entry per group (outer first)
-    @test full_boundary_components(hf_concentric_annulus()).blocks == [[ID], [ID]]
+    @test full_boundary_components(hf_shifted_annulus()).blocks == [[ID], [ID]]
+    # symmetric annuli (B7): identity and the x axis reflection, for the outer loop and the hole loop
+    XKEY = symmetry_key(XAxisReflection())
+    @test full_boundary_components(hf_concentric_annulus()).blocks == [[ID, XKEY], [ID, XKEY]]
+    @test full_boundary_components(hf_eccentric_annulus()).blocks == [[ID, XKEY], [ID, XKEY]]
     @test full_boundary_components(hf_rect_with_hole()).blocks == [[ID], [ID]]
     dom = MultiplyConnectedDomain(hf_rect_domain(0.0, 0.0, 4.0, 4.0, 1), [hf_circle_domain(0.3, 3.0, 3.0, 2), hf_two_loop_hole(5)], 1)
     multi = full_boundary_components(hf_HoleBilliard{Float64}(dom, register_symmetries()))
@@ -445,18 +464,22 @@ end
 
 @testset "full_boundary (billiards with holes)" begin
     # the concatenation of the loops of full_boundary_components, outer loop first
-    for b in (hf_concentric_annulus(), hf_eccentric_annulus(), hf_rect_with_hole(), hf_d2_with_hole())
+    for b in (hf_concentric_annulus(), hf_eccentric_annulus(), hf_shifted_annulus(), hf_rect_with_hole(), hf_d2_with_hole())
         loops = full_boundary_components(b).curves
         @test full_boundary(b) == reduce(vcat, loops)
         @test length(full_boundary(b)) == sum(length, loops)
     end
-    @test length(full_boundary(hf_concentric_annulus())) == 2
+    @test length(full_boundary(hf_shifted_annulus())) == 2
+    @test length(full_boundary(hf_concentric_annulus())) == 4
     @test length(full_boundary(hf_d2_with_hole())) == 9
     @test full_boundary(hf_d2_with_hole())[end].radius == 0.2
     # the hole curves keep domain_fun pointing into the hole: an interior point of the hole is on the inner side of its boundary
-    ann = hf_concentric_annulus()
-    @test domain_fun(full_boundary(ann)[2], SVector(0.0, 0.0)) < 0
-    @test domain_fun(full_boundary(ann)[1], SVector(0.0, 0.0)) < 0
+    ann = hf_shifted_annulus()
+    @test domain_fun(full_boundary(ann)[2], SVector(0.7, 0.1)) < 0
+    @test domain_fun(full_boundary(ann)[1], SVector(0.7, 0.1)) < 0
+    # same for the symmetric annulus: its two hole half circles, then the outer half circles
+    sann = hf_concentric_annulus()
+    @test all(domain_fun(c, SVector(0.0, 0.0)) < 0 for c in full_boundary(sann))
 end
 
 ################################################################################

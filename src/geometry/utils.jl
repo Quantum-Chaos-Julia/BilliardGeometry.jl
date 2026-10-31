@@ -125,8 +125,8 @@ list as periodic.
 * `flags`: One entry per curve, see [`is_overlaping`](@ref).
 """
 function is_connected(boundary; start_initial = true)
-    start_pts = CircularArray([curve(crv,0.0) for crv in boundary])
-    end_pts = CircularArray([curve(crv,1.0) for crv in boundary])    
+    start_pts = CircularArray([curve(crv,0) for crv in boundary])
+    end_pts = CircularArray([curve(crv,1) for crv in boundary])    
     if start_initial
         test = [is_overlaping(end_pts[i-1], start_pts[i]) for i in 1:length(start_pts)]
     else

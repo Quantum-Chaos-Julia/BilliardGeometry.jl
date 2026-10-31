@@ -146,8 +146,9 @@ end
 
 @testset "pb_sectors (holes)" begin
     # Hole curves are not part of the Poincare-Birkhoff boundary: the breakpoints end at the outer perimeter.
-    # With an empty symmetry registry the outer loop of the full boundary is the fundamental outer boundary.
-    holed = (rect_hole = hf_rect_with_hole(), annulus = hf_concentric_annulus(), eccentric = hf_eccentric_annulus())
+    # With an empty symmetry registry the outer loop of the full boundary is the fundamental outer boundary (the unreduced annulus
+    # has a nonzero center; the origin-centered annulus is symmetric, see below).
+    holed = (rect_hole = hf_rect_with_hole(), annulus = hf_shifted_annulus())
     for (name, b) in pairs(holed)
         @testset "$name" begin
             @test isempty(b.symmetries)
@@ -167,8 +168,19 @@ end
 
     # rectangle [0,3] x [0,2]: outer perimeter 10, hole perimeter 3
     @test last(pb_sectors(holed.rect_hole)) ≈ 10.0 atol = pb_ATOL
-    # concentric annulus: outer circle of radius 1
+    # unreduced annulus: outer circle of radius 1
     @test last(pb_sectors(holed.annulus)) ≈ 2 * pi atol = pb_ATOL
+
+    # symmetric annulus (B7): the fundamental outer boundary is the upper half circle (the wall is not physical), the registry holds
+    # XAxisReflection, so the sectors are the half circle and its mirror image: they end at the full perimeter 2 pi, hole ends excluded
+    sym_ann = hf_concentric_annulus()
+    @test length(sym_ann.symmetries) == 1
+    ann_sectors = pb_sectors(sym_ann)
+    @test issorted(ann_sectors)
+    @test length(ann_sectors) == length(unique(ann_sectors))
+    @test isapprox(first(ann_sectors), 0.0; atol = pb_ATOL)
+    @test isapprox(last(ann_sectors), 2 * pi; atol = pb_ATOL)
+    @test ann_sectors ≈ [0.0, pi, 2 * pi] atol = pb_ATOL
 
     # nonempty registry: the image sectors are built from the outer boundary only and stay within (nsym + 1) outer perimeters
     d2 = hf_d2_with_hole()

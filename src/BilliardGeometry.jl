@@ -243,7 +243,7 @@ include("geometry/poincarebirkhoff.jl")
 include("geometry/geometry.jl")
 export AxisReflection, XAxisReflection, YAxisReflection, XYAxisReflection, DiagonalReflection, AntiDiagonalReflection, CompositeReflection, NFoldRotation, apply_symmetry, apply_symmetry_pb, D2_symmetry, D4_symmetry, Cn_symmetry, orientation_reversing
 export SymmetryRegistry, register_symmetries, symmetry_of
-export SymmetryOrbitMap, fundamental_size, full_size, orbit_size, symmetry_orbit, symmetry_node_multiple, symmetry_index_orbits, get_symmetries, get_symmetry_group
+export SymmetryOrbitMap, fundamental_size, full_size, orbit_size, symmetry_orbit, symmetry_node_multiple, symmetry_index_orbits, group_symmetry_orbits, get_symmetries, get_symmetry_group
 export SpecularReflection, QuantumSolverIgnore, Transparent, PeriodicX, SymmetryWall, get_boundary_curves, get_all_curves, get_curve, get_all_domains, get_domain, update_boundary_condition, genus, boundary_components, geometric_boundary_components
 export LineSegment
 export PolarSegment, FourierCoeffPolarSegment, polar_radius

@@ -154,16 +154,27 @@ end
 end
 
 @testset "is_inside (AnnularBilliard)" begin
-    # AnnularBilliard(0.3, 0.2): unit disk without the disk of radius 0.3 centered at (0.2, 0)
+    # AnnularBilliard(0.3, 0.2) is symmetric: membership refers to the reduced domain, the upper half of the unit disk without the
+    # half disk of radius 0.3 centered at (0.2, 0); points with y < 0 lie outside the fundamental domain
     an = AnnularBilliard(0.3, 0.2)
-    @test is_inside(an, SVector(0.9, 0.0)) === true
-    @test is_inside(an, SVector(-0.7, 0.0)) === true
-    @test is_inside(an, SVector(0.55, 0.0)) === true     # 0.35 from the hole center
-    @test is_inside(an, SVector(0.2, 0.0)) === false     # hole center
-    @test is_inside(an, SVector(0.0, 0.0)) === false     # 0.2 from the hole center
-    @test is_inside(an, SVector(0.4, 0.0)) === false
-    @test is_inside(an, SVector(1.1, 0.0)) === false     # outside the outer circle
-    @test is_inside(an, [SVector(0.9, 0.0), SVector(0.2, 0.0)]) == [true, false]
+    @test is_inside(an, SVector(0.9, 0.05)) === true
+    @test is_inside(an, SVector(-0.7, 0.1)) === true
+    @test is_inside(an, SVector(0.55, 0.02)) === true    # 0.35 from the hole center
+    @test is_inside(an, SVector(0.2, 0.05)) === false    # near the hole center
+    @test is_inside(an, SVector(0.0, 0.05)) === false    # 0.2 from the hole center
+    @test is_inside(an, SVector(0.4, 0.05)) === false
+    @test is_inside(an, SVector(1.1, 0.05)) === false    # outside the outer circle
+    @test is_inside(an, SVector(0.9, -0.2)) === false    # reflected half plane
+    @test is_inside(an, [SVector(0.9, 0.05), SVector(0.2, 0.05)]) == [true, false]
+
+    # nonzero center: unreduced billiard, the full ring about (0.5, 0.1) with the hole about (0.7, 0.1)
+    sh = AnnularBilliard(0.3, 0.2; center = [0.5, 0.1])
+    @test is_inside(sh, SVector(1.4, 0.1)) === true
+    @test is_inside(sh, SVector(1.4, -0.3)) === true
+    @test is_inside(sh, SVector(-0.3, 0.1)) === true
+    @test is_inside(sh, SVector(0.7, 0.1)) === false     # hole center
+    @test is_inside(sh, SVector(0.5, 0.1)) === false     # 0.2 from the hole center
+    @test is_inside(sh, SVector(1.6, 0.1)) === false     # outside the outer circle
 end
 
 @testset "is_inside (MultiplyConnectedDomain)" begin
@@ -205,20 +216,29 @@ end
 end
 
 @testset "is_inside (SinaiBilliard)" begin
-    # the square [-1, 1]^2 without the disk of radius 0.3 about the origin
+    # symmetric Sinai billiard: membership refers to the fundamental triangle 0 <= y <= x <= 1 without the eighth disc of radius 0.3
     sn = SinaiBilliard(1.0, 0.3)
-    @test is_inside(sn, SVector(0.5, 0.5)) === true
-    @test is_inside(sn, SVector(-0.5, -0.5)) === true
-    @test is_inside(sn, SVector(-0.9, 0.1)) === true
+    @test is_inside(sn, SVector(0.5, 0.2)) === true
     @test is_inside(sn, SVector(0.9, 0.1)) === true
-    @test is_inside(sn, SVector(0.25, 0.25)) === true    # distance 0.354 from the origin
-    @test is_inside(sn, SVector(0.31, 0.0)) === true
-    @test is_inside(sn, SVector(0.1, 0.1)) === false     # inside the hole
-    @test is_inside(sn, SVector(-0.1, -0.2)) === false
-    @test is_inside(sn, SVector(0.2, 0.2)) === false     # distance 0.283 from the origin
-    @test is_inside(sn, SVector(0.29, 0.0)) === false
+    @test is_inside(sn, SVector(0.7, 0.6)) === true
+    @test is_inside(sn, SVector(0.31, 0.02)) === true
+    @test is_inside(sn, SVector(0.2, 0.1)) === false     # inside the hole piece
+    @test is_inside(sn, SVector(0.25, 0.05)) === false
+    @test is_inside(sn, SVector(0.2, 0.15)) === false    # distance 0.25 from the origin
+    @test is_inside(sn, SVector(0.3, 0.7)) === false     # y > x, outside the fundamental triangle
+    @test is_inside(sn, SVector(-0.5, -0.5)) === false
     @test is_inside(sn, SVector(1.1, 0.5)) === false
-    @test is_inside(sn, [SVector(0.5, 0.5), SVector(0.1, 0.1)]) == [true, false]
+    @test is_inside(sn, [SVector(0.5, 0.2), SVector(0.2, 0.1)]) == [true, false]
+
+    # nonzero center: the full square [-0.5, 1.5] x [-1.2, 0.8] about (0.5, -0.2) without the disk of radius 0.3
+    sh = SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])
+    @test is_inside(sh, SVector(1.2, -0.2)) === true
+    @test is_inside(sh, SVector(0.0, 0.0)) === true
+    @test is_inside(sh, SVector(0.0, -1.0)) === true
+    @test is_inside(sh, SVector(0.5, -0.2)) === false    # center of the hole
+    @test is_inside(sh, SVector(0.6, -0.1)) === false
+    @test is_inside(sh, SVector(2.0, 0.0)) === false
+    @test is_inside(sh, [SVector(1.2, -0.2), SVector(0.5, -0.2)]) == [true, false]
 end
 
 @testset "is_inside (SquareWithinSquareBilliard)" begin
