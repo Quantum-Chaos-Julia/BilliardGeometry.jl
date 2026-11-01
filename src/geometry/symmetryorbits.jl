@@ -508,10 +508,17 @@ addresses the hole groups and checks the symmetry against the group `G'`.
 * `orbits::SymmetryOrbitMap{T}`: Exact boundary symmetry-orbit map.
 """
 function symmetry_index_orbits(::Type{T}, billiard::Bi, N::Int, symmetry::AbsSymmetry, character...) where {T<:Real,Bi<:AbsBilliard}
-    multiple = symmetry_node_multiple(symmetry)
+    block_keys = _block_keys(billiard)
+    multiple = lcm(_orbit_node_multiple(symmetry), length(block_keys))
     N % multiple == 0 || throw(ArgumentError("$(typeof(symmetry)) requires N divisible by $multiple; received N = $N"))
-    return _symmetry_orbits(T, _block_keys(billiard), N, symmetry, character...)
+    return _symmetry_orbits(T, block_keys, N, symmetry, character...)
 end
+
+# Node multiple used by `symmetry_index_orbits`: reflections about axes other than the four special ones need no
+# multiple of their own, the number of reconstruction blocks is enforced separately.
+_orbit_node_multiple(symmetry::AbsSymmetry) = symmetry_node_multiple(symmetry)
+_orbit_node_multiple(symmetry::AxisReflection{A}) where {A} = A in (0 // 1, 1 // 4, 1 // 2, 3 // 4) ? symmetry_node_multiple(symmetry) : 1
+_orbit_node_multiple(symmetry::CompositeReflection) = foldl(lcm, (_orbit_node_multiple(ref) for ref in symmetry.reflections); init = 1)
 
 ################################################################################
 # GROUP ORBITS (BILLIARDS WITH HOLES)

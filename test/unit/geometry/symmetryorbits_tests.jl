@@ -499,10 +499,11 @@ end
         @test sort(vec(orbits.fund_to_full)) == 1:16        # the orbits partition the nodes
         @test orbits.fund_to_full[2, :] == [_boundary_symmetry_permutation(d4, 16, sym)[q] for q in orbits.fundamental_indices]
     end
-    # a mirror at a generic angle has no node multiple, even when registered
+    # a mirror at a generic angle has no node multiple of its own, only the block count constrains N
     generic = so_polar_billiard(AxisReflection{1 // 6}())
     @test_throws ArgumentError symmetry_node_multiple(AxisReflection{1 // 6}())
-    @test_throws ArgumentError symmetry_index_orbits(Float64, generic, 12, AxisReflection{1 // 6}())
+    @test orbit_size(symmetry_index_orbits(Float64, generic, 12, AxisReflection{1 // 6}())) == 2
+    @test_throws "divisible by 2" symmetry_index_orbits(Float64, generic, 11, AxisReflection{1 // 6}())
 end
 
 @testset "symmetry_index_orbits (partition and counting)" begin
@@ -939,7 +940,7 @@ end
     # a mirror at a generic angle has no node multiple, but the block count of the group is enough on the group path
     gen = AxisReflection{1 // 6}()
     b = so_polar_billiard(gen)
-    @test_throws ArgumentError symmetry_index_orbits(Float64, b, 6, gen)
+    @test orbit_size(symmetry_index_orbits(Float64, b, 6, gen)) == 2
     orbits = group_symmetry_orbits(Float64, b, 0, 6, gen)
     @test orbit_size(orbits) == 2
     @test sort(vec(orbits.fund_to_full)) == 1:6
@@ -1002,9 +1003,9 @@ end
     @test_throws ArgumentError symmetry_index_orbits(Float64, d4, 12, DiagonalReflection())
     @test_throws ArgumentError symmetry_index_orbits(Float64, d4, 12, CompositeReflection(YAxisReflection(), DiagonalReflection()))
     @test_throws "divisible by 8" symmetry_index_orbits(Float64, d4, 12, DiagonalReflection())
-    # a non-special axis has no node multiple
+    # a non-special axis has no node multiple of its own
     generic = so_polar_billiard(AxisReflection{1 // 6}())
-    @test_throws ArgumentError symmetry_index_orbits(Float64, generic, 12, AxisReflection{1 // 6}())
+    @test orbit_size(symmetry_index_orbits(Float64, generic, 12, AxisReflection{1 // 6}())) == 2
     # a valid call still works through the generic method
     @test orbit_size(symmetry_index_orbits(Float64, d4, 16, DiagonalReflection())) == 2
 end
@@ -1038,5 +1039,65 @@ end
             @test count(im -> isapprox(im, m; atol = tol), images) == 1
         end
         @test all(isapprox(members[i], members[j]; atol = tol) == (i == j) for i in 1:4, j in 1:4)
+    end
+end
+
+# Generic-axis reflections: symmetry_index_orbits on a D3 billiard (registry Dn_symmetry(3), mirror axes pi/3, 2 pi/3 and 0).
+# Reference object: the wedge 0 <= phi <= pi/3 of r = 1 + 0.15 cos(3 phi) (arc, SymmetryWall(1, 2) on the axis pi/3 and
+# SymmetryWall(5, 2) on the x axis), the registry has 5 elements so there are 6 reconstruction blocks. The node count must be a
+# multiple of lcm(orbit multiple of the symmetry, 6); AxisReflection at a generic angle contributes 1. The node permutation of
+# every registered element is checked against its geometric action on midpoint nodes of full_boundary. Helper names: `dn_`.
+struct DnTestBilliard{T} <: AbsBilliard
+    fundamental_domain::SimpleDomain{T}
+    symmetries::SymmetryRegistry
+end
+
+function dn_billiard()
+    c = SVector(0.0, 0.0)
+    arc = FourierCoeffPolarSegment([0.0, 0.0, 0.0, 0.0, 0.0, 0.15]; R = 1.0, arc_angle = pi / 3, shift_angle = 0.0, center = c,
+                                   bc = SpecularReflection(), domain_id = 1, segment_id = 1)
+    p0 = curve(arc, 0.0)
+    p1 = curve(arc, 1.0)
+    wall1 = LineSegment(p1, c; bc = SymmetryWall(1, 2), domain_id = 1, segment_id = 2)
+    wall0 = LineSegment(c, p0; bc = SymmetryWall(5, 2), domain_id = 1, segment_id = 3)
+    dom = SimpleDomain{Float64}(AbsCurve[arc, wall1, wall0], SVector{2,Float64}[p0, p1, c], 1)
+    return DnTestBilliard{Float64}(dom, Dn_symmetry(3))
+end
+
+@testset "symmetry_index_orbits (generic axes, D3)" begin
+    b = dn_billiard()
+    sym = CompositeReflection(AxisReflection{1 // 3}(), AxisReflection{2 // 3}())
+    orbits = symmetry_index_orbits(Float64, b, 48, sym, ComplexF64[1, 1])
+    @test orbits isa SymmetryOrbitMap{Float64}
+    @test orbit_size(orbits) == 6
+    @test fundamental_size(orbits) == 8
+    @test full_size(orbits) == 48
+    @test all(==(6), so_member_counts(orbits))
+    # N must be a multiple of the six blocks
+    @test_throws ArgumentError symmetry_index_orbits(Float64, b, 50, sym, ComplexF64[1, 1])
+    # a single generic mirror pairs the nodes
+    single = symmetry_index_orbits(Float64, b, 48, AxisReflection{1 // 3}())
+    @test orbit_size(single) == 2
+    @test_throws ArgumentError symmetry_index_orbits(Float64, b, 50, AxisReflection{1 // 3}())
+
+    @testset "node permutations are the geometric images" begin
+        M = 8
+        N = 6 * M
+        curves = full_boundary(b)
+        @test length(curves) == 6
+        nodes = reduce(vcat, [[SVector{2,Float64}(curve(c, (u + 0.5) / M)) for u in 0:M-1] for c in curves])
+        keys = _block_keys(b)
+        for g in b.symmetries
+            p = _block_node_permutation(N, keys, g)
+            @test all(q -> isapprox(apply_symmetry(g, nodes[q]), nodes[p[q]]; atol = 1e-12), 1:N)
+        end
+        # every orbit member is a geometric image of its representative
+        for k in 1:fundamental_size(orbits)
+            r = nodes[orbits.fundamental_indices[k]]
+            images = vcat([r], [apply_symmetry(g, r) for g in b.symmetries])
+            for q in orbits.fund_to_full[:, k]
+                @test count(im -> isapprox(im, nodes[q]; atol = 1e-12), images) == 1
+            end
+        end
     end
 end

@@ -46,6 +46,7 @@ end
     include("geometry/billiards/prosen_tests.jl")
     include("geometry/billiards/annular_tests.jl")
     include("geometry/billiards/sinai_tests.jl")
+    include("geometry/billiards/julia_tests.jl")
     include("geometry/billiards/square_in_square_tests.jl")
 end
 

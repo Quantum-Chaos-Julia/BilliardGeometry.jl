@@ -269,3 +269,39 @@ Registers the `n-1` non-identity images of an `n`-fold rotational symmetry
 `Float64`); see [`NFoldRotation`](@ref).
 """
 Cn_symmetry(n; T::Type{<:Real}=Float64) = register_symmetries((NFoldRotation(n,i; T=T) for i in 1:(n-1))...)
+
+"""
+    Dn_symmetry(n; shift=0//1, T::Type{<:Real}=Float64) → reg::SymmetryRegistry
+
+Registers the `2n-1` non-identity elements of the dihedral group `Dₙ` in the
+reconstruction order of a fundamental wedge that runs counterclockwise from the
+angle `π*shift` to `π*shift + π/n`, bounded by two mirror lines.
+
+## Description
+Image `k = 1,...,2n-1` of the wedge occupies the angles `π*shift + kπ/n` to
+`π*shift + (k+1)π/n`, so the images form one contiguous closed loop. Odd `k` is the
+reflection about the axis `A = shift + (k+1)/(2n)` and even `k` the rotation by `2π(k/2)/n`
+(an [`XYAxisReflection`](@ref) when that is a rotation by `π`). The wedge wall at
+`π*shift + π/n` borders image `sym_id = 1` and the wall at `π*shift` borders image
+`sym_id = 2n-1`. For `n = 2, 4` and `shift = 0` the result equals [`D2_symmetry`](@ref) and
+[`D4_symmetry`](@ref).
+
+## Arguments
+* `n`: Order of the rotation subgroup, positive.
+* `shift`: Angle of the first mirror line in half-turns, a `Rational`.
+* `T`: Numeric type of the rotation matrices, see [`NFoldRotation`](@ref).
+"""
+function Dn_symmetry(n::Integer; shift::Rational=0//1, T::Type{<:Real}=Float64)
+    n >= 1 || throw(ArgumentError("n must be positive; received n=$n"))
+    gens = AbsSymmetry[]
+    for k in 1:2n-1
+        if isodd(k)
+            push!(gens, AxisReflection{mod(Rational{Int}(shift) + (k + 1) // (2n), 1 // 1)}())
+        elseif 2*(k ÷ 2) == n
+            push!(gens, XYAxisReflection())
+        else
+            push!(gens, NFoldRotation(n, k ÷ 2; T=T))
+        end
+    end
+    return register_symmetries(gens...)
+end

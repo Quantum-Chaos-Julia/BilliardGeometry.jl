@@ -158,9 +158,12 @@ orientation-reversing elements also reverse each curve and the curve list).
 
 The `piece` is closed by [`SymmetryWall`](@ref) edges on the mirror lines and
 the cuts of the group. They are not physical, so the physical boundary of the
-hole is the chain of the physical arcs of all pieces, one closed loop
-traversed with the hole region on its left. The registry order is the chain
-order: the physical arcs of consecutive pieces must meet end to start
+hole is the chain of the physical arcs of all pieces, split into closed loops
+traversed with the hole region on its left (one loop when the pieces surround a
+single region, several when the group exchanges separate regions, for example
+three discs under `D₃` with the group acting about the origin). The registry
+order is the chain order: the physical arcs of consecutive pieces of a loop must
+meet end to start, and the pieces of one loop are consecutive in the registry order
 (for [`D4_symmetry`](@ref) the piece runs counterclockwise from the angle `0`
 to `π/4` about `center`).
 
@@ -199,7 +202,7 @@ Construct a [`SymmetricHole`](@ref) from its fundamental `piece` and the registr
 * `id_stride::Int = 100` : Domain ids of the image of `piece` under `symmetries[k]` are those of `piece` plus `k*id_stride`. They must not collide with ids of other parts of the domain.
 
 ## Throws
-`ArgumentError` when `symmetries` is not a group (not closed under composition) or has duplicate elements, when a `SymmetryWall` of `piece` refers to a `sym_id` absent from `symmetries`, or when the physical arcs of the pieces do not chain into one closed loop in registry order.
+`ArgumentError` when `symmetries` is not a group (not closed under composition) or has duplicate elements, when a `SymmetryWall` of `piece` refers to a `sym_id` absent from `symmetries`, or when the physical arcs of the pieces do not chain into closed loops in registry order.
 """
 function SymmetricHole(piece::AbsDomain, symmetries::SymmetryRegistry, center=nothing; id_stride::Integer=100)
     subdomains = _outer_subdomains(piece)
@@ -219,7 +222,14 @@ function SymmetricHole(piece::AbsDomain, symmetries::SymmetryRegistry, center=no
         append!(pieces, orientation_reversing(sym) ? reverse(images) : images)
     end
     loop = _pieces_loop(pieces)
-    (!isempty(loop) && all(is_connected(loop))) || throw(ArgumentError("the physical arcs of the pieces of a SymmetricHole do not chain into one closed loop in registry order; the registry order must be the order of the images around the hole"))
+    isempty(loop) && throw(ArgumentError("the physical arcs of the pieces of a SymmetricHole do not chain into closed loops in registry order; the registry order must be the order of the images around the hole"))
+    loops = try
+        _split_closed_loops(loop)
+    catch err
+        err isa ArgumentError || rethrow()
+        throw(ArgumentError("the physical arcs of the pieces of a SymmetricHole do not chain into closed loops in registry order; the registry order must be the order of the images around the hole"))
+    end
+    all(l -> all(is_connected(l)), loops) || throw(ArgumentError("the physical arcs of the pieces of a SymmetricHole do not chain into closed loops in registry order; the registry order must be the order of the images around the hole"))
     return SymmetricHole{T}(piece, symmetries, c, pieces, Int(id_stride))
 end
 
@@ -229,8 +239,8 @@ hole_leaves(h::SymmetricHole) = AbsDomainHole[h]
 get_all_domains(h::SymmetricHole) = copy(h.pieces)
 get_all_curves(h::SymmetricHole) = AbsCurve[crv for d in h.pieces for crv in d.boundary]
 get_boundary_curves(h::SymmetricHole) = _pieces_loop(h.pieces)
-boundary_components(h::SymmetricHole) = Vector{AbsCurve}[get_boundary_curves(h)]
-hole_loop_count(::SymmetricHole) = 1
+boundary_components(h::SymmetricHole) = _split_closed_loops(get_boundary_curves(h))
+hole_loop_count(h::SymmetricHole) = length(boundary_components(h))
 _hole_geometric_curves(h::SymmetricHole) = get_boundary_curves(h)
 
 function _set_curve_bc(h::SymmetricHole, domain_id, segment_id, bc::AbsBoundaryCondition)

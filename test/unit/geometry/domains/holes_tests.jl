@@ -248,7 +248,7 @@ end
     scrambled = register_symmetries(XAxisReflection(), DiagonalReflection(), YAxisReflection(), XYAxisReflection(),
                                     AntiDiagonalReflection(), NFoldRotation(4, 1), NFoldRotation(4, 3))
     @test_throws ArgumentError SymmetricHole(wedge, scrambled)
-    @test_throws "do not chain into one closed loop in registry order" SymmetricHole(wedge, scrambled)
+    @test_throws "do not chain into closed loops in registry order" SymmetricHole(wedge, scrambled)
     # a registry that is not closed under composition is not a group (R, R^2, R^3 needed)
     @test_throws ArgumentError SymmetricHole(wedge, register_symmetries(NFoldRotation(4, 1)))
     @test_throws "not closed under composition" SymmetricHole(wedge, register_symmetries(NFoldRotation(4, 1)))
@@ -310,6 +310,36 @@ end
     @test hl_loop_closed(loop)
     @test hl_loop_length(loop) ≈ 2 * pi * 0.2 atol = hl_ATOL
     @test hl_signed_area(loop) ≈ pi * 0.04 atol = hl_ATOL
+end
+
+@testset "SymmetricHole with several loops (D3 half-disc piece)" begin
+    # half disc of radius 0.2 about (0, 0.5) closed by a mirror wall, acted on by D3 = Dn_symmetry(3; shift = 1//6) about the origin:
+    # the 6 images pair up into three obstacles, so the chain of arcs closes after every second piece
+    reg = Dn_symmetry(3; shift = 1 // 6)
+    top, bottom = SVector(0.0, 0.7), SVector(0.0, 0.3)
+    half_arc = CircleSegment(0.2, pi, -pi / 2, [0.0, 0.5]; domain_id = 2, segment_id = 1)
+    mirror = LineSegment(top, bottom; bc = SymmetryWall(1, 2), domain_id = 2, segment_id = 2)
+    piece = SimpleDomain{Float64}(AbsCurve[half_arc, mirror], SVector{2,Float64}[top, bottom], 2)
+    h = SymmetricHole(piece, reg, [0.0, 0.0])
+    @test length(h.pieces) == 6
+    @test hole_loop_count(h) == 3
+    comps = boundary_components(h)
+    @test length(comps) == 3
+    @test [length(l) for l in comps] == [2, 2, 2]
+    for loop in comps
+        @test hl_loop_closed(loop)
+        @test hl_loop_length(loop) ≈ 2 * pi * 0.2 atol = hl_ATOL
+        @test hl_signed_area(loop) ≈ pi * 0.04 atol = hl_ATOL
+    end
+    @test length(get_boundary_curves(h)) == 6
+    @test area(h) ≈ 3 * pi * 0.04 atol = hl_ATOL
+    @test is_inside(h, SVector(0.05, 0.5)) === true
+    @test is_inside(h, SVector(0.5, 0.0)) === false
+
+    # pieces that do not chain into closed loops in registry order are rejected: a registry listing the elements out of order
+    elems = collect(reg)
+    scrambled = register_symmetries(elems[[2, 4, 1, 3, 5]]...)
+    @test_throws ArgumentError SymmetricHole(piece, scrambled, [0.0, 0.0])
 end
 
 @testset "is_inside (SymmetricHole)" begin
