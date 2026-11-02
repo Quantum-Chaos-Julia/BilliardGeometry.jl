@@ -234,6 +234,9 @@ include("geometry/billiards/star.jl")
 include("geometry/billiards/c3.jl")
 include("geometry/billiards/prosen.jl")
 include("geometry/billiards/annular.jl")
+include("geometry/billiards/cutcircle.jl")
+include("geometry/billiards/lemon.jl")
+include("geometry/billiards/squash.jl")
 include("geometry/fullboundary.jl")
 include("geometry/inversions.jl")
 include("geometry/arclength.jl")
@@ -267,6 +270,9 @@ export StarBilliard
 export C3Billiard
 export ProsenBilliard
 export AnnularBilliard
+export CutCircleBilliard
+export LemonBilliard
+export SquashBilliard
 export full_boundary
 export invert_curve
 export arc_length, construct_arc_length_interpolation
@@ -291,5 +297,8 @@ export SquareWithinSquareBilliard
 
 include("geometry/billiards/julia.jl")
 export JuliaBilliard
+
+include("geometry/billiards/c6_c3_hole.jl")
+export C6C3HoleBilliard
 
 end

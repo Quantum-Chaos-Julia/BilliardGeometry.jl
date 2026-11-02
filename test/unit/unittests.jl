@@ -39,6 +39,8 @@ end
     include("geometry/billiards/limacon_tests.jl")
     include("geometry/billiards/circle_tests.jl")
     include("geometry/billiards/ellipse_tests.jl")
+    include("geometry/billiards/cutcircle_tests.jl")
+    include("geometry/billiards/lemon_tests.jl")
     include("geometry/billiards/rectangle_tests.jl")
     include("geometry/billiards/polygon_tests.jl")
     include("geometry/billiards/star_tests.jl")
@@ -48,6 +50,7 @@ end
     include("geometry/billiards/sinai_tests.jl")
     include("geometry/billiards/julia_tests.jl")
     include("geometry/billiards/square_in_square_tests.jl")
+    include("geometry/billiards/c6_c3_hole_tests.jl")
 end
 
 @group "geometry: boundaries and orbits" begin
