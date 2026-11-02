@@ -81,8 +81,8 @@ end
     @test w.boundary[2] isa LineSegment{Float64,Transparent}
     @test w.boundary[3] isa LineSegment{Float64,SymmetryWall}
 
-    # the keyword is typed as Vector{AbsBoundaryCondition}, so a vector of a single concrete condition type is rejected
-    @test_throws TypeError CircleWedge(1.0, pi / 2, 0.0, 0.5, 0.0, 2; bcs = [Transparent(1), Transparent(2), Transparent(3)])
+    # any vector of boundary conditions is accepted, including one of a single concrete condition type
+    @test CircleWedge(1.0, pi / 2, 0.0, 0.5, 0.0, 2; bcs = [Transparent(1), Transparent(2), Transparent(3)]) isa CircleWedge
     # fewer than three conditions cannot be matched to the three curves
     @test_throws BoundsError CircleWedge(1.0, pi / 2, 0.0, 0.5, 0.0, 2; bcs = AbsBoundaryCondition[SpecularReflection()])
 end

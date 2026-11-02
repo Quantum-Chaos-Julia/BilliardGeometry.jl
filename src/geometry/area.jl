@@ -59,28 +59,29 @@ function area(curves::AbstractVector{<:AbsCurve}; rtol=1e-10)
 end
 
 """
-    area(domain::AbsDomain; rtol=1e-10) → A::Real
+    area(domain::AbsSimpleDomain; rtol=1e-10) → A::Real
+    area(domain::AbsCompositeDomain; rtol=1e-10) → A::Real
 
 Area of a closed simple domain from the Green-theorem integral over its full
 `boundary` (symmetry walls included); for a composite domain the sum over its
 subdomains (assumed non-overlapping).
 """
-area(domain::AbsSimpleDomain; kwargs...) = area(domain.boundary; kwargs...)
-area(domain::AbsCompositeDomain; kwargs...) = sum(area(sd; kwargs...) for sd in domain.subdomains)
+area(domain::AbsSimpleDomain; rtol=1e-10) = area(domain.boundary; rtol)
+area(domain::AbsCompositeDomain; rtol=1e-10) = sum(area(sd; rtol) for sd in domain.subdomains)
 
 """
     area(hole::AbsDomainHole; rtol=1e-10) → A::Real
 
 Positive area of a hole: the sum over its loops of the absolute Green-theorem area.
 """
-area(hole::AbsDomainHole; kwargs...) = sum(area(loop; kwargs...) for loop in boundary_components(hole))
+area(hole::AbsDomainHole; rtol=1e-10) = sum(area(loop; rtol) for loop in boundary_components(hole))
 
 # Floating-point type `T` of a `Billiard{T}`; read from the type so that it is
 # inferable even though the boundary is stored as `Vector{AbsCurve}`.
 @inline _billiard_eltype(::Bi) where {Bi<:AbsBilliard} = Bi.parameters[1]
 
 """
-    area(billiard::AbsBilliard; kwargs...) → A::Real
+    area(billiard::AbsBilliard; rtol=1e-10) → A::Real
 
 Returns the area of the complete physical billiard, using
 [`full_boundary`](@ref) so the result is independent of any symmetry
@@ -96,12 +97,12 @@ with holes, the outer area minus the area of every hole.
 ## Returns
 * `A`: Area of the physical region Ω.
 """
-@inline area(billiard::AbsBilliard; kwargs...) = _billiard_area(billiard.fundamental_domain, billiard; kwargs...)::_billiard_eltype(billiard)
+@inline area(billiard::AbsBilliard; rtol=1e-10) = _billiard_area(billiard.fundamental_domain, billiard; rtol)::_billiard_eltype(billiard)
 
-_billiard_area(::AbsDomain, billiard::AbsBilliard; kwargs...) = area(full_boundary(billiard); kwargs...)
-function _billiard_area(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard; kwargs...)
+_billiard_area(::AbsDomain, billiard::AbsBilliard; rtol=1e-10) = area(full_boundary(billiard); rtol)
+function _billiard_area(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard; rtol=1e-10)
     outer = first(_full_boundary_data(billiard))
-    return area(outer; kwargs...) - sum(area(h; kwargs...) for h in domain.holes; init=zero(_billiard_eltype(billiard)))
+    return area(outer; rtol) - sum(area(h; rtol) for h in domain.holes; init=zero(_billiard_eltype(billiard)))
 end
 
 """
@@ -130,7 +131,7 @@ end
 @inline symmetry_reduction_factor(billiard::AbsBilliard) = length(billiard.symmetries) + 1
 
 """
-    fundamental_area(billiard::AbsBilliard) → A::Real
+    fundamental_area(billiard::AbsBilliard; rtol=1e-10) → A::Real
 
 Returns the area of the billiard's fundamental domain, obtained by dividing
 the full physical [`area`](@ref) by the highest-order discrete symmetry's
@@ -143,15 +144,18 @@ trivial, in particular for billiards whose only holes are `DomainHole`s.
 ## Arguments
 * `billiard`: Billiard whose fundamental-domain area is computed.
 
+## Keyword arguments
+* `rtol = 1e-10` : Relative tolerance of the Green-theorem quadrature.
+
 ## Returns
 * `A`: Area of the fundamental domain.
 """
-@inline function fundamental_area(billiard::AbsBilliard)
-    return _fundamental_area(billiard.fundamental_domain, billiard)
+@inline function fundamental_area(billiard::AbsBilliard; rtol=1e-10)
+    return _fundamental_area(billiard.fundamental_domain, billiard; rtol)
 end
 
-@inline _fundamental_area(::AbsDomain, billiard::AbsBilliard) = area(billiard)/symmetry_reduction_factor(billiard)
-_fundamental_area(::AbsMultiplyConnectedDomain, billiard::AbsBilliard) = area(billiard)/(length(get_symmetry_group(billiard)) + 1)
+@inline _fundamental_area(::AbsDomain, billiard::AbsBilliard; rtol=1e-10) = area(billiard; rtol)/symmetry_reduction_factor(billiard)
+_fundamental_area(::AbsMultiplyConnectedDomain, billiard::AbsBilliard; rtol=1e-10) = area(billiard; rtol)/(length(get_symmetry_group(billiard)) + 1)
 
 ################################################################################
 ######################## CORNER ANGLES (WEYL LAW INPUT) #######################

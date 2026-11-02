@@ -17,11 +17,11 @@ are available:
 
 ## Keyword arguments
 * `method::Symbol = :auto` : Strategy, see above.
-* `t_init = 0.5` : Initial guess for `:auto`, `:roots` and `:optim`.
-* `rtol = sqrt(eps(T))` : Relative tolerance.
-* `atol = 1e-15` : Absolute tolerance.
+* `t_init = 0.5` : Initial guess for `:auto`, `:roots` and `:optim`; ignored by `:grid_optim`, which starts from its best grid point.
+* `rtol = sqrt(eps(T))` : Relative tolerance. Used by `:roots` (parameter and distance check) and by the `:optim` refinement; not used by the `:grid_optim` grid test.
+* `atol = 1e-15` : Absolute tolerance. Its meaning depends on the method: parameter tolerance (and `sqrt(atol)` distance threshold) for `:roots`, gradient/objective tolerance for `:optim`, and a squared-distance cutoff `atol^2` for the `:grid_optim` early exit.
 * `maxevals = 50` : Maximum number of iterations.
-* `n_grid = 20` : Number of grid points for `:grid_optim`.
+* `n_grid = 20` : Number of grid points; used only by `:grid_optim`.
 
 ## Returns
 * `t`: Curve parameter wrapped to `[0,1]`.
@@ -156,13 +156,14 @@ function invert_curve_grid_search(crv::C, pt::SVector{2,T};
 end
 
 """
-    invert_curve_nelder_mead(crv, pt, t_init, atol, maxevals) → t
+    invert_curve_nelder_mead(crv, pt, t_init, rtol, atol, maxevals) → t
 
 Derivative-free inversion with the Nelder–Mead simplex of Optim.jl, for curves
 whose derivatives are problematic. Slower than the other methods, and not
-selectable through [`invert_curve`](@ref).
+selectable through [`invert_curve`](@ref). `rtol` is accepted for a uniform
+signature and is unused.
 """
-function invert_curve_nelder_mead(crv::C, pt::SVector{2,T}, t_init, atol, maxevals) where {C<:AbsCurve, T<:Real}
+function invert_curve_nelder_mead(crv::C, pt::SVector{2,T}, t_init, rtol, atol, maxevals) where {C<:AbsCurve, T<:Real}
     function objective(t_vec)
         t = mod(t_vec[1], 1.0)
         pos = curve(crv, t)

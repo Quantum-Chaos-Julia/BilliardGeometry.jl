@@ -29,7 +29,7 @@ struct SquareWithinSquareBilliard{T} <: AbsBilliard where T<:Real
 end
 
 """
-    SquareWithinSquareBilliard(a = 1; positions = [-a/2, a/2], sizes = fill(a/4, 2)) → billiard::SquareWithinSquareBilliard
+    SquareWithinSquareBilliard(a = 1; positions = [-a/2, a/2], sizes = fill(a/4, length(positions))) → billiard::SquareWithinSquareBilliard
 
 Construct a [`SquareWithinSquareBilliard`](@ref).
 
@@ -43,7 +43,7 @@ Construct a [`SquareWithinSquareBilliard`](@ref).
 ## Throws
 `ArgumentError` if the lengths differ, a size is not positive, an obstacle does not lie strictly inside the outer square, or two obstacles overlap or touch.
 """
-function SquareWithinSquareBilliard(a::T=one(T); positions::AbstractVector{<:Real}=T[-a/2,a/2], sizes::AbstractVector{<:Real}=fill(a/4,2)) where {T<:Real}
+function SquareWithinSquareBilliard(a::T=one(T); positions::AbstractVector{<:Real}=T[-a/2,a/2], sizes::AbstractVector{<:Real}=fill(a/4,length(positions))) where {T<:Real}
     a > zero(T) || throw(ArgumentError("a must be positive; received $a"))
     length(positions) == length(sizes) || throw(ArgumentError("positions and sizes must have the same length"))
     pos = T.(positions); sz = T.(sizes); n = length(pos)

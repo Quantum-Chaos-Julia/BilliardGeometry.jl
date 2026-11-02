@@ -31,7 +31,8 @@ Construct a [`C3Billiard`](@ref).
 ## Keyword arguments
 * `scale = 1` : Overall length scale `s`, must be positive.
 """
-function C3Billiard(a::T; scale::T=one(T)) where T<:Real
+function C3Billiard(a::T; scale=one(T)) where T<:Real
+    scale = T(scale)
     scale > zero(T) || throw(ArgumentError("scale must be positive; received scale=$scale"))
     c = SVector{2,T}(zero(T),zero(T))
     R = scale/T(2)

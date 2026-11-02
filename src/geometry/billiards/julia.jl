@@ -37,7 +37,8 @@ Construct a [`JuliaBilliard`](@ref).
 ## Throws
 `ArgumentError` for non-positive `r`, `d` or `R`, when an obstacle does not lie strictly inside the disc (`d + r ≥ R`), or when two obstacles overlap or touch (`√3 d ≤ 2r`).
 """
-function JuliaBilliard(r::T, d::T; R::T=one(T)) where T<:Real
+function JuliaBilliard(r::T, d::T; R=one(T)) where T<:Real
+    R = T(R)
     r > zero(T) || throw(ArgumentError("r must be positive; received $r"))
     d > zero(T) || throw(ArgumentError("d must be positive; received $d"))
     R > zero(T) || throw(ArgumentError("R must be positive; received $R"))

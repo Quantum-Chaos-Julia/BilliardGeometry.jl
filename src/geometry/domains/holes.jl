@@ -306,7 +306,7 @@ struct SymmetrizedHoles{H<:AbsDomainHole} <: AbsDomainHole
 end
 
 """
-    SymmetrizedHoles(base, symmetries; id_stride) → holes::SymmetrizedHoles
+    SymmetrizedHoles(base, symmetries; id_stride = _default_copy_stride(base)) → holes::SymmetrizedHoles
 
 Construct a [`SymmetrizedHoles`](@ref) from a base hole and the registry of the operations that place its copies.
 

@@ -224,7 +224,9 @@ rotation by `2π*m/N`.
 * `N`: Order of the rotational symmetry.
 * `m`: Power of the fundamental rotation.
 * `sym_id`: Stable identifier assigned by [`register_symmetries`](@ref) (purely geometric; carries no representation data — see `SymmetrySector` in `QuantumBilliards.jl` for the per-solve irrep-sector choice).
-* `T`: Numeric type of the rotation angle/matrix, matching the billiard's own `T<:Real` (defaults to `Float64`; pass explicitly for `BigFloat`/`Float32` billiards so the rotation isn't silently narrowed/widened to `Float64`).
+
+## Keyword arguments
+* `T = Float64` : Numeric type of the rotation angle/matrix, matching the billiard's own `T<:Real` (defaults to `Float64`; pass explicitly for `BigFloat`/`Float32` billiards so the rotation isn't silently narrowed/widened to `Float64`).
 
 ## Attributes
 * `order::Int64`: Order `N` of the rotational symmetry.
@@ -267,6 +269,12 @@ Registers the `n-1` non-identity images of an `n`-fold rotational symmetry
 
 `T` should match the billiard's own numeric type parameter (defaults to
 `Float64`); see [`NFoldRotation`](@ref).
+
+## Arguments
+* `n`: Order of the rotation group.
+
+## Keyword arguments
+* `T = Float64` : Numeric type of the rotation matrices.
 """
 Cn_symmetry(n; T::Type{<:Real}=Float64) = register_symmetries((NFoldRotation(n,i; T=T) for i in 1:(n-1))...)
 
@@ -288,8 +296,10 @@ reflection about the axis `A = shift + (k+1)/(2n)` and even `k` the rotation by 
 
 ## Arguments
 * `n`: Order of the rotation subgroup, positive.
-* `shift`: Angle of the first mirror line in half-turns, a `Rational`.
-* `T`: Numeric type of the rotation matrices, see [`NFoldRotation`](@ref).
+
+## Keyword arguments
+* `shift = 0//1` : Angle of the first mirror line in half-turns, a `Rational`.
+* `T = Float64` : Numeric type of the rotation matrices, see [`NFoldRotation`](@ref).
 """
 function Dn_symmetry(n::Integer; shift::Rational=0//1, T::Type{<:Real}=Float64)
     n >= 1 || throw(ArgumentError("n must be positive; received n=$n"))

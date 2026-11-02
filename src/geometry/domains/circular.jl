@@ -30,9 +30,9 @@ Construct a [`CircleWedge`](@ref) centered at `(x0, y0)`.
 * `id`: Id of the domain.
 
 ## Keyword arguments
-* `bcs::Vector{AbsBoundaryCondition}` : Boundary conditions of the arc and of the two radii, in the order of the `boundary` field.
+* `bcs::AbstractVector{<:AbsBoundaryCondition}` : Boundary conditions of the arc and of the two radii, in the order of the `boundary` field.
 """
-function CircleWedge(R, arc_angle, shift_angle, x0, y0, id; bcs::Vector{AbsBoundaryCondition} = [SpecularReflection(), SpecularReflection(),SpecularReflection()])
+function CircleWedge(R, arc_angle, shift_angle, x0, y0, id; bcs::AbstractVector{<:AbsBoundaryCondition} = [SpecularReflection(), SpecularReflection(),SpecularReflection()])
     center = SVector(x0,y0)
     circle = CircleSegment(R, arc_angle, shift_angle, x0, y0; bc = bcs[1], domain_id=id, segment_id=1)
     pt0 = curve(circle, 0)

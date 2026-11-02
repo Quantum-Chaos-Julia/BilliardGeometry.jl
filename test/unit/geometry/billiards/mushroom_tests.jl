@@ -1,5 +1,5 @@
 # Unit tests for the mushroom billiard constructor (structural checks only):
-#   src/geometry/billiards/mushroom.jl   (MushroomBilliard{T}, MushroomBilliard(half_width, stem_heigth; R, origin))
+#   src/geometry/billiards/mushroom.jl   (MushroomBilliard{T}, MushroomBilliard(half_width, stem_height; R, center))
 # Reference object: the half mushroom with cap radius R, stem half-width hw < R and stem height h, a composite domain of three
 # subdomains (cap sector with id 1, triangle with id 2, stem rectangle with id 3) joined by Transparent curves, one YAxisReflection
 # symmetry (sym_id 1), and the constructor guard that rejects a cap centre away from the origin because the YAxisReflection
@@ -64,13 +64,13 @@ end
     @test subs[2].corners[1] == SVector(0.0, 2.0)
 end
 
-@testset "MushroomBilliard origin guard" begin
+@testset "MushroomBilliard center guard" begin
     # the YAxisReflection symmetry requires the cap centre at the origin
-    @test_throws ArgumentError MushroomBilliard(mb_HW, mb_STEM; origin=[0.1, 0.0])
-    @test_throws ArgumentError MushroomBilliard(mb_HW, mb_STEM; origin=[0.0, 0.2])
-    @test_throws ArgumentError MushroomBilliard(mb_HW; origin=[-0.3, 0.4])
-    # an explicit zero origin is accepted and gives the default billiard
-    @test MushroomBilliard(mb_HW, mb_STEM; origin=[0.0, 0.0]) isa MushroomBilliard{Float64}
+    @test_throws ArgumentError MushroomBilliard(mb_HW, mb_STEM; center=[0.1, 0.0])
+    @test_throws ArgumentError MushroomBilliard(mb_HW, mb_STEM; center=[0.0, 0.2])
+    @test_throws ArgumentError MushroomBilliard(mb_HW; center=[-0.3, 0.4])
+    # an explicit zero center is accepted and gives the default billiard
+    @test MushroomBilliard(mb_HW, mb_STEM; center=[0.0, 0.0]) isa MushroomBilliard{Float64}
 end
 
 @testset "MushroomBilliard eltype promotion" begin
@@ -83,7 +83,7 @@ end
     @test subs[1].boundary[2].radius isa Float32
     @test eltype(subs[3].corners) == SVector{2,Float32}
     # keyword arguments given in Float64 are converted to the element type of the half-width
-    mush32 = MushroomBilliard(0.5f0, 2.0f0; R=1.5, origin=[0.0, 0.0])
+    mush32 = MushroomBilliard(0.5f0, 2.0f0; R=1.5, center=[0.0, 0.0])
     @test mush32 isa MushroomBilliard{Float32}
     @test mush32.fundamental_domain.subdomains[1].boundary[2].radius === 1.5f0
     # the default stem height of the one-argument method takes the element type of the half-width

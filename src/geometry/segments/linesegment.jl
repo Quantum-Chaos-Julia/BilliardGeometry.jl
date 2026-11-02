@@ -106,7 +106,7 @@ function domain_fun(line::L, pts::AbstractArray) where {L<:AbsLine}
 end
 
 # arc length
-function arc_length(line::L, pt::SVector{2,T}) where {L<:AbsLine, T<:Real}
+function arc_length(line::L, pt::SVector{2,T}; kwargs...) where {L<:AbsLine, T<:Real}
     r0 = line.pt0
     x, y = pt .- r0
     return hypot(x, y)
