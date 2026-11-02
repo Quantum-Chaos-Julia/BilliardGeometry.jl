@@ -1,5 +1,8 @@
 using Test
+using Logging
 using BilliardGeometry
+
+global_logger(ConsoleLogger(stderr, Logging.Error))
 
 const BG_TEST_GROUPS = ("unit", "integration", "all")
 const BG_TEST_GROUP = get(ENV, "BG_TEST_GROUP", "all")
