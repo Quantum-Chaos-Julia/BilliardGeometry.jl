@@ -167,7 +167,7 @@ _fundamental_area(::AbsMultiplyConnectedDomain, billiard::AbsBilliard; rtol=1e-1
 Interior angles (in radians, matching e.g. [`Polygon`](@ref)'s `angles`
 field convention) at every true corner of `billiard`'s boundary.
 
-## Keyword Arguments
+## Keyword arguments
 * `fundamental::Bool = true`: When `true` (default), uses
   [`geometric_boundary_components`](@ref) (the fundamental-domain boundary
   actually diagonalized over by basis/BIM solvers, including any

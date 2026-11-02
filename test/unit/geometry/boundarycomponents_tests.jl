@@ -13,6 +13,7 @@
 
 using StaticArrays: SVector
 using LinearAlgebra: norm
+using Test: collect_test_logs
 using BilliardGeometry: _is_true_corner, _junction_angle, _component_corner_locations, _component_corner_angles,
                         _global_t_to_segment_u, _eval_composite_geom_global_t, _group_curves_by_domain_id,
                         _signed_junction_angle
@@ -21,15 +22,6 @@ using BilliardGeometry: _is_true_corner, _junction_angle, _component_corner_loca
 const bc_ATOL = 1e-12
 # Absolute tolerance for Float32 results (a few ulps of Float32).
 const bc_ATOL_F32 = 1.0f-6
-
-# Output of `f()` written to stdout, returned as a vector of lines.
-function bc_captured_lines(f)
-    mktemp() do path, io
-        redirect_stdout(f, io)
-        flush(io)
-        return readlines(path)
-    end
-end
 
 # Closed counterclockwise unit square, right triangle and half disk as composite components.
 bc_square() = [LineSegment([0.0, 0.0], [1.0, 0.0]), LineSegment([1.0, 0.0], [1.0, 1.0]),
@@ -160,28 +152,38 @@ end
 end
 
 @testset "print_component_junctions" begin
-    lines = bc_captured_lines(() -> print_component_junctions(bc_square()))
-    @test lines[1] == "junction diagnostics:"
-    @test length(lines) == 5
-    @test count(l -> occursin("TRUE CORNER", l), lines) == 4
-    @test count(l -> occursin("smooth join", l), lines) == 0
-    # one line per join, the last one closes the loop at the seam sigma = 0
-    @test occursin("1 -> 2", lines[2])
-    @test occursin("4 -> 1", lines[5])
-    @test occursin("σ = 0.0", lines[5])
-    @test occursin("angle = $(pi / 2)", lines[2])
+    # one @info record per join
+    logs, _ = collect_test_logs() do
+        print_component_junctions(bc_square())
+    end
+    @test length(logs) == 4
+    @test all(l -> l.level == Base.CoreLogging.Info && l.message == "Junction", logs)
+    kw(l, k) = Dict(l.kwargs)[k]
+    @test count(l -> kw(l, :classification) == "true corner", logs) == 4
+    @test count(l -> kw(l, :classification) == "smooth join", logs) == 0
+    @test [(kw(l, :from), kw(l, :to)) for l in logs] == [(1, 2), (2, 3), (3, 4), (4, 1)]
+    # the last join closes the loop at the seam sigma = 0
+    @test kw(logs[4], :σ) == 0.0
+    @test kw(logs[1], :angle) ≈ pi / 2 atol = bc_ATOL
     # the parameter of the first join is 2 pi * 1/4
-    @test occursin("σ = $(pi / 2)", lines[2])
+    @test kw(logs[1], :σ) ≈ pi / 2 atol = bc_ATOL
 
     # smooth joins are labelled as such; the keyword T selects the number type of the printed values
     smooth = [LineSegment([0.0, 0.0], [1.0, 0.0]), LineSegment([1.0, 0.0], [2.0, 0.0])]
-    smooth_lines = bc_captured_lines(() -> print_component_junctions(smooth; T=Float32))
-    @test length(smooth_lines) == 3
-    @test count(l -> occursin("smooth join", l), smooth_lines) == 2
-    @test count(l -> occursin("TRUE CORNER", l), smooth_lines) == 0
+    smooth_logs, _ = collect_test_logs() do
+        print_component_junctions(smooth; T=Float32)
+    end
+    @test length(smooth_logs) == 2
+    @test count(l -> kw(l, :classification) == "smooth join", smooth_logs) == 2
+    @test count(l -> kw(l, :classification) == "true corner", smooth_logs) == 0
+    @test all(l -> kw(l, :angle) isa Float32, smooth_logs)
+    @test all(l -> kw(l, :σ) isa Float32, smooth_logs)
     # a large angle_tol makes every join smooth
-    tol_lines = bc_captured_lines(() -> print_component_junctions(bc_square(); angle_tol=2.0))
-    @test count(l -> occursin("smooth join", l), tol_lines) == 4
+    tol_logs, _ = collect_test_logs() do
+        print_component_junctions(bc_square(); angle_tol=2.0)
+    end
+    @test length(tol_logs) == 4
+    @test count(l -> kw(l, :classification) == "smooth join", tol_logs) == 4
 end
 
 @testset "_global_t_to_segment_u" begin

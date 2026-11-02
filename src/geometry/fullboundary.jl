@@ -2,9 +2,8 @@
 ############################# FULL PHYSICAL BOUNDARY ##########################
 ################################################################################
 # `full_boundary(billiard)` reconstructs the complete physical boundary of a
-# billiard from its fundamental domain plus its discrete symmetry generators
-# (`billiard.symmetries`), instead of every billiard hand-maintaining its own
-# `full_boundary` field. This is needed by boundary-integral (BIM) solvers,
+# billiard from its fundamental domain plus its discrete symmetry elements
+# (`billiard.symmetries`). This is needed by boundary-integral (BIM) solvers,
 # which discretize the *entire* physical boundary (unlike basis solvers,
 # which only ever need the fundamental domain).
 #

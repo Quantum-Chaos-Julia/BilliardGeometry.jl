@@ -33,7 +33,6 @@ struct LineSegment{T, BC}  <: AbsLine{BC} where {T<:Real}
     segment_id::Int64
 end
 
-#constructors
 """
     LineSegment(pt0, pt1; bc = SpecularReflection(), orientation = 1, domain_id = 1, segment_id = 1) → line::LineSegment
 
@@ -60,7 +59,6 @@ function LineSegment(pt0, pt1; bc = SpecularReflection(), orientation = 1, domai
 end
 
 
-# returns SVector(x,y)
 """
     curve(crv::AbsCurve, t::Real) → pt::SVector{2}
     curve(crv::AbsCurve, ts::AbstractArray) → pts::Vector{SVector{2}}
@@ -77,7 +75,6 @@ function curve(line::L, ts::AbstractArray) where {L<:AbsLine}
     return collect(line_eq(line.pt0,line.pt1,t) for t in ts)
 end
 
-# returns negative value inside
 """
     domain_fun(crv::AbsCurve, pt::SVector{2}) → d
     domain_fun(crv::AbsCurve, pts::AbstractArray) → ds::Vector
@@ -105,7 +102,6 @@ function domain_fun(line::L, pts::AbstractArray) where {L<:AbsLine}
     end
 end
 
-# arc length
 function arc_length(line::L, pt::SVector{2,T}; kwargs...) where {L<:AbsLine, T<:Real}
     r0 = line.pt0
     x, y = pt .- r0

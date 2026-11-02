@@ -127,9 +127,9 @@ end
 """
     print_component_junctions(comp::Vector; T=Float64, angle_tol=1e-8)
 
-Prints diagnostic information (global periodic parameter, tangent
+Logs diagnostic information (global periodic parameter, tangent
 discontinuity angle, corner classification) for every join of a composite
-boundary component.
+boundary component, one `@info` record per join.
 
 ## Keyword arguments
 * `T = Float64` : Numeric type used for the diagnostics.
@@ -138,13 +138,12 @@ boundary component.
 function print_component_junctions(comp::Vector; T=Float64, angle_tol=1e-8)
     _, cum, Ltot = component_lengths(comp)
     m = length(comp)
-    println("junction diagnostics:")
     @inbounds for j in 1:m
         jr = j == m ? 1 : j+1
-        σ = j == m ? zero(T) : T(2*pi)*cum[j+1]/Ltot
+        σ = j == m ? zero(T) : T(2*pi)*T(cum[j+1])/T(Ltot)
         a = _junction_angle(comp[j], comp[jr], T)
-        flag = a > T(angle_tol) ? "TRUE CORNER" : "smooth join"
-        println("  $j -> $jr : σ = $σ, angle = $a, $flag")
+        flag = a > T(angle_tol) ? "true corner" : "smooth join"
+        @info "Junction" from=j to=jr σ=σ angle=a classification=flag
     end
 end
 

@@ -73,7 +73,6 @@ function CircleSegment(R, arc_angle, shift_angle, x0, y0; bc = SpecularReflectio
     return CircleSegment(T(R),T(arc_angle),T(shift_angle),center,Int64(orientation),L,bc,Int64(domain_id),Int64(segment_id))
 end
 
-# returns SVector(x,y)
 function curve(circle::L, t) where {L<:CircleSegment}
     return circle_eq(circle.radius, circle.arc_angle, circle.shift_angle, circle.center, t)
 end
@@ -84,7 +83,6 @@ function curve(circle::L, ts::AbstractArray) where {L<:CircleSegment}
     end
 end
 
-# returns negative value inside
 function domain_fun(circle::L, pt::SVector{2,T}) where {L<:CircleSegment, T<:Real}
     return circle_domain(circle.radius, circle.center, pt[1], pt[2])*circle.orientation
 end

@@ -54,7 +54,6 @@ function is_inside(domain::D, pts::AbstractArray) where {D<:AbsDomain}
 end
 
 
-#check if points inside for general curves
 """
     is_inside(crv::AbsCurve, pt::SVector{2}) → flag::Bool
     is_inside(crv::AbsCurve, pts::AbstractArray) → flags::Vector{Bool}
@@ -73,7 +72,6 @@ function is_inside(curve::C, pts::AbstractArray) where {C<:AbsCurve}
     end
 end
 
-#gradient of domain_function gives normal direcrion
 """
     domain_gradient_vector(crv::AbsCurve, pt::SVector{2}) → g::SVector{2}
     domain_gradient_vector(crv::AbsCurve, pts::AbstractArray) → gs::Vector

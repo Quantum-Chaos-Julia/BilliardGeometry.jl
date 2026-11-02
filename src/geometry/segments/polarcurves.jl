@@ -156,7 +156,6 @@ function curve(polar_curve::L, ts::AbstractArray) where {L<:AbsPolarCurve}
     return [Translation(polar_curve.center)(CartesianFromPolar()(pt)) for pt in pts_polar]
 end
 
-#generic functions
 function polar_radius(polar_curve::L, phi::AbstractArray) where {L<:AbsPolarCurve}
     return [polar_radius(polar_curve, t) for t in phi]
 end
@@ -167,7 +166,6 @@ function polar_domain(polar_curve::L, pt) where {L<:AbsPolarCurve}
     return @. (pt_polar.r - R)
 end
 
-# returns negative value inside
 function domain_fun(polar_curve::L, pt::SVector{2,T}) where {L<:AbsPolarCurve, T<:Real}
     return polar_domain(polar_curve, pt)*polar_curve.orientation
 
