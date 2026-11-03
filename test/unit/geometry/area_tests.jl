@@ -99,7 +99,7 @@ end
     # the square hole of SquareWithinSquareBilliard has area side^2
     @test area(AnnularBilliard(0.3, 0.2; center = [0.5, 0.1]).fundamental_domain.holes[1].domain.boundary) ≈ pi * 0.3^2 rtol = ar_RTOL
     @test area(SinaiBilliard(1.0, 0.3; center = [0.5, -0.2]).fundamental_domain.holes[1].domain.boundary) ≈ pi * 0.3^2 rtol = ar_RTOL
-    @test area(SquareWithinSquareBilliard(1.0).fundamental_domain.holes[1].domain.boundary) ≈ 0.25^2 rtol = ar_RTOL
+    @test area(full_boundary_components(SquareWithinSquareBilliard(1.0)).curves[2]) ≈ 0.25^2 rtol = ar_RTOL
     # the symmetric billiards (B7) keep only a fraction of the hole in the fundamental frame; the full physical hole loops are
     # reconstructed by full_boundary_components: the full circle of radius R about the hole, the full square of side 0.4
     @test area(full_boundary_components(AnnularBilliard(0.3, 0.2)).curves[2]) ≈ pi * 0.3^2 rtol = ar_RTOL
@@ -220,9 +220,10 @@ end
     @test symmetry_reduction_factor(ar_polar_billiard(XYAxisReflection())) == 2
     # no registered symmetry: factor 1
     @test symmetry_reduction_factor(TriangleBilliard(pi / 2, 1.0)) == 1
-    @test symmetry_reduction_factor(SquareWithinSquareBilliard(1.0)) == 1
     @test symmetry_reduction_factor(AnnularBilliard(0.3, 0.2; center = [0.5, 0.1])) == 1
     @test symmetry_reduction_factor(SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])) == 1
+    @test symmetry_reduction_factor(SquareWithinSquareBilliard(1.0)) == 4
+    @test symmetry_reduction_factor(SquareWithinSquareBilliard(1.0; positions = [0.1], sizes = [0.4])) == 2
     # B7: origin-centered billiards with holes are symmetric: annulus mirror y -> -y (order 2), Sinai and a single centered
     # square obstacle D4 (order 8)
     @test symmetry_reduction_factor(AnnularBilliard(0.3, 0.2)) == 2
@@ -249,7 +250,7 @@ end
     @test maximal_symmetry(TriangleBilliard(pi / 2, 1.0)) === nothing
     @test maximal_symmetry(AnnularBilliard(0.3, 0.2; center = [0.5, 0.1])) === nothing
     @test maximal_symmetry(SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])) === nothing
-    @test maximal_symmetry(SquareWithinSquareBilliard(1.0)) === nothing
+    @test maximal_symmetry(SquareWithinSquareBilliard(1.0)) isa XYAxisReflection
     # B7: the symmetric billiards with holes report the registered element of the largest factor
     @test maximal_symmetry(AnnularBilliard(0.3, 0.2)) isa XAxisReflection
     sinai_max = maximal_symmetry(SinaiBilliard(1.0, 0.3))
@@ -318,12 +319,12 @@ end
         @test symmetry_reduction_factor(b2) == 4
         @test fundamental_area(b2) > area(b2) / symmetry_reduction_factor(b2)
     end
-    # the unreduced Sinai billiard and the default two-obstacle square have an empty registry: the fundamental area is the area
+    # the unreduced Sinai billiard has an empty registry: the fundamental area is the area
     @testset "SinaiBilliard" begin
         @test fundamental_area(SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])) ≈ 4 - pi * 0.3^2 rtol = ar_RTOL
     end
     @testset "SquareWithinSquareBilliard" begin
-        @test fundamental_area(SquareWithinSquareBilliard(1.0)) ≈ 4 - 2 * 0.25^2 rtol = ar_RTOL
+        @test fundamental_area(SquareWithinSquareBilliard(1.0)) ≈ (4 - 2 * 0.25^2) / 4 rtol = ar_RTOL
     end
 end
 
@@ -383,9 +384,11 @@ end
     sinai_shifted = SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])
     @test length(corner_angles(sinai_shifted)) == 4
     @test corner_angles(sinai_shifted) ≈ fill(pi / 2, 4) atol = ar_ANGLE_ATOL
-    # SquareWithinSquareBilliard: four right angles outside, 3 pi / 2 at each of the eight hole corners
+    # SquareWithinSquareBilliard: corners of the wedge (0,0), (1,-1), (1,1) and of the obstacle piece; the full boundary has
+    # four right angles outside and 3 pi / 2 at each of the eight obstacle corners
     sws = SquareWithinSquareBilliard(1.0)
-    @test corner_angles(sws) ≈ [fill(pi / 2, 4); fill(3pi / 2, 8)] atol = ar_ANGLE_ATOL
+    @test corner_angles(sws) ≈ [pi / 2, pi / 4, pi / 4, 7pi / 4, 3pi / 2, 7pi / 4, 7pi / 4, 7pi / 4, 3pi / 2] atol = ar_ANGLE_ATOL
+    @test corner_angles(sws; fundamental = false) ≈ [fill(pi / 2, 4); fill(3pi / 2, 8)] atol = ar_ANGLE_ATOL
 end
 
 @testset "corner_angles (hole corners)" begin
