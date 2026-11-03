@@ -299,9 +299,9 @@ mc_ids(reg) = [g.sym_id for g in reg]
     @test length(get_symmetry_group(SinaiBilliard(1.0, 0.3))) == 7
     @test mc_ids(get_symmetry_group(SinaiBilliard(1.0, 0.3))) == mc_ids(SinaiBilliard(1.0, 0.3).symmetries)
     @test length(get_symmetry_group(SquareWithinSquareBilliard(1.0; positions = [0.0], sizes = [0.4]))) == 7
-    # a shifted center (Sinai) and the default two-obstacle configuration keep the empty registry
+    # a shifted center (Sinai) keeps the empty registry; the default two-obstacle square is mirror symmetric (3 elements)
     @test length(get_symmetry_group(SinaiBilliard(1.0, 0.3; center = [0.5, -0.2]))) == 0
-    @test length(get_symmetry_group(SquareWithinSquareBilliard(1.0))) == 0
+    @test length(get_symmetry_group(SquareWithinSquareBilliard(1.0))) == 3
 
     # several holes: intersection over the holes
     other_disc = DomainHole(hf_circle_domain(0.05, 0.6, 0.6, 9))
@@ -406,8 +406,8 @@ end
     @test_logs (:info, "SinaiBilliard: outer symmetry group G has order 8, symmetry group G' has order 8") SinaiBilliard(1.0, 0.3)
     @test_logs (:info, "AnnularBilliard: outer symmetry group G has order 2, symmetry group G' has order 2") AnnularBilliard(0.3, 0.2)
     @test_logs (:info, "SquareWithinSquareBilliard: outer symmetry group G has order 8, symmetry group G' has order 8") SquareWithinSquareBilliard(1.0; positions = [0.0], sizes = [0.4])
-    # an explicit shifted center, or the default two-obstacle square, has an empty registry and stays silent
+    # an explicit shifted center has an empty registry and stays silent
     @test_logs SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])
     @test_logs AnnularBilliard(0.3, 0.2; center = [0.5, 0.1])
-    @test_logs SquareWithinSquareBilliard(1.0)
+    @test_logs (:info, "SquareWithinSquareBilliard: outer symmetry group G has order 4, symmetry group G' has order 4") SquareWithinSquareBilliard(1.0)
 end

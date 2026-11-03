@@ -242,7 +242,7 @@ end
 end
 
 @testset "is_inside (SquareWithinSquareBilliard)" begin
-    # the square [-1, 1]^2 without the two square holes [0.375, 0.625]^2 and [-0.625, -0.375]^2
+    # the fundamental wedge (0,0), (1,-1), (1,1) without the obstacle piece around (0.5, 0.5)
     sws = SquareWithinSquareBilliard(1.0)
     # points in a hole or outside the outer square are outside
     @test is_inside(sws, SVector(0.55, 0.45)) === false
@@ -251,17 +251,17 @@ end
     @test is_inside(sws, SVector(1.2, 0.1)) === false
     @test is_inside(sws, SVector(-1.2, 0.1)) === false
 
-    # points of the billiard, on both sides of the diagonal, are inside
+    # points of the fundamental wedge, on both sides of the diagonal, are inside; other quadrants are outside
     @testset "points of the billiard" begin
         @test is_inside(sws, SVector(0.9, 0.2)) === true
         @test is_inside(sws, SVector(0.7, 0.1)) === true
         @test is_inside(sws, SVector(0.3, 0.1)) === true
         @test is_inside(sws, SVector(0.9, 0.5)) === true
         @test is_inside(sws, SVector(0.5, 0.3)) === true
-        @test is_inside(sws, SVector(-0.2, -0.5)) === true
-        @test is_inside(sws, SVector(0.0, -0.9)) === true
-        @test is_inside(sws, SVector(0.2, 0.9)) === true
-        @test is_inside(sws, SVector(-0.9, 0.1)) === true
+        @test is_inside(sws, SVector(-0.2, -0.5)) === false
+        @test is_inside(sws, SVector(0.0, -0.9)) === false
+        @test is_inside(sws, SVector(0.2, 0.9)) === false
+        @test is_inside(sws, SVector(-0.9, 0.1)) === false
     end
     @testset "array form" begin
         @test is_inside(sws, [SVector(0.9, 0.2), SVector(0.55, 0.45), SVector(0.3, 0.1)]) == [true, false, true]
