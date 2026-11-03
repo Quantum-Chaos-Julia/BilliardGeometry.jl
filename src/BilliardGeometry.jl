@@ -17,7 +17,7 @@ sign of [`domain_fun`](@ref) tells on which side of a curve a point lies.
 * Boundary conditions: [`SpecularReflection`](@ref), [`Transparent`](@ref), [`PeriodicX`](@ref), [`SymmetryWall`](@ref), [`QuantumSolverIgnore`](@ref).
 * Curves: [`LineSegment`](@ref), [`CircleSegment`](@ref), [`FourierCoeffPolarSegment`](@ref), [`PolarSegment`](@ref), [`CompositeCurve`](@ref).
 * Domains: [`Polygon`](@ref), [`CircleWedge`](@ref), [`SimpleDomain`](@ref), [`CompositeDomain`](@ref), [`PolarDomain`](@ref), [`MultiplyConnectedDomain`](@ref), [`DomainHole`](@ref).
-* Billiards: [`TriangleBilliard`](@ref), [`StadiumBilliard`](@ref), [`MushroomBilliard`](@ref), [`PolarBilliard`](@ref), [`LimaconBilliard`](@ref), [`CircleBilliard`](@ref), [`EllipseBilliard`](@ref), [`RectangleBilliard`](@ref), [`PolygonBilliard`](@ref), [`StarBilliard`](@ref), [`C3Billiard`](@ref), [`ProsenBilliard`](@ref), [`AnnularBilliard`](@ref), [`SinaiBilliard`](@ref), [`SquareWithinSquareBilliard`](@ref), [`JuliaBilliard`](@ref).
+* Billiards: [`TriangleBilliard`](@ref), [`StadiumBilliard`](@ref), [`MushroomBilliard`](@ref), [`PolarBilliard`](@ref), [`LimaconBilliard`](@ref), [`CircleBilliard`](@ref), [`EllipseBilliard`](@ref), [`RectangleBilliard`](@ref), [`PolygonBilliard`](@ref), [`StarBilliard`](@ref), [`C3Billiard`](@ref), [`ProsenBilliard`](@ref), [`AnnularBilliard`](@ref), [`SinaiBilliard`](@ref), [`GeneralizedSinaiBilliard`](@ref), [`SquareWithinSquareBilliard`](@ref), [`JuliaBilliard`](@ref).
 * Symmetries: [`XAxisReflection`](@ref), [`YAxisReflection`](@ref), [`XYAxisReflection`](@ref), [`DiagonalReflection`](@ref), [`AntiDiagonalReflection`](@ref), [`CompositeReflection`](@ref), [`NFoldRotation`](@ref), [`SymmetryRegistry`](@ref), [`SymmetryOrbitMap`](@ref).
 * Boundary samplers and Kress grading: [`LinearNodes`](@ref), [`GaussLegendreNodes`](@ref), [`FourierNodes`](@ref), [`sample_points`](@ref), [`kress_graded_nodes_data`](@ref), [`multi_kress_graded_nodes_data`](@ref).
 """
@@ -291,6 +291,9 @@ export kress_R!, kress_R_even!, kress_R_odd!, s_mid, kress_graded_nodes_data, mu
 
 include("geometry/billiards/sinai.jl")
 export SinaiBilliard
+
+include("geometry/billiards/generalized_sinai.jl")
+export GeneralizedSinaiBilliard
 
 include("geometry/billiards/square_in_square.jl")
 export SquareWithinSquareBilliard
