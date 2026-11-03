@@ -154,16 +154,27 @@ end
 end
 
 @testset "is_inside (AnnularBilliard)" begin
-    # AnnularBilliard(0.3, 0.2): unit disk without the disk of radius 0.3 centered at (0.2, 0)
+    # AnnularBilliard(0.3, 0.2) is symmetric: membership refers to the reduced domain, the upper half of the unit disk without the
+    # half disk of radius 0.3 centered at (0.2, 0); points with y < 0 lie outside the fundamental domain
     an = AnnularBilliard(0.3, 0.2)
-    @test is_inside(an, SVector(0.9, 0.0)) === true
-    @test is_inside(an, SVector(-0.7, 0.0)) === true
-    @test is_inside(an, SVector(0.55, 0.0)) === true     # 0.35 from the hole center
-    @test is_inside(an, SVector(0.2, 0.0)) === false     # hole center
-    @test is_inside(an, SVector(0.0, 0.0)) === false     # 0.2 from the hole center
-    @test is_inside(an, SVector(0.4, 0.0)) === false
-    @test is_inside(an, SVector(1.1, 0.0)) === false     # outside the outer circle
-    @test is_inside(an, [SVector(0.9, 0.0), SVector(0.2, 0.0)]) == [true, false]
+    @test is_inside(an, SVector(0.9, 0.05)) === true
+    @test is_inside(an, SVector(-0.7, 0.1)) === true
+    @test is_inside(an, SVector(0.55, 0.02)) === true    # 0.35 from the hole center
+    @test is_inside(an, SVector(0.2, 0.05)) === false    # near the hole center
+    @test is_inside(an, SVector(0.0, 0.05)) === false    # 0.2 from the hole center
+    @test is_inside(an, SVector(0.4, 0.05)) === false
+    @test is_inside(an, SVector(1.1, 0.05)) === false    # outside the outer circle
+    @test is_inside(an, SVector(0.9, -0.2)) === false    # reflected half plane
+    @test is_inside(an, [SVector(0.9, 0.05), SVector(0.2, 0.05)]) == [true, false]
+
+    # nonzero center: unreduced billiard, the full ring about (0.5, 0.1) with the hole about (0.7, 0.1)
+    sh = AnnularBilliard(0.3, 0.2; center = [0.5, 0.1])
+    @test is_inside(sh, SVector(1.4, 0.1)) === true
+    @test is_inside(sh, SVector(1.4, -0.3)) === true
+    @test is_inside(sh, SVector(-0.3, 0.1)) === true
+    @test is_inside(sh, SVector(0.7, 0.1)) === false     # hole center
+    @test is_inside(sh, SVector(0.5, 0.1)) === false     # 0.2 from the hole center
+    @test is_inside(sh, SVector(1.6, 0.1)) === false     # outside the outer circle
 end
 
 @testset "is_inside (MultiplyConnectedDomain)" begin
@@ -205,20 +216,29 @@ end
 end
 
 @testset "is_inside (SinaiBilliard)" begin
-    # the square [-1, 1]^2 without the disk of radius 0.3 about the origin
+    # symmetric Sinai billiard: membership refers to the fundamental triangle 0 <= y <= x <= 1 without the eighth disc of radius 0.3
     sn = SinaiBilliard(1.0, 0.3)
-    @test is_inside(sn, SVector(0.5, 0.5)) === true
-    @test is_inside(sn, SVector(-0.5, -0.5)) === true
-    @test is_inside(sn, SVector(-0.9, 0.1)) === true
+    @test is_inside(sn, SVector(0.5, 0.2)) === true
     @test is_inside(sn, SVector(0.9, 0.1)) === true
-    @test is_inside(sn, SVector(0.25, 0.25)) === true    # distance 0.354 from the origin
-    @test is_inside(sn, SVector(0.31, 0.0)) === true
-    @test is_inside(sn, SVector(0.1, 0.1)) === false     # inside the hole
-    @test is_inside(sn, SVector(-0.1, -0.2)) === false
-    @test is_inside(sn, SVector(0.2, 0.2)) === false     # distance 0.283 from the origin
-    @test is_inside(sn, SVector(0.29, 0.0)) === false
+    @test is_inside(sn, SVector(0.7, 0.6)) === true
+    @test is_inside(sn, SVector(0.31, 0.02)) === true
+    @test is_inside(sn, SVector(0.2, 0.1)) === false     # inside the hole piece
+    @test is_inside(sn, SVector(0.25, 0.05)) === false
+    @test is_inside(sn, SVector(0.2, 0.15)) === false    # distance 0.25 from the origin
+    @test is_inside(sn, SVector(0.3, 0.7)) === false     # y > x, outside the fundamental triangle
+    @test is_inside(sn, SVector(-0.5, -0.5)) === false
     @test is_inside(sn, SVector(1.1, 0.5)) === false
-    @test is_inside(sn, [SVector(0.5, 0.5), SVector(0.1, 0.1)]) == [true, false]
+    @test is_inside(sn, [SVector(0.5, 0.2), SVector(0.2, 0.1)]) == [true, false]
+
+    # nonzero center: the full square [-0.5, 1.5] x [-1.2, 0.8] about (0.5, -0.2) without the disk of radius 0.3
+    sh = SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])
+    @test is_inside(sh, SVector(1.2, -0.2)) === true
+    @test is_inside(sh, SVector(0.0, 0.0)) === true
+    @test is_inside(sh, SVector(0.0, -1.0)) === true
+    @test is_inside(sh, SVector(0.5, -0.2)) === false    # center of the hole
+    @test is_inside(sh, SVector(0.6, -0.1)) === false
+    @test is_inside(sh, SVector(2.0, 0.0)) === false
+    @test is_inside(sh, [SVector(1.2, -0.2), SVector(0.5, -0.2)]) == [true, false]
 end
 
 @testset "is_inside (SquareWithinSquareBilliard)" begin
@@ -287,4 +307,83 @@ end
     g32 = domain_gradient_vector(arc32, SVector(0.6f0, 0.8f0))
     @test g32 isa SVector{2,Float32}
     @test g32 ≈ SVector(0.6f0, 0.8f0) atol = gm_ATOL_F32
+end
+
+@testset "verify_transparent_bcs (no transparent curves)" begin
+    # nothing to check: vacuously true
+    @test verify_transparent_bcs(CircleBilliard(1.0))
+    @test verify_transparent_bcs(RectangleBilliard(1.0, 0.6))
+    @test verify_transparent_bcs(gm_triangle())
+end
+
+@testset "verify_transparent_bcs (stadium, mushroom)" begin
+    @test (@inferred verify_transparent_bcs(StadiumBilliard(1.0))) === true
+    @test verify_transparent_bcs(MushroomBilliard(1.0, 0.5))
+    # keyword arguments
+    @test verify_transparent_bcs(StadiumBilliard(1.0); n = 3, δ = 1e-8, verbose = false)
+end
+
+@testset "verify_transparent_bcs (wrong joins are detected)" begin
+    stadium = StadiumBilliard(1.0)
+    # the circle wedge (domain 1) chord is segment 2; point it to a missing domain
+    missing_next = update_boundary_condition(stadium, 1, 2, Transparent(5))
+    @test verify_transparent_bcs(missing_next; verbose = false) == false
+    @test_logs (:warn, r"missing domain 5") match_mode = :any verify_transparent_bcs(missing_next)
+
+    # point it back to its own domain: the step outward is not inside the "next" domain
+    self_next = update_boundary_condition(stadium, 1, 2, Transparent(1))
+    @test verify_transparent_bcs(self_next; verbose = false) == false
+
+    # mushroom chord of the cap (domain 1, segment 3) joined to the stem (domain 3) instead of the triangle (domain 2)
+    wrong_next = update_boundary_condition(MushroomBilliard(1.0, 0.5), 1, 3, Transparent(3))
+    @test verify_transparent_bcs(wrong_next; verbose = false) == false
+    @test_logs (:warn, r"fails at") match_mode = :any verify_transparent_bcs(wrong_next)
+
+    # verbose = false is silent
+    @test_logs verify_transparent_bcs(wrong_next; verbose = false)
+
+    # two squares given in swapped order of pieces still join correctly, but a gap between them does not create a transparent curve
+    sq(x0) = [SVector(x0, 0.0), SVector(x0 + 1.0, 0.0), SVector(x0 + 1.0, 1.0), SVector(x0, 1.0)]
+    gap = PolygonBilliard([sq(0.0), sq(1.5)])
+    @test verify_transparent_bcs(gap; verbose = false)
+end
+
+@testset "verify_transparent_bcs (all billiards with Transparent curves)" begin
+    @testset "StadiumBilliard" begin
+        for hw in (0.3, 1.0, 2.5)
+            @test verify_transparent_bcs(StadiumBilliard(hw); verbose = false)
+        end
+        @test verify_transparent_bcs(StadiumBilliard(1f0); verbose = false)
+    end
+    @testset "MushroomBilliard" begin
+        for (hw, sh) in ((1.0, 0.5), (0.3, 1.0), (0.9, 2.0))
+            @test verify_transparent_bcs(MushroomBilliard(hw, sh); verbose = false)
+        end
+        @test verify_transparent_bcs(MushroomBilliard(0.5, 0.5; R = 2.0); verbose = false)
+    end
+    @testset "SquashBilliard" begin
+        for (hw, r) in ((1.0, 1.0), (1.0, 1.5), (0.5, 1.2), (2.0, 3.0))
+            @test verify_transparent_bcs(SquashBilliard(hw, r); verbose = false)
+        end
+    end
+    @testset "PolygonBilliard (pieces)" begin
+        sq(x0) = [SVector(x0, 0.0), SVector(x0 + 1.0, 0.0), SVector(x0 + 1.0, 1.0), SVector(x0, 1.0)]
+        @test verify_transparent_bcs(PolygonBilliard([sq(0.0), sq(1.0)]); verbose = false)
+        @test verify_transparent_bcs(PolygonBilliard([sq(0.0), sq(1.0), sq(2.0)]); verbose = false)
+        # clockwise piece input is reoriented
+        @test verify_transparent_bcs(PolygonBilliard([reverse(sq(0.0)), sq(1.0)]); verbose = false)
+        # square split along its diagonal
+        a, b, c, d = SVector(0.0, 0.0), SVector(1.0, 0.0), SVector(1.0, 1.0), SVector(0.0, 1.0)
+        @test verify_transparent_bcs(PolygonBilliard([[a, b, c], [a, c, d]]); verbose = false)
+        # fan of three triangles around an interior vertex
+        o = SVector(0.5, 0.4)
+        @test verify_transparent_bcs(PolygonBilliard([[a, b, o], [b, c, o], [c, d, o], [d, a, o]]); verbose = false)
+    end
+    @testset "billiards without Transparent curves" begin
+        for b in (AnnularBilliard(0.3, 0.1), CutCircleBilliard(0.5), LemonBilliard(0.3), ProsenBilliard(0.3),
+                  EllipseBilliard(1.0, 0.6), SinaiBilliard(1.0, 0.3), LimaconBilliard(0.3), SquareWithinSquareBilliard(1.0),
+                  C3Billiard(1.0), C6C3HoleBilliard(0.3, 0.2), JuliaBilliard(0.2, 0.5))
+            @test verify_transparent_bcs(b; verbose = false)
+        end
+    end
 end

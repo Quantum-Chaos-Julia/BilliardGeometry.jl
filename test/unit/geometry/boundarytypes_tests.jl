@@ -5,7 +5,9 @@
 # Reference objects: CircleBilliard(1.0), the quarter-disk fundamental domain with the arc (SpecularReflection, segment 1)
 # and the two symmetry walls (segments 2, 3); RectangleBilliard(1.0, 0.6) with two physical edges (segments 1, 2) and two
 # symmetry walls (segments 3, 4); StadiumBilliard(1.0), a composite domain of two subdomains (ids 1, 2) joined by a
-# Transparent curve; AnnularBilliard(0.3, 0.1), a multiply connected domain of genus 1 with the outer circle first.
+# Transparent curve; AnnularBilliard(0.3, 0.1), a multiply connected domain of genus 1. Centered at the origin it is symmetric (B7):
+# the outer region is the upper half disc (arc + SymmetryWall) and the hole a SymmetricHole of two half-disc pieces (domain ids 2 and
+# 102), registry {XAxisReflection}; with a nonzero center (bt_shifted_annulus) it keeps the unreduced construction (outer circle first).
 # get_all_curves is called on billiards and on simple and composite domains (the CircleBilliard fundamental domain and the
 # StadiumBilliard fundamental domain, whose curve count is the sum over its subdomains). update_boundary_condition is called
 # on a simple-domain billiard (CircleBilliard) and on composite-domain billiards (StadiumBilliard with Float64 and Float32,
@@ -20,6 +22,7 @@ bt_circle() = CircleBilliard(1.0)
 bt_rect() = RectangleBilliard(1.0, 0.6)
 bt_stadium() = StadiumBilliard(1.0)
 bt_annulus() = AnnularBilliard(0.3, 0.1)
+bt_shifted_annulus() = AnnularBilliard(0.3, 0.1; center = [0.5, 0.1])
 
 # True if `updated` has the same curves (by domain and segment id, in the same order) as `original` and every curve other than
 # (domain_id, segment_id) keeps its boundary condition.
@@ -277,6 +280,7 @@ end
     annulus = bt_annulus()
     @test genus(annulus) == 1
     @test genus(annulus.fundamental_domain) == 1
+    @test genus(bt_shifted_annulus()) == 1
 end
 
 @testset "boundary_components" begin
@@ -297,10 +301,19 @@ end
     @test length(comps) == 1
     @test length(comps[1]) == 2
 
-    # annulus: the outer circle comes first, then the hole
+    # symmetric annulus: the outer physical arc comes first, then the physical arcs of the two hole pieces (one component)
     annulus = bt_annulus()
     comps = boundary_components(annulus)
     @test length(comps) == genus(annulus) + 1
+    @test [length(c) for c in comps] == [1, 2]
+    @test comps[1][1].radius == 1.0 && comps[1][1].domain_id == 1
+    @test [c.radius for c in comps[2]] == [0.3, 0.3]
+    @test [c.domain_id for c in comps[2]] == [2, 102]
+
+    # shifted annulus: the outer circle comes first, then the hole
+    shifted = bt_shifted_annulus()
+    comps = boundary_components(shifted)
+    @test length(comps) == genus(shifted) + 1
     @test length(comps[1]) == 1 && length(comps[2]) == 1
     @test comps[1][1].radius == 1.0 && comps[1][1].domain_id == 1
     @test comps[2][1].radius == 0.3 && comps[2][1].domain_id == 2
@@ -326,8 +339,14 @@ end
     @test length(comps) == 1
     @test !any(c -> c.bc isa Transparent, comps[1])
 
-    # annulus: two components, outer first
+    # symmetric annulus: the outer half disc (arc, wall) and the two half-disc pieces of the hole (arc and two walls each)
     comps = geometric_boundary_components(bt_annulus())
+    @test [length(c) for c in comps] == [2, 3, 3]
+    @test [[c.domain_id for c in comp] for comp in comps] == [[1, 1], [2, 2, 2], [102, 102, 102]]
+    @test comps[1][1].radius == 1.0
+
+    # shifted annulus: two components, outer first
+    comps = geometric_boundary_components(bt_shifted_annulus())
     @test length(comps) == 2
     @test comps[1][1].radius == 1.0
     @test comps[2][1].radius == 0.3
@@ -365,11 +384,18 @@ end
     @test isempty(get_hole_boundary_curves(bt_stadium().fundamental_domain))
     @test get_hole_boundary_curves(bt_circle()) isa Vector{AbsCurve}
 
-    ann = hf_concentric_annulus()
+    ann = hf_shifted_annulus()
     holes = get_hole_boundary_curves(ann)
     @test length(holes) == 1
     @test holes[1].radius == 0.3 && holes[1].domain_id == 2
     @test get_hole_boundary_curves(ann.fundamental_domain) == holes
+    # symmetric annulus: the physical arcs of the two half-disc pieces, ids 2 and 102 (full frame, about the hole center)
+    sym_holes = get_hole_boundary_curves(hf_concentric_annulus())
+    @test length(sym_holes) == 2
+    @test [c.domain_id for c in sym_holes] == [2, 102]
+    @test all(c -> c.radius == 0.3 && c.bc isa SpecularReflection, sym_holes)
+    # Sinai: the eight physical arcs of the obstacle pieces
+    @test [c.domain_id for c in get_hole_boundary_curves(SinaiBilliard(1.0, 0.3))] == [2 + 100k for k in 0:7]
     # rectangular hole: four curves of the loop, counterclockwise
     rect = get_hole_boundary_curves(hf_rect_with_hole())
     @test length(rect) == 4
@@ -391,6 +417,7 @@ end
     @test length(get_boundary_curves(hf_rect_with_hole().fundamental_domain)) == 4
 
     # billiard level, empty registry: outer curves followed by the hole curves (the frames coincide)
+    ann = hf_shifted_annulus()
     bc = get_boundary_curves(ann)
     @test length(bc) == 2
     @test [c.domain_id for c in bc] == [1, 2]
@@ -404,19 +431,28 @@ end
     d2 = hf_d2_with_hole()
     @test_throws ArgumentError get_boundary_curves(d2)
     @test_throws "full_boundary_components" get_boundary_curves(d2)
+    # the production billiards with a symmetric hole are rejected the same way
+    @test_throws ArgumentError get_boundary_curves(hf_concentric_annulus())
+    @test_throws ArgumentError get_boundary_curves(SinaiBilliard(1.0, 0.3))
     # with a nonempty registry but no holes the outer curves are returned
     no_holes = hf_HoleBilliard{Float64}(MultiplyConnectedDomain(hf_quarter_square_domain(), [], 1), D2_symmetry())
     @test length(get_boundary_curves(no_holes)) == 2
 end
 
 @testset "get_all_domains (billiards with holes)" begin
-    # outer subdomains followed by the simple domains of the holes
-    ann = hf_concentric_annulus()
+    # outer subdomains followed by the simple domains of the holes (unreduced annulus: DomainHole)
+    ann = hf_shifted_annulus()
     doms = get_all_domains(ann)
     @test [d.id for d in doms] == [1, 2]
     @test doms[1] === ann.fundamental_domain.subdomains[1]
     @test doms[2] === ann.fundamental_domain.holes[1].domain
     @test get_all_domains(ann.fundamental_domain) == doms
+    # symmetric annulus: the outer half disc, the hole piece and its image under XAxisReflection (id 2 + 100)
+    sym = hf_concentric_annulus()
+    @test [d.id for d in get_all_domains(sym)] == [1, 2, 102]
+    @test get_domain(sym, 102) === sym.fundamental_domain.holes[1].pieces[2]
+    @test [d.id for d in get_all_domains(SinaiBilliard(1.0, 0.3))] == [1; [2 + 100k for k in 0:7]]
+    @test length(get_all_curves(sym)) == 8
     @test [d.id for d in get_all_domains(hf_d2_with_hole())] == [1, 5]
     # composite outer region and a composite hole
     dom = MultiplyConnectedDomain(StadiumBilliard(1.0).fundamental_domain, [hf_two_loop_hole(5)], 1)
@@ -434,11 +470,11 @@ end
 
 @testset "update_boundary_condition (billiards with holes)" begin
     # a hole curve is found by (domain_id, segment_id) in the holes
-    ann = hf_eccentric_annulus()
+    ann = hf_shifted_annulus()
     updated = update_boundary_condition(ann, 2, 1, QuantumSolverIgnore())
     @test updated isa AnnularBilliard{Float64}
     @test get_curve(updated, 2, 1).bc isa QuantumSolverIgnore
-    @test get_curve(updated, 2, 1).radius == 0.2
+    @test get_curve(updated, 2, 1).radius == 0.3
     @test updated.fundamental_domain.holes[1] isa DomainHole
     @test updated.symmetries == ann.symmetries
     # the other curve keeps its condition and the original billiard is unchanged
@@ -463,11 +499,21 @@ end
     # unknown (domain_id, segment_id): ArgumentError
     @test_throws ArgumentError update_boundary_condition(ann, 3, 1, QuantumSolverIgnore())
     @test_throws ArgumentError update_boundary_condition(ann, 2, 9, QuantumSolverIgnore())
+
+    # symmetric annulus: an outer curve can be updated, a physical arc of the SymmetricHole cannot (the arcs of its pieces would no
+    # longer chain into one closed physical loop)
+    sym = hf_concentric_annulus()
+    updated_sym = update_boundary_condition(sym, 1, 1, QuantumSolverIgnore())
+    @test updated_sym isa AnnularBilliard{Float64}
+    @test get_curve(updated_sym, 1, 1).bc isa QuantumSolverIgnore
+    @test updated_sym.symmetries == sym.symmetries
+    @test get_curve(sym, 1, 1).bc isa SpecularReflection
+    @test_throws ArgumentError update_boundary_condition(sym, 2, 1, QuantumSolverIgnore())
 end
 
 @testset "boundary_components (billiards with holes)" begin
     # outer component first, then one component per hole loop
-    for (b, lens, ids) in ((hf_concentric_annulus(), [1, 1], [1, 2]), (hf_eccentric_annulus(), [1, 1], [1, 2]),
+    for (b, lens, ids) in ((hf_concentric_annulus(), [1, 2], [1, 2]), (hf_eccentric_annulus(), [1, 2], [1, 2]), (hf_shifted_annulus(), [1, 1], [1, 2]),
                            (hf_rect_with_hole(), [4, 4], [1, 2]), (hf_d2_with_hole(), [2, 1], [1, 5]))
         comps = boundary_components(b)
         @test [length(c) for c in comps] == lens
@@ -497,7 +543,8 @@ end
 
 @testset "geometric_boundary_components (billiards with holes)" begin
     # the outer component keeps its symmetry walls (fundamental frame), then one closed loop per hole loop
-    @test [length(c) for c in geometric_boundary_components(hf_concentric_annulus())] == [1, 1]
+    @test [length(c) for c in geometric_boundary_components(hf_concentric_annulus())] == [2, 3, 3]
+    @test [length(c) for c in geometric_boundary_components(hf_shifted_annulus())] == [1, 1]
     @test [length(c) for c in geometric_boundary_components(hf_rect_with_hole())] == [4, 4]
     d2 = geometric_boundary_components(hf_d2_with_hole())
     @test [length(c) for c in d2] == [4, 1]

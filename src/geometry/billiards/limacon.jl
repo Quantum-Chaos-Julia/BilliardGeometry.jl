@@ -28,7 +28,8 @@ Construct a [`LimaconBilliard`](@ref) with `r(φ) = R + a*cos(φ)`.
 ## Throws
 `ArgumentError` if `|a| > 1`.
 """
-function LimaconBilliard(a::T; R::T = one(T)) where T<:Real
+function LimaconBilliard(a::T; R = one(T)) where T<:Real
+    R = T(R)
     abs(a) <= one(T) || throw(ArgumentError("Limaçon requires |a|<=1 to remain a simple (non-self-intersecting) curve; received a=$a"))
     center = SVector{2,T}(zero(T), zero(T)); coef = SVector{2,T}(zero(T), a)
     bc = SpecularReflection(); symmetries = register_symmetries(XAxisReflection())

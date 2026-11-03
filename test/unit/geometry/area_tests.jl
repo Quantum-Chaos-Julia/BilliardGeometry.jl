@@ -1,5 +1,7 @@
 # Unit tests for src/geometry/area.jl: area (curve, composite, vector, billiard), fundamental_area, corner_angles, symmetry_reduction_factor, maximal_symmetry.
-# Reference values are closed forms (circle, rectangle, right triangle, regular polygon, squares by Green's theorem); helpers use the prefix `ar_`.
+# Reference values are closed forms (circle, rectangle, right triangle, regular polygon, squares by Green's theorem); the reduction
+# factor of a billiard is the order of its registered group (registry length + 1), that of a single element is 2 for a mirror,
+# 4 for XY and the order for a rotation. Helpers use the prefix `ar_`.
 
 using StaticArrays: SVector
 using BilliardGeometry: AbsSymmetry, symmetry_reduction_factor, maximal_symmetry
@@ -25,6 +27,13 @@ end
 
 # Symmetry subtype without a method of its own, to reach the generic fallback of symmetry_reduction_factor.
 struct ar_PlainSymmetry <: AbsSymmetry end
+
+# Circular PolarBilliard whose registry holds exactly the given symmetries; the shape is irrelevant for registry-only queries.
+function ar_polar_billiard(syms::AbsSymmetry...)
+    seg = FourierCoeffPolarSegment(Float64[]; shift_angle = -pi / 4)
+    dom = PolarDomain{Float64}([seg], [curve(seg, 0.0)], 1)
+    return PolarBilliard{Float64}(dom, register_symmetries(syms...))
+end
 
 @testset "area (curve)" begin
     # a full circle of radius R has area pi R^2, wherever its center is (Green's theorem on a closed curve)
@@ -86,11 +95,16 @@ end
     # the sign of the total follows the outer loop: a cw outer loop with a ccw inner loop gives the same 3
     @test area(vcat(ar_square(0.0, 0.0, 2.0; ccw = false), ar_square(0.5, 0.5, 1.0; ccw = true))) ≈ 3.0 rtol = ar_RTOL
 
-    # hole boundaries as stored by the hole billiards: the full circle of radius R = 0.3 has area pi R^2,
-    # the Sinai hole is the same full circle, the square hole of SquareWithinSquareBilliard has area side^2
-    @test area(AnnularBilliard(0.3, 0.2).fundamental_domain.holes[1].domain.boundary) ≈ pi * 0.3^2 rtol = ar_RTOL
-    @test area(SinaiBilliard(1.0, 0.3).fundamental_domain.holes[1].domain.boundary) ≈ pi * 0.3^2 rtol = ar_RTOL
+    # hole boundaries as stored by the unreduced hole billiards (nonzero center): the full circle of radius R = 0.3 has area pi R^2,
+    # the square hole of SquareWithinSquareBilliard has area side^2
+    @test area(AnnularBilliard(0.3, 0.2; center = [0.5, 0.1]).fundamental_domain.holes[1].domain.boundary) ≈ pi * 0.3^2 rtol = ar_RTOL
+    @test area(SinaiBilliard(1.0, 0.3; center = [0.5, -0.2]).fundamental_domain.holes[1].domain.boundary) ≈ pi * 0.3^2 rtol = ar_RTOL
     @test area(SquareWithinSquareBilliard(1.0).fundamental_domain.holes[1].domain.boundary) ≈ 0.25^2 rtol = ar_RTOL
+    # the symmetric billiards (B7) keep only a fraction of the hole in the fundamental frame; the full physical hole loops are
+    # reconstructed by full_boundary_components: the full circle of radius R about the hole, the full square of side 0.4
+    @test area(full_boundary_components(AnnularBilliard(0.3, 0.2)).curves[2]) ≈ pi * 0.3^2 rtol = ar_RTOL
+    @test area(full_boundary_components(SinaiBilliard(1.0, 0.3)).curves[2]) ≈ pi * 0.3^2 rtol = ar_RTOL
+    @test area(full_boundary_components(SquareWithinSquareBilliard(1.0; positions = [0.0], sizes = [0.4])).curves[2]) ≈ 0.4^2 rtol = ar_RTOL
 end
 
 @testset "area (billiard)" begin
@@ -139,6 +153,7 @@ end
         @test area(AnnularBilliard(0.3, 0.2)) ≈ pi * (1 - 0.3^2) rtol = ar_RTOL
         @test area(hf_concentric_annulus()) ≈ pi * (1 - 0.3^2) rtol = ar_RTOL
         @test area(hf_eccentric_annulus()) ≈ pi * (1 - 0.2^2) rtol = ar_RTOL
+        @test area(hf_shifted_annulus()) ≈ pi * (1 - 0.3^2) rtol = ar_RTOL
         @test (@inferred area(hf_concentric_annulus())) isa Float64
     end
     @testset "rectangle with a rectangular hole" begin
@@ -159,7 +174,7 @@ end
         @test area(hf_HoleBilliard{Float64}(bite, register_symmetries())) ≈ 1 - pi / 16 rtol = ar_RTOL
     end
     @testset "SinaiBilliard" begin
-        # SinaiBilliard(a, R): square [-a, a]^2 with a disk of radius R removed: 4 a^2 - pi R^2
+        # SinaiBilliard(a, R): square [-a, a]^2 with a disk of radius R removed: 4 a^2 - pi R^2, also for the symmetric (origin) billiard
         @test area(SinaiBilliard(1.0, 0.3)) ≈ 4 - pi * 0.3^2 rtol = ar_RTOL
         @test area(SinaiBilliard(2.0, 0.5; center = [0.3, -0.4])) ≈ 16 - pi * 0.5^2 rtol = ar_RTOL
         @test (@inferred area(SinaiBilliard(1.0, 0.3))) isa Float64
@@ -190,15 +205,29 @@ end
 end
 
 @testset "symmetry_reduction_factor (billiard)" begin
-    # the factor is that of the largest generator in the registry
+    # the factor of a billiard is the order of its registered symmetry group: registered elements plus the identity
     @test symmetry_reduction_factor(CircleBilliard(1.0)) == 4       # D2
     @test symmetry_reduction_factor(StadiumBilliard(0.7)) == 4      # D2
     @test symmetry_reduction_factor(C3Billiard(0.1)) == 3           # C3
+    # D4 (seven registered elements) has order 8, which no single element's factor reaches
+    d4 = ar_polar_billiard(collect(D4_symmetry())...)
+    @test length(d4.symmetries) == 7
+    @test symmetry_reduction_factor(d4) == 8
+    @test maximum(symmetry_reduction_factor, d4.symmetries) == 4
+    # registries holding only rotations or a single element
+    @test symmetry_reduction_factor(ar_polar_billiard((NFoldRotation(6, m) for m in 1:5)...)) == 6
+    @test symmetry_reduction_factor(ar_polar_billiard(DiagonalReflection())) == 2
+    @test symmetry_reduction_factor(ar_polar_billiard(XYAxisReflection())) == 2
     # no registered symmetry: factor 1
     @test symmetry_reduction_factor(TriangleBilliard(pi / 2, 1.0)) == 1
-    @test symmetry_reduction_factor(AnnularBilliard(0.3, 0.2)) == 1
-    @test symmetry_reduction_factor(SinaiBilliard(1.0, 0.3)) == 1
     @test symmetry_reduction_factor(SquareWithinSquareBilliard(1.0)) == 1
+    @test symmetry_reduction_factor(AnnularBilliard(0.3, 0.2; center = [0.5, 0.1])) == 1
+    @test symmetry_reduction_factor(SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])) == 1
+    # B7: origin-centered billiards with holes are symmetric: annulus mirror y -> -y (order 2), Sinai and a single centered
+    # square obstacle D4 (order 8)
+    @test symmetry_reduction_factor(AnnularBilliard(0.3, 0.2)) == 2
+    @test symmetry_reduction_factor(SinaiBilliard(1.0, 0.3)) == 8
+    @test symmetry_reduction_factor(SquareWithinSquareBilliard(1.0; positions = [0.0], sizes = [0.4])) == 8
     @test (@inferred symmetry_reduction_factor(CircleBilliard(1.0))) isa Int
 end
 
@@ -210,11 +239,23 @@ end
     @test c3.order == 3
     # the returned generator is the registered one, with its sym_id
     @test maximal_symmetry(CircleBilliard(1.0)).sym_id == 2
+    # D4: the per-element maximum (factor 4) is the first registered element reaching it, the rotation by pi/2, not the group order 8
+    d4_max = maximal_symmetry(ar_polar_billiard(collect(D4_symmetry())...))
+    @test d4_max isa NFoldRotation
+    @test (d4_max.order, d4_max.m) == (4, 1)
+    @test d4_max.sym_id == 2
+    @test symmetry_reduction_factor(d4_max) == 4
     # empty registry: nothing
     @test maximal_symmetry(TriangleBilliard(pi / 2, 1.0)) === nothing
-    @test maximal_symmetry(AnnularBilliard(0.3, 0.2)) === nothing
-    @test maximal_symmetry(SinaiBilliard(1.0, 0.3)) === nothing
+    @test maximal_symmetry(AnnularBilliard(0.3, 0.2; center = [0.5, 0.1])) === nothing
+    @test maximal_symmetry(SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])) === nothing
     @test maximal_symmetry(SquareWithinSquareBilliard(1.0)) === nothing
+    # B7: the symmetric billiards with holes report the registered element of the largest factor
+    @test maximal_symmetry(AnnularBilliard(0.3, 0.2)) isa XAxisReflection
+    sinai_max = maximal_symmetry(SinaiBilliard(1.0, 0.3))
+    @test sinai_max isa NFoldRotation
+    @test (sinai_max.order, sinai_max.m) == (4, 1)
+    @test maximal_symmetry(SquareWithinSquareBilliard(1.0; positions = [0.0], sizes = [0.4])) isa NFoldRotation
 end
 
 @testset "fundamental_area" begin
@@ -233,20 +274,53 @@ end
 end
 
 @testset "fundamental_area (billiards with holes)" begin
-    # empty registry: the fundamental area is the area
+    # empty registry (nonzero center): the fundamental area is the area
     @testset "no symmetry" begin
-        @test fundamental_area(hf_concentric_annulus()) ≈ pi * (1 - 0.3^2) rtol = ar_RTOL
-        @test fundamental_area(hf_eccentric_annulus()) ≈ area(hf_eccentric_annulus()) rtol = ar_RTOL
+        @test fundamental_area(hf_shifted_annulus()) ≈ area(hf_shifted_annulus()) rtol = ar_RTOL
         @test fundamental_area(hf_rect_with_hole()) ≈ 5.5 rtol = ar_RTOL
     end
-    # a DomainHole is compatible only with the empty registry: with D2 the fundamental area is undefined
-    @testset "DomainHole with symmetries" begin
-        @test_throws ArgumentError fundamental_area(hf_d2_with_hole())
-        @test_throws "not compatible" fundamental_area(hf_d2_with_hole())
+    # B7: origin-centered annulus, Sinai and a single centered square obstacle keep their full symmetry group, so the fundamental
+    # area is the reduced-domain area, area / |G'|
+    @testset "symmetric production billiards" begin
+        @test fundamental_area(hf_concentric_annulus()) ≈ pi * (1 - 0.3^2) / 2 rtol = ar_RTOL
+        @test fundamental_area(hf_eccentric_annulus()) ≈ area(hf_eccentric_annulus()) / 2 rtol = ar_RTOL
+        @test fundamental_area(SinaiBilliard(1.0, 0.3)) ≈ (4 - pi * 0.3^2) / 8 rtol = ar_RTOL
+        @test fundamental_area(SquareWithinSquareBilliard(1.0; positions = [0.0], sizes = [0.4])) ≈ (4 - 0.16) / 8 rtol = ar_RTOL
     end
-    # the registry of the Sinai and square-within-square billiards is empty: the fundamental area is the area
+    # a DomainHole has no symmetry, so G' = {e} in a D2 billiard: the fundamental area is the area (no division by |G|)
+    @testset "DomainHole with symmetries" begin
+        b = hf_d2_with_hole()
+        @test fundamental_area(b) ≈ 4 - pi * 0.2^2 rtol = ar_RTOL
+        @test fundamental_area(b) ≈ area(b) rtol = ar_RTOL
+        @test length(get_symmetry_group(b)) == 0
+    end
+    # symmetric holes in the D2 quarter-square billiard: fundamental_area = area / |G'| with |G'| = length(get_symmetry_group) + 1
+    @testset "symmetric holes with G' != {e}" begin
+        mk(hole) = hf_HoleBilliard{Float64}(MultiplyConnectedDomain(hf_quarter_square_domain(), [hole], 1), D2_symmetry())
+        # D4 disc of radius 0.3 at the origin: G' = D2, order 4
+        b4 = mk(hf_d4_symmetric_hole())
+        @test fundamental_area(b4) ≈ (4 - pi * 0.09) / 4 rtol = ar_RTOL
+        @test fundamental_area(b4) / area(b4) ≈ 0.25 rtol = ar_RTOL
+        # D2 disc of radius 0.1 about (0.5, 0): G' = {X}, order 2
+        b2 = mk(hf_d2_symmetric_hole())
+        @test fundamental_area(b2) ≈ (4 - pi * 0.01) / 2 rtol = ar_RTOL
+        # half disc of radius 0.2 about (0.3, 0): G' = {X}
+        bh = mk(hf_half_disc_hole())
+        @test fundamental_area(bh) ≈ (4 - pi * 0.04) / 2 rtol = ar_RTOL
+        # four discs of radius 0.1 placed by D2: G' = D2
+        bs = mk(hf_symmetrized_disc())
+        @test fundamental_area(bs) ≈ (4 - 4 * pi * 0.01) / 4 rtol = ar_RTOL
+        # fundamental area times the order of G' gives the physical area
+        for b in (b4, b2, bh, bs)
+            @test fundamental_area(b) * (length(get_symmetry_group(b)) + 1) ≈ area(b) rtol = ar_RTOL
+        end
+        # the outer registry order |G| = 4 is not what divides the area when G' is smaller
+        @test symmetry_reduction_factor(b2) == 4
+        @test fundamental_area(b2) > area(b2) / symmetry_reduction_factor(b2)
+    end
+    # the unreduced Sinai billiard and the default two-obstacle square have an empty registry: the fundamental area is the area
     @testset "SinaiBilliard" begin
-        @test fundamental_area(SinaiBilliard(1.0, 0.3)) ≈ 4 - pi * 0.3^2 rtol = ar_RTOL
+        @test fundamental_area(SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])) ≈ 4 - pi * 0.3^2 rtol = ar_RTOL
     end
     @testset "SquareWithinSquareBilliard" begin
         @test fundamental_area(SquareWithinSquareBilliard(1.0)) ≈ 4 - 2 * 0.25^2 rtol = ar_RTOL
@@ -299,10 +373,16 @@ end
 end
 
 @testset "corner_angles (billiards with holes)" begin
-    # SinaiBilliard: the four right angles of the outer square, the full circle of the hole has no corner
+    # SinaiBilliard (symmetric): the reduced domain has the two pi/4 angles of the fundamental triangle, the pi/2 angle where the
+    # side meets the x axis and, at the obstacle piece, 3 pi / 2 (twice, arc meets wall) and 7 pi / 4 (at the center); the full
+    # physical boundary has the four right angles of the square and no corner at the circle
     sinai = SinaiBilliard(1.0, 0.3)
-    @test length(corner_angles(sinai)) == 4
-    @test corner_angles(sinai) ≈ fill(pi / 2, 4) atol = ar_ANGLE_ATOL
+    @test sort(corner_angles(sinai)) ≈ [pi / 4, pi / 4, pi / 2, 3pi / 2, 3pi / 2, 7pi / 4] atol = ar_ANGLE_ATOL
+    @test corner_angles(sinai; fundamental = false) ≈ fill(pi / 2, 4) atol = ar_ANGLE_ATOL
+    # unreduced Sinai: the four right angles of the outer square, the full circle of the hole has no corner
+    sinai_shifted = SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])
+    @test length(corner_angles(sinai_shifted)) == 4
+    @test corner_angles(sinai_shifted) ≈ fill(pi / 2, 4) atol = ar_ANGLE_ATOL
     # SquareWithinSquareBilliard: four right angles outside, 3 pi / 2 at each of the eight hole corners
     sws = SquareWithinSquareBilliard(1.0)
     @test corner_angles(sws) ≈ [fill(pi / 2, 4); fill(3pi / 2, 8)] atol = ar_ANGLE_ATOL
@@ -317,8 +397,12 @@ end
     @test corner_angles(rect; fundamental = false) ≈ expected atol = ar_ANGLE_ATOL
     @test count(a -> isapprox(a, 3pi / 2; atol = ar_ANGLE_ATOL), corner_angles(rect)) == 4
     @test eltype(corner_angles(rect)) == Float64
-    # a smooth (circular) hole has no corners
-    @test isempty(corner_angles(hf_concentric_annulus()))
+    # a smooth (circular) hole has no corners (unreduced annulus, nonzero center)
+    @test isempty(corner_angles(hf_shifted_annulus()))
+    @test isempty(corner_angles(hf_shifted_annulus(); fundamental = false))
+    # symmetric annulus: the reduced domain has two pi/2 corners (wall meets the outer arc) and two 3 pi / 2 corners (wall meets the
+    # hole arc), the full physical boundary is smooth
+    @test sort(corner_angles(hf_concentric_annulus())) ≈ [pi / 2, pi / 2, 3pi / 2, 3pi / 2] atol = ar_ANGLE_ATOL
     @test isempty(corner_angles(hf_eccentric_annulus(); fundamental = false))
     # D2 billiard: the fundamental frame is the quarter square (four pi / 2 corners incl. the walls), the full frame the full square
     d2 = hf_d2_with_hole()

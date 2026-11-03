@@ -37,10 +37,11 @@ struct FourierCoeffPolarSegment{T,BC,N}  <: AbsPolarCurve{BC} where {N<:Int,T<:R
 end
 
 """
-    FourierCoeffPolarSegment(coef; R = 1.0, arc_angle = 2π, shift_angle = 0.0, center = [0.0,0.0], orientation = 1, bc = SpecularReflection(), domain_id = 1, segment_id = 1) → seg::FourierCoeffPolarSegment
+    FourierCoeffPolarSegment(coef; R = 1.0, arc_angle = 2π, shift_angle = 0.0, center = SVector(0.0,0.0), orientation = 1, bc = SpecularReflection(), domain_id = 1, segment_id = 1) → seg::FourierCoeffPolarSegment
 
 Construct a [`FourierCoeffPolarSegment`](@ref). The numeric type is the
-promotion of the element types of all numeric arguments and the arc length is
+promotion of the element types of `coef`, `Float64` defaults and any numeric keyword passed; pass all of
+`R`, `arc_angle`, `shift_angle` and `center` in the desired type to obtain a non-`Float64` segment. The arc length is
 computed by quadrature.
 
 ## Arguments
@@ -50,13 +51,13 @@ computed by quadrature.
 * `R = 1.0` : Mean radius.
 * `arc_angle = 2π` : Angle swept by the segment.
 * `shift_angle = 0.0` : Polar angle of the start point.
-* `center = [0.0,0.0]` : Origin of the polar coordinates.
+* `center = SVector(0.0,0.0)` : Origin of the polar coordinates.
 * `orientation = 1` : `+1` or `-1`, selects the inside.
 * `bc = SpecularReflection()` : Boundary condition.
 * `domain_id = 1` : Id of the domain the segment belongs to.
 * `segment_id = 1` : Id of the segment inside its domain.
 """
-function FourierCoeffPolarSegment(coef; R=1.0, arc_angle=2.0*pi, shift_angle=0.0, center=[0.0,0.0], orientation=1, bc=SpecularReflection(), domain_id=1, segment_id=1)
+function FourierCoeffPolarSegment(coef; R=1.0, arc_angle=2.0*pi, shift_angle=0.0, center=SVector(0.0,0.0), orientation=1, bc=SpecularReflection(), domain_id=1, segment_id=1)
     N = length(coef)
     T = promote_type(eltype(coef), typeof(R), typeof(arc_angle), typeof(shift_angle), eltype(center))
     coefs = SVector{N,T}(coef)
@@ -120,17 +121,17 @@ struct PolarSegment{T,BC,F}  <: AbsPolarCurve{BC} where {T<:Real}
 end
 
 """
-    PolarSegment(r_func; R = 1.0, arc_angle = 2π, shift_angle = 0.0, center = [0.0,0.0], orientation = 1, bc = SpecularReflection(), domain_id = 1, segment_id = 1) → seg::PolarSegment
+    PolarSegment(r_func; R = 1.0, arc_angle = 2π, shift_angle = 0.0, center = SVector(0.0,0.0), orientation = 1, bc = SpecularReflection(), domain_id = 1, segment_id = 1) → seg::PolarSegment
 
 Construct a [`PolarSegment`](@ref) from the radial function `r_func(φ)`. The
-numeric type is the promotion of the numeric keyword arguments and the arc
+numeric type is the promotion of the numeric keyword arguments (including their `Float64` defaults) and the arc
 length is computed by quadrature. Keyword arguments are as in
 [`FourierCoeffPolarSegment`](@ref).
 
 ## Arguments
 * `r_func`: Callable returning the radius for a polar angle `φ`.
 """
-function PolarSegment(r_func::F; R=1.0, arc_angle=2.0*pi, shift_angle=0.0, center=[0.0,0.0], orientation=1, bc=SpecularReflection(), domain_id=1, segment_id=1) where {F}
+function PolarSegment(r_func::F; R=1.0, arc_angle=2.0*pi, shift_angle=0.0, center=SVector(0.0,0.0), orientation=1, bc=SpecularReflection(), domain_id=1, segment_id=1) where {F}
     T = promote_type(typeof(R), typeof(arc_angle), typeof(shift_angle), eltype(center))
     polar_curve = PolarSegment{T,typeof(bc),F}(T(R), r_func, T(arc_angle), T(shift_angle), SVector{2,T}(center), Int64(orientation), zero(T), bc, Int64(domain_id), Int64(segment_id))
     L = arc_length(polar_curve, one(T))
@@ -155,7 +156,6 @@ function curve(polar_curve::L, ts::AbstractArray) where {L<:AbsPolarCurve}
     return [Translation(polar_curve.center)(CartesianFromPolar()(pt)) for pt in pts_polar]
 end
 
-#generic functions
 function polar_radius(polar_curve::L, phi::AbstractArray) where {L<:AbsPolarCurve}
     return [polar_radius(polar_curve, t) for t in phi]
 end
@@ -166,7 +166,6 @@ function polar_domain(polar_curve::L, pt) where {L<:AbsPolarCurve}
     return @. (pt_polar.r - R)
 end
 
-# returns negative value inside
 function domain_fun(polar_curve::L, pt::SVector{2,T}) where {L<:AbsPolarCurve, T<:Real}
     return polar_domain(polar_curve, pt)*polar_curve.orientation
 

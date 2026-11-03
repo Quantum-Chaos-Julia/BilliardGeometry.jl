@@ -17,11 +17,11 @@ are available:
 
 ## Keyword arguments
 * `method::Symbol = :auto` : Strategy, see above.
-* `t_init = 0.5` : Initial guess for `:auto`, `:roots` and `:optim`.
-* `rtol = sqrt(eps(T))` : Relative tolerance.
-* `atol = 1e-15` : Absolute tolerance.
+* `t_init = 0.5` : Initial guess for `:auto`, `:roots` and `:optim`; ignored by `:grid_optim`, which starts from its best grid point.
+* `rtol = sqrt(eps(T))` : Relative tolerance. Used by `:roots` (parameter and distance check) and by the `:optim` refinement; not used by the `:grid_optim` grid test.
+* `atol = 1e-15` : Absolute tolerance. Its meaning depends on the method: parameter tolerance (and `sqrt(atol)` distance threshold) for `:roots`, gradient/objective tolerance for `:optim`, and a squared-distance cutoff `atol^2` for the `:grid_optim` early exit.
 * `maxevals = 50` : Maximum number of iterations.
-* `n_grid = 20` : Number of grid points for `:grid_optim`.
+* `n_grid = 20` : Number of grid points; used only by `:grid_optim`.
 
 ## Returns
 * `t`: Curve parameter wrapped to `[0,1]`.
@@ -35,7 +35,6 @@ function invert_curve(crv::C, pt::SVector{2,T};
                       n_grid=20) where {C<:AbsCurve, T<:Real}
     
     if method == :auto
-        # Try fast method first, fallback to robust
         try
             return invert_curve_roots(crv, pt, t_init, rtol, atol, maxevals)
         catch e
@@ -76,7 +75,6 @@ function invert_curve_roots(crv::C, pt::SVector{2,T}, t_init, rtol, atol, maxeva
     if norm(curve(crv, result) - pt) > sqrt(atol) + rtol * (1 + norm(pt))
         error("point is not on the curve: the stationary point of the distance is at nonzero distance")
     end
-    # Wrap to [0, 1]
     return mod(result, 1.0)
 end
 
@@ -89,14 +87,12 @@ analytic gradient obtained from `ForwardDiff`; the parameter is wrapped to
 `[0,1]`.
 """
 function invert_curve_optim(crv::C, pt::SVector{2,T}, t_init, rtol, atol, maxevals) where {C<:AbsCurve, T<:Real}
-    # Objective: minimize distance squared
     function objective(t_vec)
-        t = mod(t_vec[1], 1.0)  # Keep in [0, 1]
+        t = mod(t_vec[1], 1.0)
         pos = curve(crv, t)
         return sum((pos .- pt).^2)
     end
     
-    # Gradient using ForwardDiff
     function gradient!(G, t_vec)
         t = mod(t_vec[1], 1.0)
         pos = curve(crv, t)
@@ -105,7 +101,6 @@ function invert_curve_optim(crv::C, pt::SVector{2,T}, t_init, rtol, atol, maxeva
         G[1] = 2 * dot(vel, residual)
     end
     
-    # Use BFGS with gradient
     result = optimize(objective, gradient!, [t_init], BFGS(),
                      Optim.Options(
                          g_tol=atol,
@@ -131,7 +126,6 @@ function invert_curve_grid_search(crv::C, pt::SVector{2,T};
                                   atol=1e-15, 
                                   maxevals=50, 
                                   n_grid=20) where {C<:AbsCurve, T<:Real}
-    # Coarse grid search
     t_samples = range(0.0, 1.0, length=n_grid+1)[1:end-1]
     min_dist = Inf
     best_t = 0.5
@@ -146,7 +140,6 @@ function invert_curve_grid_search(crv::C, pt::SVector{2,T};
         end
     end
     
-    # Check if we're already very close
     if min_dist < atol^2
         return best_t
     end
@@ -156,13 +149,14 @@ function invert_curve_grid_search(crv::C, pt::SVector{2,T};
 end
 
 """
-    invert_curve_nelder_mead(crv, pt, t_init, atol, maxevals) → t
+    invert_curve_nelder_mead(crv, pt, t_init, rtol, atol, maxevals) → t
 
 Derivative-free inversion with the Nelder–Mead simplex of Optim.jl, for curves
 whose derivatives are problematic. Slower than the other methods, and not
-selectable through [`invert_curve`](@ref).
+selectable through [`invert_curve`](@ref). `rtol` is accepted for a uniform
+signature and is unused.
 """
-function invert_curve_nelder_mead(crv::C, pt::SVector{2,T}, t_init, atol, maxevals) where {C<:AbsCurve, T<:Real}
+function invert_curve_nelder_mead(crv::C, pt::SVector{2,T}, t_init, rtol, atol, maxevals) where {C<:AbsCurve, T<:Real}
     function objective(t_vec)
         t = mod(t_vec[1], 1.0)
         pos = curve(crv, t)

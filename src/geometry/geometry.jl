@@ -54,7 +54,6 @@ function is_inside(domain::D, pts::AbstractArray) where {D<:AbsDomain}
 end
 
 
-#check if points inside for general curves
 """
     is_inside(crv::AbsCurve, pt::SVector{2}) → flag::Bool
     is_inside(crv::AbsCurve, pts::AbstractArray) → flags::Vector{Bool}
@@ -73,7 +72,6 @@ function is_inside(curve::C, pts::AbstractArray) where {C<:AbsCurve}
     end
 end
 
-#gradient of domain_function gives normal direcrion
 """
     domain_gradient_vector(crv::AbsCurve, pt::SVector{2}) → g::SVector{2}
     domain_gradient_vector(crv::AbsCurve, pts::AbstractArray) → gs::Vector
@@ -92,5 +90,60 @@ function domain_gradient_vector(curve::C, pts::AbstractArray) where {C<:AbsCurve
     f(r) = domain_fun(curve, r)
     gs = [ForwardDiff.gradient(f, pt) for pt in pts]
     return gs
+end
+
+"""
+    verify_transparent_bcs(billiard::AbsBilliard; n = 9, δ = 1e-6, verbose = true) → ok::Bool
+
+Check that every [`Transparent`](@ref) curve of `billiard` really joins the two
+subdomains it claims to join.
+
+## Description
+For each transparent curve of a simple domain `A` with `bc = Transparent(next_id)`,
+`n` interior parameter values `t` are sampled. With `p = curve(crv, t)` and the
+outward unit normal `n̂ = normal_vec(crv, t)`, the test requires
+* `p - δ n̂` lies in `A` (the normal points out of `A`),
+* `p + δ n̂` lies in the domain `next_id` and not in `A`.
+
+Failures (wrong `next_id`, missing domain, flipped curve orientation, overlapping
+or gapped subdomains) are reported with `@warn` when `verbose`.
+
+## Arguments
+* `billiard`: Billiard to check; points are in the fundamental frame.
+
+## Keyword arguments
+* `n::Int = 9`: Number of samples per curve, at `t = i/(n+1)`.
+* `δ = 1e-6`: Step along the normal.
+* `verbose::Bool = true`: Emit a warning per failing sample.
+
+## Returns
+* `ok`: `true` if all samples pass (also when there are no transparent curves).
+"""
+function verify_transparent_bcs(billiard::B; n::Int=9, δ::Real=1e-6, verbose::Bool=true) where {B<:AbsBilliard}
+    ok = true
+    for dom in get_all_domains(billiard), crv in dom.boundary
+        crv.bc isa Transparent || continue
+        other = get_domain(billiard, crv.bc.next_id)
+        if other === nothing
+            verbose && @warn "Transparent curve (domain $(dom.id), segment $(crv.segment_id)) points to missing domain $(crv.bc.next_id)"
+            ok = false
+            continue
+        end
+        for i in 1:n
+            t = i / (n + 1)
+            p = curve(crv, t)
+            nv = normal_vec(crv, t)
+            pin = p - δ * nv
+            pout = p + δ * nv
+            in_self = all(is_inside(dom, pin))
+            out_self = !all(is_inside(dom, pout))
+            in_other = all(is_inside(other, pout))
+            if !(in_self && out_self && in_other)
+                verbose && @warn "Transparent curve (domain $(dom.id), segment $(crv.segment_id)) fails at t=$t" point=p inside_own=in_self outside_own=out_self inside_next=in_other next_id=crv.bc.next_id
+                ok = false
+            end
+        end
+    end
+    return ok
 end
 

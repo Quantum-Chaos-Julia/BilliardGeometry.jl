@@ -32,7 +32,7 @@ end
 
 
 """
-    PolarBilliard(coef; center = [0.0,0.0]) → billiard::PolarBilliard
+    PolarBilliard(coef; center = SVector(0.0,0.0)) → billiard::PolarBilliard
 
 Construct a [`PolarBilliard`](@ref) with radial function
 `r(φ) = 1 + Σₙ [aₙ cos(nφ) + bₙ sin(nφ)]` over a full turn.
@@ -43,7 +43,7 @@ Construct a [`PolarBilliard`](@ref) with radial function
 ## Keyword arguments
 * `center` : Origin of the polar coordinates.
 """
-function PolarBilliard(coef; center=[0.0,0.0])
+function PolarBilliard(coef; center=SVector(0.0,0.0))
     type = eltype(coef)
     segment = FourierCoeffPolarSegment(coef;center=center )
     r0 = curve(segment, 0.0)

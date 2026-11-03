@@ -79,6 +79,8 @@ Available out of the box:
 | Ellipse | `EllipseBilliard(...)` |
 | Rectangle | `RectangleBilliard(...)` |
 | Stadium | `StadiumBilliard(half_width)` |
+| Cut circle | `CutCircleBilliard(half_width)` |
+| Lemon | `LemonBilliard(half_width)` |
 | Robnik limaçon | `LimaconBilliard(...)` |
 | Mushroom | `MushroomBilliard(half_width, stem_height; R)` |
 | Prosen | `ProsenBilliard(...)` |

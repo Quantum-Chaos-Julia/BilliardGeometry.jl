@@ -2,7 +2,7 @@
     MushroomBilliard{T} <: AbsBilliard
 
 Bunimovich mushroom: a semicircular cap of radius `R` on top of a rectangular
-stem of width `2*half_width` and height `stem_heigth`. Reflection about the `y`
+stem of width `2*half_width` and height `stem_height`. Reflection about the `y`
 axis is the only symmetry, so the fundamental domain is the right half. It is a
 [`CompositeDomain`](@ref) of three simple domains: the cap region between the
 arc and the chord from `(0,R)` to `(half_width,0)` (`id = 1`), the triangle
@@ -19,7 +19,7 @@ struct MushroomBilliard{T} <: AbsBilliard where T<:Real
 end
 
 """
-    MushroomBilliard(half_width, stem_heigth = 1; R = 1, origin = zeros(2)) → billiard::MushroomBilliard
+    MushroomBilliard(half_width, stem_height = 1; R = 1, center = zeros(2)) → billiard::MushroomBilliard
     MushroomBilliard(fundamental_domain::CompositeDomain, symmetries::SymmetryRegistry) → billiard::MushroomBilliard
 
 Construct a [`MushroomBilliard`](@ref), or wrap a given composite fundamental
@@ -27,18 +27,18 @@ domain and symmetry registry.
 
 ## Arguments
 * `half_width`: Half the width of the stem.
-* `stem_heigth`: Height of the stem.
+* `stem_height`: Height of the stem.
 
 ## Keyword arguments
 * `R = 1` : Radius of the cap.
-* `origin` : Center of the cap circle; must be the origin because the symmetry is the reflection about the `y` axis.
+* `center` : Center of the cap circle; must be the origin because the symmetry is the reflection about the `y` axis.
 
 ## Throws
-`ArgumentError` if `origin` is not `(0,0)`.
+`ArgumentError` if `center` is not `(0,0)`.
 """
-function MushroomBilliard(half_width::T, stem_heigth::T=one(T); R=one(T), origin=zeros(T,2)) where T<:Real
-    cx, cy = T(origin[1]), T(origin[2]) #center of circle segment
-    (iszero(cx) && iszero(cy)) || throw(ArgumentError("YAxisReflection symmetry requires origin == (0,0); received origin=$origin"))
+function MushroomBilliard(half_width::T, stem_height::T=one(T); R=one(T), center=zeros(T,2)) where T<:Real
+    cx, cy = T(center[1]), T(center[2]) #center of circle segment
+    (iszero(cx) && iszero(cy)) || throw(ArgumentError("YAxisReflection symmetry requires center == (0,0); received center=$center"))
     Rv = T(R)
     symmetries = register_symmetries(YAxisReflection())
     #mushroom cap consists of two domains
@@ -53,7 +53,7 @@ function MushroomBilliard(half_width::T, stem_heigth::T=one(T); R=one(T), origin
     bcs=[SymmetryWall(1,2),Transparent(3),Transparent(1)])
 
     #mushroom stem consists of one domain   
-    stem_dom = Polygon([[cx,cy],[cx,-stem_heigth],[half_width,-stem_heigth],[half_width,cy]],3; 
+    stem_dom = Polygon([[cx,cy],[cx,-stem_height],[half_width,-stem_height],[half_width,cy]],3; 
     bcs=[SymmetryWall(1,2),SpecularReflection(),SpecularReflection(),Transparent(2)])
 
     return MushroomBilliard{T}(CompositeDomain([circle_dom, triangle_dom, stem_dom]), symmetries)

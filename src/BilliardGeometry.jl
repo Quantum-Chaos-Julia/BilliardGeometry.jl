@@ -17,7 +17,7 @@ sign of [`domain_fun`](@ref) tells on which side of a curve a point lies.
 * Boundary conditions: [`SpecularReflection`](@ref), [`Transparent`](@ref), [`PeriodicX`](@ref), [`SymmetryWall`](@ref), [`QuantumSolverIgnore`](@ref).
 * Curves: [`LineSegment`](@ref), [`CircleSegment`](@ref), [`FourierCoeffPolarSegment`](@ref), [`PolarSegment`](@ref), [`CompositeCurve`](@ref).
 * Domains: [`Polygon`](@ref), [`CircleWedge`](@ref), [`SimpleDomain`](@ref), [`CompositeDomain`](@ref), [`PolarDomain`](@ref), [`MultiplyConnectedDomain`](@ref), [`DomainHole`](@ref).
-* Billiards: [`TriangleBilliard`](@ref), [`StadiumBilliard`](@ref), [`MushroomBilliard`](@ref), [`PolarBilliard`](@ref), [`LimaconBilliard`](@ref), [`CircleBilliard`](@ref), [`EllipseBilliard`](@ref), [`RectangleBilliard`](@ref), [`PolygonBilliard`](@ref), [`StarBilliard`](@ref), [`C3Billiard`](@ref), [`ProsenBilliard`](@ref), [`AnnularBilliard`](@ref), [`SinaiBilliard`](@ref), [`SquareWithinSquareBilliard`](@ref).
+* Billiards: [`TriangleBilliard`](@ref), [`StadiumBilliard`](@ref), [`MushroomBilliard`](@ref), [`PolarBilliard`](@ref), [`LimaconBilliard`](@ref), [`CircleBilliard`](@ref), [`EllipseBilliard`](@ref), [`RectangleBilliard`](@ref), [`PolygonBilliard`](@ref), [`StarBilliard`](@ref), [`C3Billiard`](@ref), [`ProsenBilliard`](@ref), [`AnnularBilliard`](@ref), [`SinaiBilliard`](@ref), [`SquareWithinSquareBilliard`](@ref), [`JuliaBilliard`](@ref).
 * Symmetries: [`XAxisReflection`](@ref), [`YAxisReflection`](@ref), [`XYAxisReflection`](@ref), [`DiagonalReflection`](@ref), [`AntiDiagonalReflection`](@ref), [`CompositeReflection`](@ref), [`NFoldRotation`](@ref), [`SymmetryRegistry`](@ref), [`SymmetryOrbitMap`](@ref).
 * Boundary samplers and Kress grading: [`LinearNodes`](@ref), [`GaussLegendreNodes`](@ref), [`FourierNodes`](@ref), [`sample_points`](@ref), [`kress_graded_nodes_data`](@ref), [`multi_kress_graded_nodes_data`](@ref).
 """
@@ -234,6 +234,9 @@ include("geometry/billiards/star.jl")
 include("geometry/billiards/c3.jl")
 include("geometry/billiards/prosen.jl")
 include("geometry/billiards/annular.jl")
+include("geometry/billiards/cutcircle.jl")
+include("geometry/billiards/lemon.jl")
+include("geometry/billiards/squash.jl")
 include("geometry/fullboundary.jl")
 include("geometry/inversions.jl")
 include("geometry/arclength.jl")
@@ -241,9 +244,9 @@ include("geometry/curvederivatives.jl")
 include("geometry/boundarycomponents.jl")
 include("geometry/poincarebirkhoff.jl")
 include("geometry/geometry.jl")
-export XAxisReflection, YAxisReflection, XYAxisReflection, DiagonalReflection, AntiDiagonalReflection, CompositeReflection, NFoldRotation, apply_symmetry, apply_symmetry_pb, D2_symmetry, Cn_symmetry, orientation_reversing
+export AxisReflection, XAxisReflection, YAxisReflection, XYAxisReflection, DiagonalReflection, AntiDiagonalReflection, CompositeReflection, NFoldRotation, apply_symmetry, apply_symmetry_pb, D2_symmetry, D4_symmetry, Dn_symmetry, Cn_symmetry, orientation_reversing
 export SymmetryRegistry, register_symmetries, symmetry_of
-export SymmetryOrbitMap, fundamental_size, full_size, orbit_size, symmetry_orbit, symmetry_node_multiple, symmetry_index_orbits, get_symmetries
+export SymmetryOrbitMap, fundamental_size, full_size, orbit_size, symmetry_orbit, symmetry_node_multiple, symmetry_index_orbits, group_symmetry_orbits, get_symmetries, get_symmetry_group
 export SpecularReflection, QuantumSolverIgnore, Transparent, PeriodicX, SymmetryWall, get_boundary_curves, get_all_curves, get_curve, get_all_domains, get_domain, update_boundary_condition, genus, boundary_components, geometric_boundary_components
 export LineSegment
 export PolarSegment, FourierCoeffPolarSegment, polar_radius
@@ -252,7 +255,7 @@ export CompositeCurve
 export Polygon
 export CircleWedge
 export SimpleDomain, CompositeDomain, reset_ids!
-export MultiplyConnectedDomain, DomainHole, hole_domains, hole_loop_count, hole_leaves, hole_domain_ids, is_hole_curve, component_of_domain_id, symmetry_compatible, validate_holes
+export MultiplyConnectedDomain, DomainHole, SymmetricHole, SymmetrizedHoles, hole_domains, hole_loop_count, hole_leaves, hole_domain_ids, is_hole_curve, component_of_domain_id, symmetry_compatible, compatible_symmetries, validate_holes
 export boundary_component_is_hole, get_outer_boundary_curves, get_hole_boundary_curves, BoundaryComponentMap, full_boundary_components
 export TriangleBilliard
 export StadiumBilliard
@@ -267,13 +270,16 @@ export StarBilliard
 export C3Billiard
 export ProsenBilliard
 export AnnularBilliard
+export CutCircleBilliard
+export LemonBilliard
+export SquashBilliard
 export full_boundary
 export invert_curve
 export arc_length, construct_arc_length_interpolation
 export tangent, tangent_2, tangent_vec, normal_vec, curvature
 export component_lengths, print_component_junctions
 export PoincareBirkhoff, pb_coords, get_pb_curve, pb_sectors
-export is_inside, curve, domain_fun, domain_gradient_vector
+export is_inside, curve, domain_fun, domain_gradient_vector, verify_transparent_bcs
 
 include("geometry/area.jl")
 export area, fundamental_area, corner_angles
@@ -288,5 +294,11 @@ export SinaiBilliard
 
 include("geometry/billiards/square_in_square.jl")
 export SquareWithinSquareBilliard
+
+include("geometry/billiards/julia.jl")
+export JuliaBilliard
+
+include("geometry/billiards/c6_c3_hole.jl")
+export C6C3HoleBilliard
 
 end

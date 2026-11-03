@@ -2,9 +2,8 @@
 ############################# FULL PHYSICAL BOUNDARY ##########################
 ################################################################################
 # `full_boundary(billiard)` reconstructs the complete physical boundary of a
-# billiard from its fundamental domain plus its discrete symmetry generators
-# (`billiard.symmetries`), instead of every billiard hand-maintaining its own
-# `full_boundary` field. This is needed by boundary-integral (BIM) solvers,
+# billiard from its fundamental domain plus its discrete symmetry elements
+# (`billiard.symmetries`). This is needed by boundary-integral (BIM) solvers,
 # which discretize the *entire* physical boundary (unlike basis solvers,
 # which only ever need the fundamental domain).
 #
@@ -31,10 +30,7 @@
 and `false` for the symmetries that preserve it: [`XYAxisReflection`](@ref) (a
 π rotation) and [`NFoldRotation`](@ref).
 """
-orientation_reversing(::XAxisReflection) = true
-orientation_reversing(::YAxisReflection) = true
-orientation_reversing(::DiagonalReflection) = true
-orientation_reversing(::AntiDiagonalReflection) = true
+orientation_reversing(::AxisReflection) = true
 orientation_reversing(::XYAxisReflection) = false
 orientation_reversing(::NFoldRotation) = false
 
@@ -132,6 +128,73 @@ function _reverse_curve(c::L) where {L<:PolarSegment}
     new_shift = c.shift_angle + c.arc_angle
     new_arc = -c.arc_angle
     return PolarSegment(c.r_func; R=c.R, arc_angle=new_arc, shift_angle=new_shift, center=c.center, orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+
+# Translation of a curve by the vector `v`; the radial function of a polar curve is unchanged, only its center moves.
+function _translate_curve(c::LineSegment{T}, v::SVector{2}) where {T<:Real}
+    w = SVector{2,T}(v)
+    return LineSegment(c.pt0 + w, c.pt1 + w; bc=c.bc, orientation=c.orientation, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+function _translate_curve(c::CircleSegment{T}, v::SVector{2}) where {T<:Real}
+    return CircleSegment(c.radius, c.arc_angle, c.shift_angle, c.center + SVector{2,T}(v); bc=c.bc, orientation=c.orientation, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+function _translate_curve(c::L, v::SVector{2}) where {L<:FourierCoeffPolarSegment}
+    return FourierCoeffPolarSegment(c.coef; R=c.R, arc_angle=c.arc_angle, shift_angle=c.shift_angle, center=c.center + SVector{2,eltype(c.center)}(v), orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+function _translate_curve(c::L, v::SVector{2}) where {L<:PolarSegment}
+    return PolarSegment(c.r_func; R=c.R, arc_angle=c.arc_angle, shift_angle=c.shift_angle, center=c.center + SVector{2,eltype(c.center)}(v), orientation=c.orientation, bc=c.bc, domain_id=c.domain_id, segment_id=c.segment_id)
+end
+
+# Translation of a simple domain; the result is a `SimpleDomain` whatever the input concrete type.
+function _translate_domain(domain::AbsSimpleDomain, v::SVector{2})
+    T = eltype(eltype(domain.corners))
+    boundary = AbsCurve[_translate_curve(c, v) for c in domain.boundary]
+    corners = SVector{2,T}[c + SVector{2,T}(v) for c in domain.corners]
+    return SimpleDomain{T}(boundary, corners, domain.id)
+end
+
+_shift_bc(bc::AbsBoundaryCondition, ::Integer) = bc
+_shift_bc(bc::Transparent, off::Integer) = Transparent(bc.next_id + off)
+_shift_bc(bc::PeriodicX, off::Integer) = PeriodicX(bc.next_id + off)
+
+# Adds `off` to the `domain_id` of a curve and to the neighbour ids stored in its boundary condition.
+function _shift_curve_ids(c::AbsCurve, off::Integer)
+    iszero(off) && return c
+    c = @set c.domain_id = c.domain_id + off
+    return @set c.bc = _shift_bc(c.bc, off)
+end
+
+"""
+    _apply_symmetry_to_domain(sym, domain::AbsSimpleDomain, id_offset=0) → image::SimpleDomain
+
+Image of a simple domain under the symmetry `sym` about the origin.
+
+## Description
+Every curve is mapped by `_apply_symmetry_to_curve`. Orientation-reversing
+elements additionally reverse each curve and the curve list, so the image
+keeps the region on the left of its boundary traversal. Segment ids and
+boundary conditions are kept (a `SymmetryWall` keeps its `sym_id` and
+`sector_id`); the `id` of the domain, the `domain_id` of every curve and the
+neighbour ids of `Transparent`/`PeriodicX` conditions are shifted by `id_offset`,
+which gives the image fresh ids. The result is always a `SimpleDomain`.
+"""
+function _apply_symmetry_to_domain(sym::AbsSymmetry, domain::AbsSimpleDomain, id_offset::Integer=0)
+    T = eltype(eltype(domain.corners))
+    if orientation_reversing(sym)
+        boundary = AbsCurve[_shift_curve_ids(_reverse_curve(_apply_symmetry_to_curve(sym, c)), id_offset) for c in Iterators.reverse(domain.boundary)]
+        corners = SVector{2,T}[SVector{2,T}(apply_symmetry(sym, p)) for p in Iterators.reverse(domain.corners)]
+    else
+        boundary = AbsCurve[_shift_curve_ids(_apply_symmetry_to_curve(sym, c), id_offset) for c in domain.boundary]
+        corners = SVector{2,T}[SVector{2,T}(apply_symmetry(sym, p)) for p in domain.corners]
+    end
+    return SimpleDomain{T}(boundary, corners, domain.id + id_offset)
+end
+
+# Image of a simple domain under `sym` acting about `center` instead of the origin.
+function _apply_symmetry_to_domain(sym::AbsSymmetry, domain::AbsSimpleDomain, center::SVector{2}, id_offset::Integer)
+    iszero(center) && return _apply_symmetry_to_domain(sym, domain, id_offset)
+    image = _apply_symmetry_to_domain(sym, _translate_domain(domain, -center), id_offset)
+    return _translate_domain(image, center)
 end
 
 """
@@ -232,17 +295,26 @@ _full_boundary(::AbsMultiplyConnectedDomain, billiard::AbsBilliard) = reduce(vca
 """
     BoundaryComponentMap
 
-Closed boundary loops of a billiard together with their role.
+Closed boundary loops of a billiard together with their role, returned by
+[`full_boundary_components`](@ref).
+
+## Description
+The loops are derived from construction provenance, not from coordinate
+matching. Loop `1` is the outer boundary (reconstructed by the symmetry
+registry); hole loops follow in the order of the holes, loops of one hole
+object consecutive.
 
 ## Attributes
 * `curves::Vector{Vector{AbsCurve}}`: One closed loop per entry; the reconstructed outer boundary first, then every hole loop.
 * `is_hole::Vector{Bool}`: Whether the loop is a hole loop.
 * `group::Vector{Int}`: Solver group of the loop: `0` for the outer boundary, `i` for loops of the `i`-th hole object.
+* `blocks::Vector{Vector{Tuple{Bool,Rational{Int}}}}`: Dihedral keys `(reflects, a)` of the reconstruction blocks of each group, `blocks[i+1]` for group `i`, identity first. The nodes of a group are the concatenation of its loops, one contiguous block per key in this order: the registry of the billiard for the outer boundary, the hole group for a [`SymmetricHole`](@ref), the identity and the placing operations for [`SymmetrizedHoles`](@ref), the identity alone for a [`DomainHole`](@ref).
 """
 struct BoundaryComponentMap
     curves::Vector{Vector{AbsCurve}}
     is_hole::Vector{Bool}
     group::Vector{Int}
+    blocks::Vector{Vector{Tuple{Bool,Rational{Int}}}}
 end
 
 """
@@ -254,22 +326,32 @@ boundary reconstructed by the billiard symmetry registry; hole loops are taken
 from the holes in the full frame, each traversed with the hole region on the
 left. For billiards without holes the single result of [`full_boundary`](@ref)
 is returned as one component.
+
+## Arguments
+* `billiard`: Billiard whose complete physical boundary loops are requested.
+
+## Returns
+* `map`: [`BoundaryComponentMap`](@ref) with `curves`, `is_hole` and `group`.
 """
 function full_boundary_components(billiard::B) where {B<:AbsBilliard}
     return _full_boundary_components(billiard.fundamental_domain, billiard)
 end
 
-_full_boundary_components(::AbsDomain, billiard::AbsBilliard) = BoundaryComponentMap([full_boundary(billiard)], [false], [0])
+_full_boundary_components(::AbsDomain, billiard::AbsBilliard) = BoundaryComponentMap([full_boundary(billiard)], [false], [0], [_block_keys(billiard)])
 
 function _full_boundary_components(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard)
     curves = Vector{Vector{AbsCurve}}()
     push!(curves, first(_full_boundary_data(billiard)))
     is_hole = Bool[false]
     group = Int[0]
-    for (i, h) in enumerate(domain.holes), loop in boundary_components(h)
-        push!(curves, loop)
-        push!(is_hole, true)
-        push!(group, i)
+    blocks = Vector{Vector{Tuple{Bool,Rational{Int}}}}([_block_keys(billiard)])
+    for (i, h) in enumerate(domain.holes)
+        for loop in boundary_components(h)
+            push!(curves, loop)
+            push!(is_hole, true)
+            push!(group, i)
+        end
+        push!(blocks, _hole_block_keys(h))
     end
-    return BoundaryComponentMap(curves, is_hole, group)
+    return BoundaryComponentMap(curves, is_hole, group, blocks)
 end

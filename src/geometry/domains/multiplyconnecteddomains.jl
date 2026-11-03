@@ -18,9 +18,20 @@ Planar domain `Ω = (⋃ subdomains) \\ (⋃ holes)`.
 * `id::Int64`: Integer id of the domain.
 
 ## Description
-The curve `orientation` field is never used to identify holes. Every subdomain
-and hole boundary is a closed loop traversed with that domain's own region on
-the left.
+`subdomains` describe only the outer region, in the fundamental frame of the
+billiard; they are reconstructed by the billiard symmetry registry. Every hole is
+a self-contained [`AbsDomainHole`](@ref) in the full physical frame and is never
+reconstructed. The curve `orientation` field is never used to identify holes
+(it only selects which side of one curve is inside, so inverted, concave
+subdomains stay valid). Every subdomain and hole boundary is a closed loop
+traversed with that domain's own region on the left. The domain has no `genus`
+or `corners` field: [`genus`](@ref) is computed from the holes.
+
+## API
+The following functions can be evaluated for this type:
+- [`genus`](@ref), [`hole_domain_ids`](@ref), [`is_hole_curve`](@ref), [`component_of_domain_id`](@ref), [`validate_holes`](@ref)
+- [`get_outer_boundary_curves`](@ref), [`get_hole_boundary_curves`](@ref), [`boundary_components`](@ref), [`boundary_component_is_hole`](@ref), [`geometric_boundary_components`](@ref)
+- [`is_inside`](@ref), [`area`](@ref)
 """
 struct MultiplyConnectedDomain{T<:Real} <: AbsMultiplyConnectedDomain
     subdomains::Vector{AbsSimpleDomain}
@@ -84,7 +95,7 @@ function _validate_hole_structure(subdomains::Vector{AbsSimpleDomain}, holes::Ve
             d isa AbsMultiplyConnectedDomain && throw(ArgumentError("hole $i contains a MultiplyConnectedDomain; holes must be simple or composite domains"))
         end
         try
-            _split_closed_loops(_connected_geometric_curves(AbsCurve[crv for crv in get_all_curves(h)]))
+            _split_closed_loops(_connected_geometric_curves(AbsCurve[crv for crv in _hole_geometric_curves(h)]))
         catch err
             err isa ArgumentError || rethrow()
             throw(ArgumentError("boundary of hole $i is not a union of closed loops: " * err.msg))
@@ -102,6 +113,12 @@ end
 
 Curve `domain_id`s contained in a hole of `domain`/`billiard`; empty when it
 has no holes.
+
+## Arguments
+* `domain`/`billiard`: Domain or billiard (its `fundamental_domain` is used).
+
+## Returns
+* `ids`: Sorted unique `domain_id`s of all curves of all holes.
 """
 hole_domain_ids(::AbsDomain) = Int[]
 hole_domain_ids(domain::MultiplyConnectedDomain) = sort!(collect(Set{Int}(crv.domain_id for h in domain.holes for crv in get_all_curves(h))))
@@ -111,7 +128,14 @@ hole_domain_ids(billiard::B) where {B<:AbsBilliard} = hole_domain_ids(billiard.f
     is_hole_curve(domain, crv::AbsCurve) → flag::Bool
 
 `true` when `crv` belongs to a hole of `domain` (a domain or billiard), decided
-by the curve's `domain_id`.
+by the curve's `domain_id` (never by its `orientation`).
+
+## Arguments
+* `domain`: Domain or billiard.
+* `crv`: Curve to test.
+
+## Returns
+* `flag`: `false` for every domain without holes.
 """
 is_hole_curve(::AbsDomain, ::AbsCurve) = false
 is_hole_curve(domain::MultiplyConnectedDomain, crv::AbsCurve) = crv.domain_id in hole_domain_ids(domain)
@@ -121,7 +145,14 @@ is_hole_curve(billiard::B, crv::AbsCurve) where {B<:AbsBilliard} = is_hole_curve
     component_of_domain_id(domain) → map::Dict{Int,Int}
 
 Maps each curve `domain_id` of `domain` (a domain or billiard) to its solver
-group: `0` for the outer region, `i` for the `i`-th hole object.
+group: `0` for the outer region, `i` for the `i`-th hole object (all loops of one
+hole object share its group). Domains without holes map every `domain_id` to `0`.
+
+## Arguments
+* `domain`: Domain or billiard.
+
+## Returns
+* `map`: Dictionary from curve `domain_id` to group index.
 """
 function component_of_domain_id(domain::MultiplyConnectedDomain)
     map = Dict{Int,Int}()
@@ -160,12 +191,20 @@ every other hole.
 This is not a proof that holes neither touch nor overlap each other or the
 outer boundary.
 
+## Arguments
+* `domain`: The multiply connected domain whose holes are checked.
+* `registry`: Symmetry registry of the billiard used to reconstruct the outer region.
+
+## Returns
+* `nothing` when all sample points pass.
+
 ## Throws
 `ArgumentError` naming the offending hole.
 """
 function validate_holes(domain::AbsMultiplyConnectedDomain, registry::SymmetryRegistry)
     outer_contains(pt) = any(all(is_inside(sd, pt)) for sd in domain.subdomains)
     for (i, h) in enumerate(domain.holes)
+        parts = _hole_parts(h)
         for loop in boundary_components(h)
             pt = SVector{2}(curve(first(loop), 0.5))
             in_outer = outer_contains(pt) || any(outer_contains(SVector{2}(apply_symmetry(sym, pt))) for sym in registry)
@@ -175,6 +214,59 @@ function validate_holes(domain::AbsMultiplyConnectedDomain, registry::SymmetryRe
                 is_inside(other, pt) && throw(ArgumentError("hole $i overlaps hole $j"))
             end
         end
+        length(parts) > 1 || continue
+        for (a, pa) in enumerate(parts), loop in boundary_components(pa)
+            pt = SVector{2}(curve(first(loop), 0.5))
+            atol = sqrt(eps(float(eltype(pt))))
+            for (b, pb) in enumerate(parts)
+                b == a && continue
+                _part_contains(pb, pt, atol) && throw(ArgumentError("copies $a and $b of hole $i overlap"))
+            end
+        end
     end
+    return nothing
+end
+
+function _symmetry_group(domain::AbsMultiplyConnectedDomain, billiard::AbsBilliard)
+    keep = Set(g.sym_id for g in billiard.symmetries)
+    for h in domain.holes
+        intersect!(keep, Set(g.sym_id for g in compatible_symmetries(h, billiard.symmetries)))
+    end
+    return SymmetryRegistry(AbsSymmetry[g for g in billiard.symmetries if g.sym_id in keep])
+end
+
+# First `(hole index, element)` of the registry that is not a symmetry of the hole, or `nothing`.
+function _first_incompatibility(domain::AbsMultiplyConnectedDomain, registry::SymmetryRegistry)
+    for (i, h) in enumerate(domain.holes)
+        ids = Set(g.sym_id for g in compatible_symmetries(h, registry))
+        for g in registry
+            g.sym_id in ids || return (i, g)
+        end
+    end
+    return nothing
+end
+_first_incompatibility(::AbsDomain, ::SymmetryRegistry) = nothing
+
+"""
+    _log_symmetry_group(name, billiard::AbsBilliard) → nothing
+
+Log one `@info` line with the outer symmetry group `G` and the symmetry group
+`G'` of the physical billiard (see [`get_symmetry_group`](@ref)); when
+`G' ≠ G` it names the first hole and registry element that break the symmetry.
+Nothing is logged for a billiard with an empty registry.
+
+## Arguments
+* `name`: Name of the billiard printed in the message.
+* `billiard`: Billiard whose symmetry groups are reported.
+"""
+function _log_symmetry_group(name, billiard::AbsBilliard)
+    isempty(billiard.symmetries) && return nothing
+    group = get_symmetry_group(billiard)
+    msg = "$name: outer symmetry group G has order $(length(billiard.symmetries) + 1), symmetry group G' has order $(length(group) + 1)"
+    if length(group) != length(billiard.symmetries)
+        i, g = _first_incompatibility(billiard.fundamental_domain, billiard.symmetries)
+        msg *= "; hole $i is not invariant under $g"
+    end
+    @info msg
     return nothing
 end

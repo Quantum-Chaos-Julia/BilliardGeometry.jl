@@ -40,7 +40,7 @@ Construct a [`TriangleBilliard`](@ref).
 ## Throws
 `ArgumentError` if the angles are not admissible or the arguments are not real.
 """
-function TriangleBilliard(gamma, chi; bcs = [SpecularReflection(),SpecularReflection(),SpecularReflection()], x0=zero(gamma), y0=zero(gamma), h = one(gamma))
+function TriangleBilliard(gamma, chi; bcs::AbstractVector{<:AbsBoundaryCondition} = [SpecularReflection(),SpecularReflection(),SpecularReflection()], x0=zero(gamma), y0=zero(gamma), h = one(gamma))
     T = promote_type(typeof(gamma), typeof(chi))
     T <: Real || throw(ArgumentError("gamma and chi must be Real; received types $(typeof(gamma)), $(typeof(chi))"))
     gamma, chi = T(gamma), T(chi)
@@ -49,7 +49,7 @@ function TriangleBilliard(gamma, chi; bcs = [SpecularReflection(),SpecularReflec
     alpha = (T(pi)-gamma)/(1+chi)
     beta = alpha*chi
     angles = SVector(alpha, beta, gamma)
-    corners = triangle_corners(angles, x0, y0, h)
+    corners = triangle_corners(angles, T(x0), T(y0), T(h))
     domain = Polygon(corners, 1; bcs)
     symmetries = register_symmetries()
     return TriangleBilliard{T}(domain, symmetries)

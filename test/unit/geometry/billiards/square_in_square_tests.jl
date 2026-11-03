@@ -5,7 +5,16 @@
 # `sizes[i]` centred at (d_i, d_i) with the positions sorted ascending. Each hole is a SimpleDomain of four counterclockwise
 # LineSegments (bottom, right, top, left; segment ids 1..4, orientation +1) with domain id i + 1, i counted from the lower left.
 # Closed forms: area 4 a^2 - sum(sizes^2), membership, corner angles (pi/2 outer, 3 pi/2 at each hole corner).
+# Exception (B7): a single obstacle centered at the origin (positions = [0]) is built symmetric. The outer region is the fundamental
+# triangle (0,0), (a,0), (a,a) (one physical side, SymmetryWall(1,2) on the diagonal, SymmetryWall(7,8) on the x axis), the hole is a
+# SymmetricHole whose piece is the triangle (0,0), (h,0), (h,h) with h = size / 2, registry D4_symmetry() (7 non-identity elements,
+# G' of order 8). Its full physical boundary is a square loop of length 8 a and a hole loop of length 4 size, 8 blocks each;
+# get_boundary_curves rejects it and the fundamental area is the area / 8. Every other configuration (two obstacles, a shifted
+# single obstacle) keeps the unreduced construction with an empty registry.
 # Guards: a > 0, equal lengths of positions and sizes, positive sizes, holes strictly inside, no overlap. No eigen solves.
+
+# Total arc length of a loop of LineSegments.
+sws_loop_length(loop) = sum(c -> c.length, loop)
 
 using StaticArrays: SVector
 
@@ -23,6 +32,14 @@ end
     sws = SquareWithinSquareBilliard(1.0)
     @test isempty(sws.symmetries)
     @test get_symmetries(sws) == ()
+    # a single obstacle away from the origin is not symmetric
+    @test isempty(SquareWithinSquareBilliard(1.0; positions=[0.1], sizes=[0.4]).symmetries)
+    # a single obstacle at the origin has the full D4 symmetry: 7 non-identity elements, G' = D4 of order 8
+    sym = SquareWithinSquareBilliard(1.0; positions=[0.0], sizes=[0.4])
+    @test length(sym.symmetries) == 7
+    @test length(get_symmetry_group(sym)) == 7
+    @test [g.sym_id for g in sym.symmetries] == [g.sym_id for g in D4_symmetry()]
+    @test typeof.(get_symmetries(sym)) == (DiagonalReflection, YAxisReflection)
 end
 
 @testset "SquareWithinSquareBilliard curves" begin
@@ -55,11 +72,45 @@ end
     @test doms[3].boundary[3].pt0 == SVector(0.625, 0.625)
 end
 
+@testset "SquareWithinSquareBilliard curves (centered obstacle)" begin
+    dom = SquareWithinSquareBilliard(1.0; positions=[0.0], sizes=[0.4]).fundamental_domain
+    @test dom.id == 1
+    @test length(dom.subdomains) == 1
+    @test length(dom.holes) == 1
+    @test dom.holes[1] isa SymmetricHole{Float64}
+    # outer region: the fundamental triangle 0 <= y <= x <= a, one physical side and the two symmetry walls (diagonal, x axis)
+    outer_dom = dom.subdomains[1]
+    @test outer_dom isa SimpleDomain{Float64}
+    @test outer_dom.id == 1
+    side, diagonal, axis = outer_dom.boundary
+    @test all(c -> c isa LineSegment{Float64}, outer_dom.boundary)
+    @test side.bc isa SpecularReflection
+    @test diagonal.bc isa SymmetryWall
+    @test axis.bc isa SymmetryWall
+    @test all(c -> c.domain_id == 1, outer_dom.boundary)
+    @test [side.pt0, side.pt1] == [SVector(1.0, 0.0), SVector(1.0, 1.0)]
+    @test [diagonal.pt0, diagonal.pt1] == [SVector(1.0, 1.0), SVector(0.0, 0.0)]
+    @test [axis.pt0, axis.pt1] == [SVector(0.0, 0.0), SVector(1.0, 0.0)]
+    # hole: the triangle (0,0), (h,0), (h,h) with h = size / 2, pieces of its D4 images, domain id 2 and id_stride 100
+    hole = dom.holes[1]
+    @test hole.piece isa SimpleDomain{Float64}
+    @test hole.piece.id == 2
+    @test length(hole.symmetries) == 7
+    @test length(hole.pieces) == 8
+    @test hole.id_stride == 100
+    @test hole.center == SVector(0.0, 0.0)
+    side_piece = only(c for c in hole.piece.boundary if c.bc isa SpecularReflection)
+    @test [side_piece.pt0, side_piece.pt1] == [SVector(0.2, 0.0), SVector(0.2, 0.2)]
+    @test count(c -> c.bc isa SymmetryWall, hole.piece.boundary) == 2
+end
+
 @testset "SquareWithinSquareBilliard hole count" begin
-    one_hole = SquareWithinSquareBilliard(1.0; positions=[0.0], sizes=[0.4]).fundamental_domain
+    # a shifted single obstacle keeps the unreduced construction
+    one_hole = SquareWithinSquareBilliard(1.0; positions=[0.1], sizes=[0.4]).fundamental_domain
     @test length(one_hole.holes) == 1
+    @test one_hole.holes[1] isa DomainHole
     @test one_hole.holes[1].domain.id == 2
-    @test one_hole.holes[1].domain.boundary[1].pt0 ≈ SVector(-0.2, -0.2) atol = 1e-14
+    @test one_hole.holes[1].domain.boundary[1].pt0 ≈ SVector(-0.1, -0.1) atol = 1e-14
 
     three_holes = SquareWithinSquareBilliard(1.0; positions=[0.5, -0.5, 0.0], sizes=[0.2, 0.2, 0.2]).fundamental_domain
     @test length(three_holes.holes) == 3
@@ -79,6 +130,7 @@ end
     @test genus(sws) == 2
     @test genus(sws.fundamental_domain) == 2
     @test genus(SquareWithinSquareBilliard(1.0; positions=[0.0], sizes=[0.4])) == 1
+    @test genus(SquareWithinSquareBilliard(1.0; positions=[0.1], sizes=[0.4])) == 1
     @test genus(SquareWithinSquareBilliard(1.0; positions=[0.5, -0.5, 0.0], sizes=[0.2, 0.2, 0.2])) == 3
     # one component of four curves for the outer square and for each hole
     comps = boundary_components(sws)
@@ -90,6 +142,16 @@ end
     @test hole_domain_ids(sws) == [2, 3]
     @test component_of_domain_id(sws) == Dict(1 => 0, 2 => 1, 3 => 2)
     @test [is_hole_curve(sws, c) for c in get_all_curves(sws)] == [fill(false, 4); fill(true, 8)]
+
+    # centered obstacle: the physical side of the fundamental triangle and the 8 pieces of the obstacle
+    sym = SquareWithinSquareBilliard(1.0; positions=[0.0], sizes=[0.4])
+    comps = boundary_components(sym)
+    @test [length(c) for c in comps] == [1, 8]
+    @test [c.domain_id for c in comps[2]] == [2 + 100k for k in 0:7]
+    @test boundary_component_is_hole(sym) == [false, true]
+    @test hole_domain_ids(sym) == [2 + 100k for k in 0:7]
+    @test component_of_domain_id(sym) == Dict(1 => 0, [2 + 100k => 1 for k in 0:7]...)
+    @test [is_hole_curve(sym, c) for c in get_all_curves(sym)] == [fill(false, 3); fill(true, 24)]
 end
 
 @testset "SquareWithinSquareBilliard geometry" begin
@@ -100,6 +162,14 @@ end
     @test area(SquareWithinSquareBilliard(2.0)) ≈ 16 - 2 * 0.5^2 rtol = 1e-12
     # without symmetry the fundamental area is the area
     @test fundamental_area(sws) ≈ area(sws) rtol = 1e-14
+    # centered obstacle: the full physical area is unchanged, the fundamental area is the area / 8 of the reduced domain
+    sym = SquareWithinSquareBilliard(1.0; positions=[0.0], sizes=[0.4])
+    @test fundamental_area(sym) ≈ (4 - 0.16) / 8 rtol = 1e-12
+    @test fundamental_area(SquareWithinSquareBilliard(1.0; positions=[0.1], sizes=[0.4])) ≈ 4 - 0.16 rtol = 1e-12
+    @test is_inside(sym, SVector(0.7, 0.3)) === true
+    @test is_inside(sym, SVector(0.1, 0.05)) === false       # inside the obstacle piece (0,0), (0.2,0), (0.2,0.2)
+    @test is_inside(sym, SVector(-0.5, 0.9)) === false       # other quadrants lie outside the fundamental triangle
+    @test is_inside(sym, SVector(1.2, 0.1)) === false
     # membership: the whole square minus the holes
     @test is_inside(sws, SVector(0.0, 0.0)) === true
     @test is_inside(sws, SVector(0.9, 0.2)) === true
@@ -114,6 +184,18 @@ end
     # full boundary: the outer loop, then one loop per hole
     @test length(full_boundary(sws)) == 12
     @test full_boundary_components(sws).is_hole == [false, true, true]
+
+    # centered obstacle: corners of the reduced domain, then the full physical boundary: two loops of 8 blocks, lengths 8a and 4 size
+    @test corner_angles(sym; fundamental = false) ≈ [fill(pi / 2, 4); fill(3pi / 2, 4)] atol = 1e-12
+    fbc = full_boundary_components(sym)
+    @test fbc.is_hole == [false, true]
+    @test [length(b) for b in fbc.blocks] == [8, 8]
+    @test [sws_loop_length(loop) for loop in fbc.curves] ≈ [8.0, 4 * 0.4] rtol = 1e-12
+    @test length(full_boundary(sym)) == 16
+    # holes plus a non-empty registry: get_boundary_curves is ambiguous and throws; the default configuration still works
+    @test_throws ArgumentError get_boundary_curves(sym)
+    @test length(get_boundary_curves(sws)) == 12
+    @test length(get_boundary_curves(SquareWithinSquareBilliard(1.0; positions=[0.1], sizes=[0.4]))) == 8
 end
 
 @testset "SquareWithinSquareBilliard argument guards" begin
@@ -146,4 +228,10 @@ end
     sws32 = SquareWithinSquareBilliard(1.0f0; positions=[-0.5, 0.5], sizes=[0.25, 0.25])
     @test sws32 isa SquareWithinSquareBilliard{Float32}
     @test all(c -> c isa LineSegment{Float32}, get_all_curves(sws32))
+    # centered obstacle (symmetric construction)
+    sym32 = SquareWithinSquareBilliard(1.0f0; positions=[0.0], sizes=[0.4])
+    @test sym32 isa SquareWithinSquareBilliard{Float32}
+    @test all(c -> c isa LineSegment{Float32}, get_all_curves(sym32))
+    @test area(sym32) isa Float32
+    @test fundamental_area(sym32) isa Float32
 end

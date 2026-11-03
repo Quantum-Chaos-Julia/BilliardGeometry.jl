@@ -31,7 +31,7 @@ the corner entries.
 ## Keyword arguments
 * `bcs` : One boundary condition per edge, `bcs[i]` for the edge from `corners[i]` to `corners[i+1]`.
 """
-function Polygon(corners, id; bcs = [SpecularReflection() for i in corners] )
+function Polygon(corners, id; bcs::AbstractVector{<:AbsBoundaryCondition} = [SpecularReflection() for i in corners] )
     M = length(corners)
     type = promote_type((eltype(c) for c in corners)...)
     corners  = [SVector{2,type}(c) for c in corners]

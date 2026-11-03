@@ -82,13 +82,14 @@ function _component_corner_locations(::Type{T}, comp::Vector; angle_tol=T(1e-8))
 end
 
 """
-    _component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8)) where {T<:Real} → angles::Vector{T}
+    _component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8), hole::Bool=false) where {T<:Real} → angles::Vector{T}
 
 Interior angles (`π` minus the tangent turning angle, i.e. the same
 convention as [`Polygon`](@ref)'s `angles` field) at every true corner of a
 composite boundary component `comp`, in the same traversal order as
 [`_component_corner_locations`](@ref) (periodic seam between the final and
-first segment checked first, if a true corner).
+first segment checked first, if a true corner). With `hole = true` the
+component is a hole loop and [`_hole_component_corner_angles`](@ref) is used.
 """
 function _component_corner_angles(::Type{T}, comp::Vector; angle_tol=T(1e-8), hole::Bool=false) where {T<:Real}
     hole && return _hole_component_corner_angles(T, comp; angle_tol=angle_tol)
@@ -126,20 +127,23 @@ end
 """
     print_component_junctions(comp::Vector; T=Float64, angle_tol=1e-8)
 
-Prints diagnostic information (global periodic parameter, tangent
+Logs diagnostic information (global periodic parameter, tangent
 discontinuity angle, corner classification) for every join of a composite
-boundary component.
+boundary component, one `@info` record per join.
+
+## Keyword arguments
+* `T = Float64` : Numeric type used for the diagnostics.
+* `angle_tol = 1e-8` : Minimum turning angle (radians) classified as a true corner.
 """
 function print_component_junctions(comp::Vector; T=Float64, angle_tol=1e-8)
     _, cum, Ltot = component_lengths(comp)
     m = length(comp)
-    println("junction diagnostics:")
     @inbounds for j in 1:m
         jr = j == m ? 1 : j+1
-        σ = j == m ? zero(T) : T(2*pi)*cum[j+1]/Ltot
+        σ = j == m ? zero(T) : T(2*pi)*T(cum[j+1])/T(Ltot)
         a = _junction_angle(comp[j], comp[jr], T)
-        flag = a > T(angle_tol) ? "TRUE CORNER" : "smooth join"
-        println("  $j -> $jr : σ = $σ, angle = $a, $flag")
+        flag = a > T(angle_tol) ? "true corner" : "smooth join"
+        @info "Junction" from=j to=jr σ=σ angle=a classification=flag
     end
 end
 
