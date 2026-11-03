@@ -279,7 +279,7 @@ export arc_length, construct_arc_length_interpolation
 export tangent, tangent_2, tangent_vec, normal_vec, curvature
 export component_lengths, print_component_junctions
 export PoincareBirkhoff, pb_coords, get_pb_curve, pb_sectors
-export is_inside, curve, domain_fun, domain_gradient_vector
+export is_inside, curve, domain_fun, domain_gradient_vector, verify_transparent_bcs
 
 include("geometry/area.jl")
 export area, fundamental_area, corner_angles
