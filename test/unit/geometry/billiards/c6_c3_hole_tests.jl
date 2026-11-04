@@ -24,8 +24,7 @@ end
     @test length(b6.symmetries) == 2
     @test [g.sym_id for g in b6.symmetries] == [g.sym_id for g in Cn_symmetry(3)]
     @test length(get_symmetry_group(b6)) == 2
-    # the group-order mismatch (C6 outer vs C3 billiard) is reported
-    @test_logs (:info, r"order 3") match_mode = :any C6C3HoleBilliard(0.1, 0.15)
+    @test_logs C6C3HoleBilliard(0.1, 0.15)
 end
 
 @testset "C6C3HoleBilliard curves" begin

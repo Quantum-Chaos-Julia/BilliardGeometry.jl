@@ -402,12 +402,11 @@ end
     # an empty registry logs nothing
     @test (@test_logs _log_symmetry_group("hf", hf_rect_with_hole())) === nothing
     @test (@test_logs _log_symmetry_group("hf", hf_shifted_annulus())) === nothing
-    # the origin-centered production constructors log their groups on every construction (G' = G, so no failing-hole clause)
-    @test_logs (:info, "SinaiBilliard: outer symmetry group G has order 8, symmetry group G' has order 8") SinaiBilliard(1.0, 0.3)
-    @test_logs (:info, "AnnularBilliard: outer symmetry group G has order 2, symmetry group G' has order 2") AnnularBilliard(0.3, 0.2)
-    @test_logs (:info, "SquareWithinSquareBilliard: outer symmetry group G has order 8, symmetry group G' has order 8") SquareWithinSquareBilliard(1.0; positions = [0.0], sizes = [0.4])
-    # an explicit shifted center has an empty registry and stays silent
+    # the production constructors are silent; the groups are reported by show / log_billiard
+    @test_logs SinaiBilliard(1.0, 0.3)
+    @test_logs AnnularBilliard(0.3, 0.2)
+    @test_logs SquareWithinSquareBilliard(1.0; positions = [0.0], sizes = [0.4])
     @test_logs SinaiBilliard(1.0, 0.3; center = [0.5, -0.2])
     @test_logs AnnularBilliard(0.3, 0.2; center = [0.5, 0.1])
-    @test_logs (:info, "SquareWithinSquareBilliard: outer symmetry group G has order 4, symmetry group G' has order 4") SquareWithinSquareBilliard(1.0)
+    @test_logs SquareWithinSquareBilliard(1.0)
 end
