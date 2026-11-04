@@ -70,6 +70,5 @@ function C6C3HoleBilliard(a::T, b::T; R=one(T), R_hole=T(R)/3) where T<:Real
     fundamental_domain = MultiplyConnectedDomain(outer_domain, [SymmetricHole(piece, Cn_symmetry(3; T=T), c)], 1)
     validate_holes(fundamental_domain, symmetries)
     billiard = C6C3HoleBilliard{T}(fundamental_domain, symmetries)
-    _log_symmetry_group("C6C3HoleBilliard", billiard)
     return billiard
 end

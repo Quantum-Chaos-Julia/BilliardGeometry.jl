@@ -70,6 +70,5 @@ function SinaiBilliard(a::T, R::T; center=SVector{2,T}(zero(T),zero(T))) where T
     end
     validate_holes(fundamental_domain, symmetries)
     billiard = SinaiBilliard{T}(fundamental_domain, symmetries)
-    _log_symmetry_group("SinaiBilliard", billiard)
     return billiard
 end

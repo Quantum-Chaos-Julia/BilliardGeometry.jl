@@ -304,4 +304,7 @@ export JuliaBilliard
 include("geometry/billiards/c6_c3_hole.jl")
 export C6C3HoleBilliard
 
+include("geometry/billiardinfo.jl")
+export log_billiard
+
 end

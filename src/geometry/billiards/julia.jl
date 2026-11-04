@@ -63,6 +63,6 @@ function JuliaBilliard(r::T, d::T; R=one(T)) where T<:Real
     fundamental_domain = MultiplyConnectedDomain(outer_domain, [holes], 1)
     validate_holes(fundamental_domain, symmetries)
     billiard = JuliaBilliard{T}(fundamental_domain, symmetries)
-    _log_symmetry_group("JuliaBilliard", billiard)
+   
     return billiard
 end

@@ -67,7 +67,7 @@ function AnnularBilliard(R_inner::T, shift::T; R_outer = one(T), center=SVector{
     end
     validate_holes(fundamental_domain, symmetries)
     billiard = AnnularBilliard{T}(fundamental_domain, symmetries)
-    _log_symmetry_group("AnnularBilliard", billiard)
+    
     return billiard
 end
 
