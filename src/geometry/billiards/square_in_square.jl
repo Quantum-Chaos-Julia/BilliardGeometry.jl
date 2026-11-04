@@ -94,7 +94,7 @@ function SquareWithinSquareBilliard(a::T=one(T); positions::AbstractVector{<:Rea
     fundamental_domain = MultiplyConnectedDomain(outer_domain, holes, 1)
     validate_holes(fundamental_domain, symmetries)
     billiard = SquareWithinSquareBilliard{T}(fundamental_domain, symmetries)
-    _log_symmetry_group("SquareWithinSquareBilliard", billiard)
+    
     return billiard
 end
 
