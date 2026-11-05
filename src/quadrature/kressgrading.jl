@@ -134,6 +134,41 @@ end
     return min(dmin, T(2*pi)+xs[1]-xs[end])
 end
 
+const _KRESS_Q_FLOOR = ScopedValue{Union{Nothing,Base.RefValue{Float64}}}(nothing)
+
+@inline function _apply_kress_q_floor(q::T) where {T<:Real}
+    floor_ref = _KRESS_Q_FLOOR[]
+    floor_ref === nothing && return q
+    return min(q, T(floor_ref[]))
+end
+
+@inline function _record_kress_q_floor(q::Real)
+    floor_ref = _KRESS_Q_FLOOR[]
+    floor_ref === nothing || (floor_ref[] = min(floor_ref[], Float64(q)))
+    return nothing
+end
+
+"""
+    with_kress_q_floor(f)
+
+Runs `f()` in a scope where any reduction of the Kress grading order `q`
+(triggered by too-close nodes) persists for all later graded-node
+constructions inside the scope. Later calls start from the reduced `q`,
+so the reduction is warned about once instead of repeated for every call.
+"""
+function with_kress_q_floor(f)
+    return with(f, _KRESS_Q_FLOOR => Ref(Inf))
+end
+
+"""
+    @with_kress_q_floor expr
+
+Macro form of [`with_kress_q_floor`](@ref) wrapping `expr`.
+"""
+macro with_kress_q_floor(ex)
+    return :(with_kress_q_floor(() -> $(esc(ex))))
+end
+
 """
     kress_graded_nodes_data(::Type{T}, N::Int; q=3, minsep_tol=1e-12) where {T<:Real} → (σ, s, jac, jac2, wq)
 
@@ -161,6 +196,8 @@ requirement is met.
 function kress_graded_nodes_data(::Type{T}, N::Int; q=3, minsep_tol=1e-12) where {T<:Real}
     qT = T(q)
     qT>one(T) || error("Require q>1 for Kress grading.")
+    qT = _apply_kress_q_floor(qT)
+    q_start = qT
     twopi = T(2*pi)
     h = twopi/T(N)
     δ = h/T(2)
@@ -175,7 +212,10 @@ function kress_graded_nodes_data(::Type{T}, N::Int; q=3, minsep_tol=1e-12) where
             wq[k] = h*a[k]
         end
         minsep = _min_periodic_spacing_sorted(s)
-        minsep>=minsep_tol && return σ,s,a,a2,wq
+        if minsep>=minsep_tol
+            qT<q_start && _record_kress_q_floor(qT)
+            return σ,s,a,a2,wq
+        end
         qnew = max(one(T),qT*0.9)
         @warn "Kress grading nodes too close; reducing q." q_old=qT q_new=qnew minsep=minsep minsep_tol=minsep_tol N=N
         qT = qnew
@@ -260,6 +300,8 @@ requested grading pushes neighboring mapped nodes below `minsep_tol`.
 """
 function multi_kress_graded_nodes_data(::Type{T}, N::Int, corners_in; q=3, minsep_tol=1e-12) where {T<:Real}
     qT = T(q); qT>one(T) || error("Require q>1.")
+    qT = _apply_kress_q_floor(qT)
+    q_start = qT
     corners = _sort_unique_corners(T,corners_in)
     twopi = T(2*pi)
     h = twopi/T(N)
@@ -289,7 +331,10 @@ function multi_kress_graded_nodes_data(::Type{T}, N::Int, corners_in; q=3, minse
             wq[i] = h*jac[i]
         end
         minsep = _min_periodic_spacing_sorted(sort(tmap))
-        minsep>=minsep_tol && return σ,tmap,jac,jac2,wq
+        if minsep>=minsep_tol
+            qT<q_start && _record_kress_q_floor(qT)
+            return σ,tmap,jac,jac2,wq
+        end
         qnew = max(one(T),qT*0.9)
         @warn "Kress grading nodes too close; reducing q." q_old=qT q_new=qnew minsep=minsep minsep_tol=minsep_tol N=N
         qT = qnew

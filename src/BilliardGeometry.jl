@@ -23,6 +23,7 @@ sign of [`domain_fun`](@ref) tells on which side of a curve a point lies.
 """
 module BilliardGeometry
 using StaticArrays 
+using Base.ScopedValues: ScopedValue, with
 using LinearAlgebra
 using CoordinateTransformations, Rotations
 using ForwardDiff
@@ -287,7 +288,7 @@ export area, fundamental_area, corner_angles
 include("quadrature/samplers.jl")
 export LinearNodes, GaussLegendreNodes, FourierNodes, sample_points
 include("quadrature/kressgrading.jl")
-export kress_R!, kress_R_even!, kress_R_odd!, s_mid, kress_graded_nodes_data, multi_kress_graded_nodes_data
+export kress_R!, kress_R_even!, kress_R_odd!, s_mid, kress_graded_nodes_data, multi_kress_graded_nodes_data, with_kress_q_floor, @with_kress_q_floor
 
 include("geometry/billiards/sinai.jl")
 export SinaiBilliard
