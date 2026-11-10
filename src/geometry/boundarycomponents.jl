@@ -158,11 +158,21 @@ globally Kress-graded composite boundary).
 """
 function _global_t_to_segment_u(::Type{T}, comp::Vector, t::T) where {T<:Real}
     lens, cum, Ltot = component_lengths(comp)
+    return _global_t_to_segment_u(T, lens, cum, Ltot, t)
+end
+
+"""
+    _global_t_to_segment_u(::Type{T}, lens, cum, Ltot, t::T) where {T<:Real} → (j::Int, u::T)
+
+Same as the `comp` method with the result of [`component_lengths`](@ref)
+supplied, for evaluation loops over many parameters.
+"""
+function _global_t_to_segment_u(::Type{T}, lens::AbstractVector, cum::AbstractVector, Ltot, t::T) where {T<:Real}
     twopi = T(2*pi)
     s = (t/twopi)*Ltot
     s >= Ltot && return 1, zero(T)
-    j = clamp(searchsortedlast(cum, s), 1, length(comp))
-    while j < length(comp) && s >= cum[j+1]
+    j = clamp(searchsortedlast(cum, s), 1, length(lens))
+    while j < length(lens) && s >= cum[j+1]
         j += 1
     end
     slocal = s - cum[j]
@@ -188,8 +198,18 @@ parameter via the chain rule (`du/dt` constant on each segment).
 * `γtt`: Second derivative with respect to the global parameter.
 """
 function _eval_composite_geom_global_t(::Type{T}, comp::Vector, t::T) where {T<:Real}
-    lens, _, Ltot = component_lengths(comp)
-    j, u = _global_t_to_segment_u(T, comp, t)
+    lens, cum, Ltot = component_lengths(comp)
+    return _eval_composite_geom_global_t(T, comp, lens, cum, Ltot, t)
+end
+
+"""
+    _eval_composite_geom_global_t(::Type{T}, comp::Vector, lens, cum, Ltot, t::T) where {T<:Real} → (xy, γt, γtt)
+
+Same as the `comp` method with the result of [`component_lengths`](@ref)
+supplied, for evaluation loops over many parameters.
+"""
+function _eval_composite_geom_global_t(::Type{T}, comp::Vector, lens::AbstractVector, cum::AbstractVector, Ltot, t::T) where {T<:Real}
+    j, u = _global_t_to_segment_u(T, lens, cum, Ltot, t)
     crv = comp[j]
     xy = curve(crv, u)
     du_dt = lens[j] == zero(T) ? zero(T) : Ltot/(T(2*pi)*lens[j])
