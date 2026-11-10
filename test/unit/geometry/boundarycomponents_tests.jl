@@ -227,7 +227,7 @@ end
     for comp in (bc_square(), bc_triangle(), bc_half_disk())
         lens, cum, Ltot = component_lengths(comp)
         tj = 2 * pi * cum[2] / Ltot                                      # end of the first segment (a junction)
-        for t in (0.0, 1e-9, 0.3, tj, 2.0, pi, 4.4, 2 * pi - 1e-9, 2 * pi)
+        for t in (0.0, 1e-9, 0.3, tj, 2.0, Float64(pi), 4.4, 2 * pi - 1e-9, 2 * pi)
             @test _global_t_to_segment_u(Float64, lens, cum, Ltot, t) == _global_t_to_segment_u(Float64, comp, t)
         end
     end
@@ -285,7 +285,7 @@ end
     for comp in (bc_square(), bc_half_disk(), [CircleSegment(1.7, 2 * pi, 0.0, [0.0, 0.0])])
         lens, cum, Ltot = component_lengths(comp)
         tj = 2 * pi * cum[2] / Ltot                                        # end of the first segment (a junction; the seam for the circle)
-        for t in (0.0, 1e-9, 0.3, tj, 2.0, pi, 4.4, 2 * pi - 1e-9, 2 * pi)
+        for t in (0.0, 1e-9, 0.3, tj, 2.0, Float64(pi), 4.4, 2 * pi - 1e-9, 2 * pi)
             @test _eval_composite_geom_global_t(Float64, comp, lens, cum, Ltot, t) == _eval_composite_geom_global_t(Float64, comp, t)
         end
     end
