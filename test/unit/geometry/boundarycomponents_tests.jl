@@ -1,7 +1,8 @@
 # Unit tests for composite boundary components (a vector of connected curves parametrized by one global periodic parameter):
 #   src/geometry/boundarycomponents.jl   (component_lengths, _junction_angle, _is_true_corner, _component_corner_locations,
 #                                         _component_corner_angles, print_component_junctions, _global_t_to_segment_u,
-#                                         _eval_composite_geom_global_t)
+#                                         _eval_composite_geom_global_t, and their methods taking the precomputed result
+#                                         (lens, cum, Ltot) of component_lengths, which must equal the comp methods exactly)
 #   src/geometry/boundarytypes.jl        (_group_curves_by_domain_id, used here for the grouping of flat curve lists)
 # Reference objects: the right-angle pair of unit lines, the CCW unit square, the CCW right triangle (0,0),(1,0),(0,1), the
 # half disk (arc of the unit circle followed by its diameter) and the full unit circle. For these the junction angles, the
@@ -221,6 +222,31 @@ end
     @test u32 ≈ 0.5f0 atol = bc_ATOL_F32
 end
 
+@testset "_global_t_to_segment_u (precomputed component_lengths)" begin
+    # the method taking (lens, cum, Ltot) is the comp method with the lengths hoisted out of the loop: results are identical
+    for comp in (bc_square(), bc_triangle(), bc_half_disk())
+        lens, cum, Ltot = component_lengths(comp)
+        tj = 2 * pi * cum[2] / Ltot                                      # end of the first segment (a junction)
+        for t in (0.0, 1e-9, 0.3, tj, 2.0, Float64(pi), 4.4, 2 * pi - 1e-9, 2 * pi)
+            @test _global_t_to_segment_u(Float64, lens, cum, Ltot, t) == _global_t_to_segment_u(Float64, comp, t)
+        end
+    end
+
+    # a junction (t = pi / 2 of the square) starts the next segment, t = 0 and t = 2 pi the first one
+    lens, cum, Ltot = component_lengths(bc_square())
+    @test _global_t_to_segment_u(Float64, lens, cum, Ltot, 0.0) == (1, 0.0)
+    @test _global_t_to_segment_u(Float64, lens, cum, Ltot, pi / 2) == (2, 0.0)
+    @test _global_t_to_segment_u(Float64, lens, cum, Ltot, 2 * pi) == (1, 0.0)
+
+    # Float32
+    comp32 = [LineSegment(Float32[0, 0], Float32[1, 0]), LineSegment(Float32[1, 0], Float32[1, 1])]
+    lens32, cum32, Ltot32 = component_lengths(comp32)
+    for t in (0.0f0, 1.0f0, Float32(pi), Float32(3 * pi / 2), 2.0f0 * Float32(pi))
+        @test _global_t_to_segment_u(Float32, lens32, cum32, Ltot32, t) == _global_t_to_segment_u(Float32, comp32, t)
+    end
+    @test @inferred(_global_t_to_segment_u(Float64, lens, cum, Ltot, 1.0)) isa Tuple{Int,Float64}
+end
+
 @testset "_eval_composite_geom_global_t" begin
     # polygon: points of the sides, derivatives with respect to t are the chord times du/dt = L / (2 pi l) = 2 / pi, no curvature
     comp = bc_square()
@@ -252,6 +278,35 @@ end
     @test xyb ≈ SVector(-1.0, 0.0) atol = 1e-7
     xymid, _, _ = _eval_composite_geom_global_t(Float64, hd, 2 * pi * (pi + 1) / (pi + 2))   # middle of the diameter
     @test xymid ≈ SVector(0.0, 0.0) atol = bc_ATOL
+end
+
+@testset "_eval_composite_geom_global_t (precomputed component_lengths)" begin
+    # the method taking (lens, cum, Ltot) returns exactly what the comp method returns: point and both derivatives
+    for comp in (bc_square(), bc_half_disk(), [CircleSegment(1.7, 2 * pi, 0.0, [0.0, 0.0])])
+        lens, cum, Ltot = component_lengths(comp)
+        tj = 2 * pi * cum[2] / Ltot                                        # end of the first segment (a junction; the seam for the circle)
+        for t in (0.0, 1e-9, 0.3, tj, 2.0, Float64(pi), 4.4, 2 * pi - 1e-9, 2 * pi)
+            @test _eval_composite_geom_global_t(Float64, comp, lens, cum, Ltot, t) == _eval_composite_geom_global_t(Float64, comp, t)
+        end
+    end
+
+    # the analytic square values also hold for the hoisted method: t = pi / 4 is the middle of the first side
+    sq = bc_square()
+    lens, cum, Ltot = component_lengths(sq)
+    xy, γt, γtt = _eval_composite_geom_global_t(Float64, sq, lens, cum, Ltot, pi / 4)
+    @test xy ≈ SVector(0.5, 0.0) atol = bc_ATOL
+    @test γt ≈ SVector(2 / pi, 0.0) atol = bc_ATOL
+    @test γtt == SVector(0.0, 0.0)
+    # the junction belongs to the next side, the end of the period wraps to the start of the first side
+    @test _eval_composite_geom_global_t(Float64, sq, lens, cum, Ltot, pi / 2)[1] ≈ SVector(1.0, 0.0) atol = bc_ATOL
+    @test _eval_composite_geom_global_t(Float64, sq, lens, cum, Ltot, 2 * pi)[1] ≈ SVector(0.0, 0.0) atol = bc_ATOL
+
+    # Float32
+    comp32 = [LineSegment(Float32[0, 0], Float32[1, 0]), LineSegment(Float32[1, 0], Float32[1, 1])]
+    lens32, cum32, Ltot32 = component_lengths(comp32)
+    for t in (0.0f0, 1.0f0, Float32(3 * pi / 2), 2.0f0 * Float32(pi))
+        @test _eval_composite_geom_global_t(Float32, comp32, lens32, cum32, Ltot32, t) == _eval_composite_geom_global_t(Float32, comp32, t)
+    end
 end
 
 @testset "_group_curves_by_domain_id" begin
